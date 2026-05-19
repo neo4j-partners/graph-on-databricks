@@ -116,11 +116,12 @@ with open(sql_file) as f:
     text = f.read()
 text = text.replace("${catalog}", catalog).replace("${schema}", schema_name)
 
-# Split on semicolons; skip blank or comment-only blocks
+# Strip comment lines before splitting so semicolons inside comments don't
+# become statement boundaries.
+text = "\n".join(l for l in text.split("\n") if not l.strip().startswith("--"))
 statements = []
 for raw in text.split(";"):
-    lines = [l for l in raw.split("\n") if not l.strip().startswith("--")]
-    stmt = "\n".join(lines).strip()
+    stmt = raw.strip()
     if stmt:
         statements.append(stmt)
 
