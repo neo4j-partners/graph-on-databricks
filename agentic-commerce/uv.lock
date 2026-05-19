@@ -7,9 +7,6 @@ resolution-markers = [
     "python_full_version >= '3.15'",
 ]
 
-[options]
-exclude-newer = "2026-05-09T00:00:00Z"
-
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -577,15 +574,15 @@ wheels = [
 
 [[package]]
 name = "databricks-job-runner"
-version = "0.4.8"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "databricks-sdk" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/a4/2eca16546967e0dd1a12d2b5ac04b49318b56ae4c7fb7c5fe6279e885790/databricks_job_runner-0.4.8.tar.gz", hash = "sha256:9daf3a66c48a42aaf89c79d08eefd7efe63d2cfae45a47ce32661bdd88a8ed1f", size = 27802, upload-time = "2026-04-25T01:39:41.905Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/ff/7fbe0b3dfa1b2bb76cdcd889bfabe3ec8afa31279f6b1122686bac3e18a9/databricks_job_runner-0.5.1.tar.gz", hash = "sha256:1ccc508d7a7d61afd57f2b97c7c1f22a359ab59062d056471ec53c69850849d1", size = 37861, upload-time = "2026-05-16T05:19:44.215Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/8d/a81fb93bbbfa589eb869be0b04dfbcb57d09feb6707de010d9974908c293/databricks_job_runner-0.4.8-py3-none-any.whl", hash = "sha256:0a1681039afe38e7a3a7c565fc827ce6ecbefb74819272f55d7a6162dafa0536", size = 34538, upload-time = "2026-04-25T01:39:40.623Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/ec/c6abaf83a165a2a8eeaecf53748ed3f40ff8a5c928c3b778439706adabc8/databricks_job_runner-0.5.1-py3-none-any.whl", hash = "sha256:6994495db0bc3e354152d856a639c211ff6ab3062266a8a70edd36bf45654b2a", size = 47819, upload-time = "2026-05-16T05:19:42.837Z" },
 ]
 
 [[package]]
@@ -3067,7 +3064,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "databricks-agents", specifier = ">=0.15.0" },
-    { name = "databricks-job-runner", specifier = ">=0.4.3" },
+    { name = "databricks-job-runner", specifier = ">=0.5.1" },
     { name = "databricks-langchain", specifier = ">=0.15.0" },
     { name = "databricks-sdk", specifier = ">=0.40.0" },
     { name = "langchain-core", specifier = ">=0.3.0" },

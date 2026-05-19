@@ -1,4 +1,4 @@
--- Gold table schema for graph-on-databricks.graph-enriched-schema
+-- Gold table schema for the graph-enriched finance pipeline.
 --
 -- Defines the three gold tables written by pull_gold_tables.py, with
 -- Unity Catalog column-level comments. Column descriptions are the primary
@@ -6,6 +6,8 @@
 --
 -- Executed by pull_gold_tables.py before writing data, on every pipeline run.
 -- Placeholders ${catalog} and ${schema} are substituted at runtime.
+-- ${catalog} resolves to the gold catalog (GOLD_CATALOG, falling back to
+-- the legacy single CATALOG when GOLD_CATALOG is unset).
 --
 -- Schema is intentional and versioned here. Any column change (name, type,
 -- description) must be reflected in both this file and pull_gold_tables.py.

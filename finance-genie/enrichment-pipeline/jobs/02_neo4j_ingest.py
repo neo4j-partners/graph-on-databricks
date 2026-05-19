@@ -36,7 +36,9 @@ from _neo4j_secrets import load_neo4j_opts  # noqa: E402
 # --------------------------------------------------------------------------- #
 # 2. Config + Neo4j credentials                                                #
 # --------------------------------------------------------------------------- #
-CATALOG = os.environ["CATALOG"]
+# Reads the five raw (silver) business tables. Silver catalog falls back to
+# the legacy single CATALOG when SILVER_CATALOG is unset.
+CATALOG = os.environ.get("SILVER_CATALOG") or os.environ["CATALOG"]
 SCHEMA = os.environ["SCHEMA"]
 SECRET_SCOPE = os.environ["NEO4J_SECRET_SCOPE"]
 

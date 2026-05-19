@@ -88,7 +88,11 @@ def main() -> None:
     # ----------------------------------------------------------------------- #
     # Config + Neo4j credentials                                               #
     # ----------------------------------------------------------------------- #
-    CATALOG = os.environ["CATALOG"]
+    # Silver source tables are read from SILVER_CATALOG; gold tables are
+    # created/written under GOLD_CATALOG. Each falls back to the legacy single
+    # CATALOG when its split-catalog override is unset.
+    CATALOG = os.environ.get("SILVER_CATALOG") or os.environ["CATALOG"]
+    GOLD_CATALOG = os.environ.get("GOLD_CATALOG") or os.environ["CATALOG"]
     SCHEMA = os.environ["SCHEMA"]
     SECRET_SCOPE = os.environ["NEO4J_SECRET_SCOPE"]
 
@@ -99,7 +103,7 @@ def main() -> None:
     # ----------------------------------------------------------------------- #
     spark = SparkSession.builder.getOrCreate()
 
-    _apply_schema(spark, CATALOG, SCHEMA)
+    _apply_schema(spark, GOLD_CATALOG, SCHEMA)
 
     # ----------------------------------------------------------------------- #
     # Read GDS features from Neo4j Account nodes                               #
@@ -133,7 +137,7 @@ def main() -> None:
     #                                                                           #
     # gold_df is cached and reused in later sections; no write-then-read cycle. #
     # ----------------------------------------------------------------------- #
-    GOLD_ACCOUNTS_TABLE = f"`{CATALOG}`.`{SCHEMA}`.gold_accounts"
+    GOLD_ACCOUNTS_TABLE = f"`{GOLD_CATALOG}`.`{SCHEMA}`.gold_accounts"
 
     account_links_df = spark.table(f"`{CATALOG}`.`{SCHEMA}`.account_links").cache()
     transactions_df = spark.table(f"`{CATALOG}`.`{SCHEMA}`.transactions").cache()
@@ -263,7 +267,7 @@ def main() -> None:
     # Both sides are guarded non-null before equality so pairs involving an    #
     # unscored account come out as false, not null.                            #
     # ----------------------------------------------------------------------- #
-    GOLD_PAIRS_TABLE = f"`{CATALOG}`.`{SCHEMA}`.gold_account_similarity_pairs"
+    GOLD_PAIRS_TABLE = f"`{GOLD_CATALOG}`.`{SCHEMA}`.gold_account_similarity_pairs"
 
     community_lookup = gold_df.select("account_id", "community_id")
 
@@ -336,7 +340,7 @@ def main() -> None:
     # that landed in the same Louvain community as ring 3 to be selected as    #
     # top_account_id instead of an actual ring member.                         #
     # ----------------------------------------------------------------------- #
-    GOLD_RING_COMMUNITIES_TABLE = f"`{CATALOG}`.`{SCHEMA}`.gold_fraud_ring_communities"
+    GOLD_RING_COMMUNITIES_TABLE = f"`{GOLD_CATALOG}`.`{SCHEMA}`.gold_fraud_ring_communities"
 
     ring_aggregates = (
         gold_df

@@ -1,0 +1,35 @@
+[project]
+name = "sql-semantics"
+version = "0.1.0"
+description = "External dbxcarta preset sample for the Finance Genie Lakehouse data"
+authors = [{ name = "Ryan Knight" }]
+requires-python = ">=3.12"
+dependencies = [
+    "dbxcarta-spark",
+    "dbxcarta-client",
+    "databricks-sdk>=0.40",
+    "python-dotenv",
+]
+
+[project.scripts]
+sql-semantics-upload-questions = "sql_semantics.upload_questions:main"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+dbxcarta-spark = { path = "../../dbxcarta/packages/dbxcarta-spark", editable = true }
+dbxcarta-client = { path = "../../dbxcarta/packages/dbxcarta-client", editable = true }
+
+[tool.pytest.ini_options]
+addopts = "-m 'not live'"
+markers = [
+    "live: tests that require a live Databricks profile, Neo4j, and a previously-loaded catalog (default pytest skips these)",
+]

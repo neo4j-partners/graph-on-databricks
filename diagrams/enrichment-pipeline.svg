@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800" font-family="Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="1000" height="800" fill="#ffffff"/>
+
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#495057"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1971c2"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9c36b5"/>
+    </marker>
+  </defs>
+
+  <text x="500" y="42" font-size="24" font-weight="bold" text-anchor="middle" fill="#1e1e1e">Enrichment Pipeline (Gold Tables) Service Topology</text>
+
+  <!-- Client box -->
+  <rect x="120" y="80" width="800" height="60" rx="10" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+  <text x="520" y="115" font-size="16" text-anchor="middle" fill="#495057">&#128100; Fraud Analyst App Client</text>
+
+  <!-- Unity Catalog box -->
+  <rect x="120" y="230" width="460" height="130" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="3"/>
+  <text x="350" y="252" font-size="14" text-anchor="middle" fill="#1971c2">&#128451; Databricks Unity Catalog</text>
+  <rect x="140" y="280" width="200" height="60" rx="8" fill="#ffffff" stroke="#1971c2" stroke-width="2"/>
+  <text x="240" y="315" font-size="13" text-anchor="middle" fill="#1971c2">Silver Delta tables</text>
+  <rect x="380" y="280" width="180" height="60" rx="8" fill="#ffec99" stroke="#1971c2" stroke-width="2"/>
+  <text x="470" y="315" font-size="13" text-anchor="middle" fill="#1971c2">Gold Delta</text>
+
+  <!-- Genie box -->
+  <rect x="680" y="230" width="240" height="130" rx="10" fill="#c5f6fa" stroke="#1098ad" stroke-width="3"/>
+  <text x="800" y="278" font-size="14" text-anchor="middle" fill="#0c8599">&#129504; Databricks Genie</text>
+  <text x="800" y="300" font-size="14" text-anchor="middle" fill="#0c8599">SQL Warehouse</text>
+  <text x="800" y="322" font-size="14" text-anchor="middle" fill="#0c8599">Dashboards</text>
+
+  <!-- Compute write -->
+  <rect x="120" y="440" width="240" height="70" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="2"/>
+  <text x="240" y="470" font-size="14" text-anchor="middle" fill="#1971c2">&#9881; Databricks Classic</text>
+  <text x="240" y="490" font-size="14" text-anchor="middle" fill="#1971c2">Compute (job)</text>
+
+  <!-- Compute read -->
+  <rect x="420" y="440" width="240" height="70" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="2"/>
+  <text x="540" y="470" font-size="14" text-anchor="middle" fill="#1971c2">&#9881; Databricks Classic</text>
+  <text x="540" y="490" font-size="14" text-anchor="middle" fill="#1971c2">Compute (job)</text>
+
+  <!-- Connector write -->
+  <rect x="120" y="560" width="240" height="70" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="2"/>
+  <text x="240" y="590" font-size="14" text-anchor="middle" fill="#1971c2">&#128279; Neo4j Spark</text>
+  <text x="240" y="610" font-size="14" text-anchor="middle" fill="#1971c2">Connector (write)</text>
+
+  <!-- Connector read -->
+  <rect x="420" y="560" width="240" height="70" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="2"/>
+  <text x="540" y="590" font-size="14" text-anchor="middle" fill="#1971c2">&#128279; Neo4j Spark</text>
+  <text x="540" y="610" font-size="14" text-anchor="middle" fill="#1971c2">Connector (read)</text>
+
+  <!-- Neo4j box -->
+  <rect x="120" y="680" width="540" height="70" rx="10" fill="#f3d9fa" stroke="#9c36b5" stroke-width="3"/>
+  <text x="390" y="720" font-size="16" text-anchor="middle" fill="#9c36b5">&#128451; Neo4j (Graph + GDS)</text>
+
+  <!-- Arrows -->
+  <!-- client -> UC -->
+  <line x1="320" y1="148" x2="320" y2="222" stroke="#495057" stroke-width="2" marker-end="url(#arrowGray)"/>
+  <rect x="278" y="160" width="84" height="20" fill="#ffffff"/>
+  <text x="320" y="174" font-size="12" text-anchor="middle" fill="#495057">reads Delta</text>
+
+  <!-- client -> Genie -->
+  <line x1="800" y1="148" x2="800" y2="222" stroke="#495057" stroke-width="2" marker-end="url(#arrowGray)"/>
+  <rect x="752" y="160" width="96" height="20" fill="#ffffff"/>
+  <text x="800" y="174" font-size="12" text-anchor="middle" fill="#495057">asks questions</text>
+
+  <!-- Gold -> Genie -->
+  <line x1="568" y1="310" x2="672" y2="310" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- UC -> compute write -->
+  <line x1="240" y1="368" x2="240" y2="432" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <rect x="218" y="382" width="44" height="20" fill="#ffffff"/>
+  <text x="240" y="396" font-size="12" text-anchor="middle" fill="#1971c2">read</text>
+
+  <!-- compute write -> connector write -->
+  <line x1="240" y1="518" x2="240" y2="552" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- connector write -> Neo4j -->
+  <line x1="240" y1="638" x2="240" y2="672" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- Neo4j -> connector read -->
+  <line x1="540" y1="672" x2="540" y2="638" stroke="#9c36b5" stroke-width="2" marker-end="url(#arrowPurple)"/>
+
+  <!-- connector read -> compute read -->
+  <line x1="540" y1="552" x2="540" y2="518" stroke="#9c36b5" stroke-width="2" marker-end="url(#arrowPurple)"/>
+
+  <!-- compute read -> Gold -->
+  <line x1="540" y1="432" x2="540" y2="348" stroke="#9c36b5" stroke-width="2" marker-end="url(#arrowPurple)"/>
+  <rect x="518" y="382" width="48" height="20" fill="#ffffff"/>
+  <text x="542" y="396" font-size="12" text-anchor="middle" fill="#9c36b5">write</text>
+</svg>

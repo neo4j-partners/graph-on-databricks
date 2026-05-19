@@ -32,7 +32,9 @@ from _gold_table_checks import run_gold_table_checks  # noqa: E402
 
 
 def main() -> None:
-    catalog = os.environ["CATALOG"]
+    # Validates the three gold tables; gold catalog falls back to the legacy
+    # single CATALOG when GOLD_CATALOG is unset.
+    catalog = os.environ.get("GOLD_CATALOG") or os.environ["CATALOG"]
     schema = os.environ["SCHEMA"]
     ground_truth_path = os.environ["GROUND_TRUTH_PATH"]
     results_volume_dir = os.environ["RESULTS_VOLUME_DIR"].rstrip("/")

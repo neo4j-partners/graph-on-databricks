@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="900" viewBox="0 0 1080 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#495057"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1971c2"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9c36b5"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="900" fill="#ffffff"/>
+
+  <text x="540" y="48" text-anchor="middle" font-size="24" font-weight="600" fill="#1e1e1e">Agentic Commerce Agent (Live Graph + Memory)</text>
+
+  <!-- Client box -->
+  <rect x="260" y="90" width="460" height="70" rx="10" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+  <text x="490" y="130" text-anchor="middle" font-size="15" fill="#495057">Databricks Apps Agentic Commerce Client</text>
+
+  <!-- Serving endpoint box -->
+  <rect x="240" y="240" width="340" height="110" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="3"/>
+  <text x="410" y="288" text-anchor="middle" font-size="15" fill="#1971c2">Databricks Model Serving endpoint</text>
+  <text x="410" y="310" text-anchor="middle" font-size="15" fill="#1971c2">(MLflow ChatAgent)</text>
+
+  <!-- Foundation Model box -->
+  <rect x="680" y="240" width="340" height="110" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="3"/>
+  <text x="850" y="288" text-anchor="middle" font-size="15" fill="#1971c2">Foundation Model API (Claude Sonnet)</text>
+  <text x="850" y="310" text-anchor="middle" font-size="15" fill="#1971c2">BGE Embeddings</text>
+
+  <!-- Neo4j box -->
+  <rect x="240" y="440" width="460" height="80" rx="10" fill="#f3d9fa" stroke="#9c36b5" stroke-width="3"/>
+  <text x="470" y="485" text-anchor="middle" font-size="16" font-weight="600" fill="#9c36b5">Neo4j (Knowledge Graph + Memory)</text>
+
+  <!-- Classic Compute box -->
+  <rect x="300" y="610" width="340" height="80" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="3"/>
+  <text x="470" y="655" text-anchor="middle" font-size="15" fill="#1971c2">Databricks Classic Compute (job)</text>
+
+  <!-- Unity Catalog box -->
+  <rect x="240" y="770" width="460" height="70" rx="10" fill="#dbe4ff" stroke="#1971c2" stroke-width="3"/>
+  <text x="470" y="810" text-anchor="middle" font-size="16" font-weight="600" fill="#1971c2">Databricks Unity Catalog: Delta tables</text>
+
+  <!-- Arrow: client -> serving -->
+  <line x1="410" y1="160" x2="410" y2="234" stroke="#495057" stroke-width="2" marker-end="url(#arrowGray)"/>
+
+  <!-- Arrows: serving -> foundation model (two) -->
+  <line x1="580" y1="278" x2="674" y2="278" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <line x1="580" y1="312" x2="674" y2="312" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- Arrow: serving -> neo4j -->
+  <line x1="410" y1="350" x2="410" y2="434" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <rect x="420" y="378" width="172" height="20" fill="#ffffff"/>
+  <text x="424" y="393" font-size="13" fill="#1971c2">neo4j driver (live Cypher)</text>
+
+  <!-- Arrow: compute -> neo4j (upward) -->
+  <line x1="470" y1="610" x2="470" y2="526" stroke="#9c36b5" stroke-width="2" marker-end="url(#arrowPurple)"/>
+  <rect x="480" y="558" width="248" height="20" fill="#ffffff"/>
+  <text x="484" y="573" font-size="13" fill="#9c36b5">Neo4j Spark Connector (bulk load)</text>
+
+  <!-- Arrow: unity catalog -> compute (upward) -->
+  <line x1="470" y1="770" x2="470" y2="696" stroke="#1971c2" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <rect x="480" y="723" width="44" height="20" fill="#ffffff"/>
+  <text x="484" y="738" font-size="13" fill="#1971c2">read</text>
+</svg>

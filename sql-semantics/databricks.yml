@@ -1,0 +1,105 @@
+bundle:
+  name: sql-semantics
+
+variables:
+  cluster_id:
+    description: ID of a preprovisioned classic single-user cluster (data_security_mode=SINGLE_USER). Required at deploy time. Cloud-agnostic; the cluster owns the Spark/Scala runtime and node type.
+  warehouse_id:
+    description: SQL warehouse ID for catalog checks and client evaluation runs. Required at deploy time.
+  dbxcarta_version:
+    description: dbxcarta version to install on the cluster. Tracks the pyproject.toml floor.
+    default: 0.2.41
+  preset_spec:
+    description: dbxcarta preset import spec consumed by the entry-point bootstrap.
+    default: sql_semantics:preset
+  secret_scope:
+    description: Databricks secret scope holding NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD.
+    default: dbxcarta-neo4j
+  neo4j_connector_maven:
+    description: Neo4j Spark Connector Maven coordinate. Ingest job only.
+    default: org.neo4j:neo4j-connector-apache-spark_2.12:5.3.6_for_spark_3
+
+artifacts:
+  sql_semantics_wheel:
+    type: whl
+    path: .
+    build: uv build --wheel
+
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+resources:
+  jobs:
+    sql_semantics_ingest:
+      name: "[${bundle.target}] sql-semantics ingest"
+      tasks:
+        - task_key: ingest
+          existing_cluster_id: ${var.cluster_id}
+          python_wheel_task:
+            package_name: dbxcarta-spark
+            entry_point: dbxcarta-ingest
+            parameters:
+              - "DBXCARTA_PRESET={{job.parameters.preset_spec}}"
+              - "DATABRICKS_SECRET_SCOPE={{job.parameters.databricks_secret_scope}}"
+              - "DATABRICKS_WAREHOUSE_ID={{job.parameters.databricks_warehouse_id}}"
+          libraries:
+            - pypi:
+                package: "dbxcarta-spark==${var.dbxcarta_version}"
+            - pypi:
+                package: "dbxcarta-presets==${var.dbxcarta_version}"
+            - whl: ./dist/*.whl
+            - maven:
+                coordinates: ${var.neo4j_connector_maven}
+          timeout_seconds: 7200
+      parameters:
+        - name: preset_spec
+          default: ${var.preset_spec}
+        - name: databricks_secret_scope
+          default: ${var.secret_scope}
+        - name: databricks_warehouse_id
+          default: ${var.warehouse_id}
+
+    sql_semantics_client:
+      name: "[${bundle.target}] sql-semantics client"
+      tasks:
+        - task_key: upload_questions
+          existing_cluster_id: ${var.cluster_id}
+          python_wheel_task:
+            package_name: sql-semantics
+            entry_point: sql-semantics-upload-questions
+          libraries:
+            - pypi:
+                package: "dbxcarta-presets==${var.dbxcarta_version}"
+            - whl: ./dist/*.whl
+          timeout_seconds: 600
+        - task_key: client
+          depends_on:
+            - task_key: upload_questions
+          existing_cluster_id: ${var.cluster_id}
+          python_wheel_task:
+            package_name: dbxcarta-client
+            entry_point: dbxcarta-client
+            parameters:
+              - "DBXCARTA_PRESET={{job.parameters.preset_spec}}"
+              - "DATABRICKS_SECRET_SCOPE={{job.parameters.databricks_secret_scope}}"
+              - "DATABRICKS_WAREHOUSE_ID={{job.parameters.databricks_warehouse_id}}"
+          libraries:
+            - pypi:
+                package: "dbxcarta-client==${var.dbxcarta_version}"
+            - pypi:
+                package: "dbxcarta-presets==${var.dbxcarta_version}"
+            - whl: ./dist/*.whl
+          timeout_seconds: 3600
+      parameters:
+        - name: preset_spec
+          default: ${var.preset_spec}
+        - name: databricks_secret_scope
+          default: ${var.secret_scope}
+        - name: databricks_warehouse_id
+          default: ${var.warehouse_id}

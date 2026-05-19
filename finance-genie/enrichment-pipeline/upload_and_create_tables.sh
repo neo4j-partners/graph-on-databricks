@@ -41,7 +41,11 @@ if [[ -z "${DATABRICKS_PROFILE:-}" ]]; then
   exit 1
 fi
 PROFILE="${DATABRICKS_PROFILE}"
-CATALOG="${DATABRICKS_CATALOG:-graph-on-databricks}"
+# Silver catalog precedence: SILVER_CATALOG → CATALOG → DATABRICKS_CATALOG →
+# literal fallback. With all three unset this is byte-for-byte the legacy
+# single-CATALOG behavior. This script only creates the five raw (silver)
+# business tables, so the resolved value is the silver catalog.
+CATALOG="${SILVER_CATALOG:-${CATALOG:-${DATABRICKS_CATALOG:-graph-on-databricks}}}"
 SCHEMA="${DATABRICKS_SCHEMA:-graph-enriched-schema}"
 VOLUME="${DATABRICKS_VOLUME:-graph-enriched-volume}"
 VOLUME_PATH="/Volumes/${CATALOG}/${SCHEMA}/${VOLUME}"
@@ -112,11 +116,12 @@ with open(sql_file) as f:
     text = f.read()
 text = text.replace("${catalog}", catalog).replace("${schema}", schema_name)
 
-# Split on semicolons; skip blank or comment-only blocks
+# Strip comment lines before splitting so semicolons inside comments don't
+# become statement boundaries.
+text = "\n".join(l for l in text.split("\n") if not l.strip().startswith("--"))
 statements = []
 for raw in text.split(";"):
-    lines = [l for l in raw.split("\n") if not l.strip().startswith("--")]
-    stmt = "\n".join(lines).strip()
+    stmt = raw.strip()
     if stmt:
         statements.append(stmt)
 

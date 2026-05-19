@@ -5,7 +5,7 @@ description = "Databricks Agentic Commerce assistant with Neo4j knowledge graph,
 requires-python = ">=3.12"
 dependencies = [
     "databricks-agents>=0.15.0",
-    "databricks-job-runner>=0.4.3",
+    "databricks-job-runner>=0.5.1",
     "databricks-langchain>=0.15.0",
     "databricks-sdk>=0.40.0",
     "langchain-core>=0.3.0",
