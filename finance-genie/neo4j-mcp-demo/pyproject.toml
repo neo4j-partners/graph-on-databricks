@@ -4,11 +4,11 @@ version = "0.1.0"
 description = "CLI-driven Databricks setup for a Neo4j MCP server exposed through Unity Catalog HTTP connections."
 requires-python = ">=3.12"
 dependencies = [
-    "databricks-agents>=1.1.0",
+    "databricks-agents>=1.10.2",
     "databricks-job-runner>=0.4.3",
     "databricks-langchain",
     "databricks-mcp",
-    "databricks-sdk>=0.40",
+    "databricks-sdk>=0.108.0",
     "langchain-core",
     "langgraph",
     "langgraph-prebuilt",
