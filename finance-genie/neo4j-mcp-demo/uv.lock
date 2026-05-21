@@ -589,15 +589,15 @@ wheels = [
 
 [[package]]
 name = "databricks-job-runner"
-version = "0.4.8"
+version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "databricks-sdk" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/a4/2eca16546967e0dd1a12d2b5ac04b49318b56ae4c7fb7c5fe6279e885790/databricks_job_runner-0.4.8.tar.gz", hash = "sha256:9daf3a66c48a42aaf89c79d08eefd7efe63d2cfae45a47ce32661bdd88a8ed1f", size = 27802, upload-time = "2026-04-25T01:39:41.905Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/76/356c4be32c7e858b6d0f3678f17be2d213eec1b4c8f094805cac1ddadce1/databricks_job_runner-0.6.2.tar.gz", hash = "sha256:ce8a6cf31a5ca319a91181bf947eeaf352f70f64d7d743197e89ac754671afad", size = 36718, upload-time = "2026-05-17T03:22:32.123Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/8d/a81fb93bbbfa589eb869be0b04dfbcb57d09feb6707de010d9974908c293/databricks_job_runner-0.4.8-py3-none-any.whl", hash = "sha256:0a1681039afe38e7a3a7c565fc827ce6ecbefb74819272f55d7a6162dafa0536", size = 34538, upload-time = "2026-04-25T01:39:40.623Z" },
+    { url = "https://files.pythonhosted.org/packages/17/be/996d649afd700532591f5ba25bafbb0df7e9c4c545f80bf2326b6df787f1/databricks_job_runner-0.6.2-py3-none-any.whl", hash = "sha256:35ff83bc8d8a8a5b06ccfc2300d06a775d4564b959af319f7e9d8236cf47ace2", size = 46455, upload-time = "2026-05-17T03:22:30.573Z" },
 ]
 
 [[package]]
@@ -658,16 +658,16 @@ wheels = [
 
 [[package]]
 name = "databricks-sdk"
-version = "0.108.0"
+version = "0.110.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "google-auth" },
     { name = "protobuf" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/13/05a1dbf9c2c43639b032128c18227953777a2a2da66e4b97d1914ceacb68/databricks_sdk-0.108.0.tar.gz", hash = "sha256:c43f1099b8228e5e9ecb4569381ec8f49b739129d35a826be72a61bc5eaaf1a6", size = 940266, upload-time = "2026-05-12T09:04:03.75Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/0f/488d61ece084f70a6d4d0ab8b5e38b0902e0b9029d0b72cde99e3f2c6b4a/databricks_sdk-0.110.0.tar.gz", hash = "sha256:b62d806982b37f8160f700d657c37b3bd586c649eb5c8c4c1216090d888c5820", size = 945261, upload-time = "2026-05-19T09:18:46.23Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/38/9b59ebb34ccaef79095f168eff1fab5f8d645b961680c7bcbc320434acd0/databricks_sdk-0.108.0-py3-none-any.whl", hash = "sha256:010528183abb475acf7f4058e331049dc7932e73a314d9808b123f5cbb722579", size = 887647, upload-time = "2026-05-12T09:04:01.771Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/23/7c2a827890ab120ac349847ec17ab5a37eb4e3bf8f1d0989fd9eec0c1e6a/databricks_sdk-0.110.0-py3-none-any.whl", hash = "sha256:8a23db05be7a304bea43b4fa78b437051ed0f3755b19594429c649ee4159b546", size = 892096, upload-time = "2026-05-19T09:18:44.313Z" },
 ]
 
 [[package]]
@@ -1544,7 +1544,7 @@ wheels = [
 
 [[package]]
 name = "langgraph"
-version = "1.2.0"
+version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
@@ -1554,9 +1554,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/58/61/d5d25e783035aa307d289b37e082258a6061c0fb4caa4a284f3bf1e87169/langgraph-1.2.0.tar.gz", hash = "sha256:4a9baaf62afc5d5f63144a50095140a34b9aa9b7cea695d25326d564775348e7", size = 690248, upload-time = "2026-05-12T03:46:39.164Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/8e/34a57e338a319e3b32c1bd183c2a9a04f7f35d683d3f3d8f597f6eacbc4e/langgraph-1.2.1.tar.gz", hash = "sha256:28314f844678d9d307cbd63e7b48b0145bf17177d84b40ee2921061e07b6f966", size = 693750, upload-time = "2026-05-21T18:33:07.478Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f6/e8/e3304ac0015c2bdb04ad9785e4ed65c788855ce7857ce6104dd2f5d322db/langgraph-1.2.0-py3-none-any.whl", hash = "sha256:03fd5895a8d4b70db1ff63ebc3bacead29dd20cd794a8b1a483e7ec9018f7a65", size = 234262, upload-time = "2026-05-12T03:46:37.971Z" },
+    { url = "https://files.pythonhosted.org/packages/73/8c/313912e26866893bd15be9b4ea3442dc86f69270b0ad01a4961d1eba7118/langgraph-1.2.1-py3-none-any.whl", hash = "sha256:5cc4020de8f1e2a048d773f6e9128646a2af8c68a8067ab9cab177a2fcc8d221", size = 235317, upload-time = "2026-05-21T18:33:05.687Z" },
 ]
 
 [[package]]
@@ -1997,10 +1997,10 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "databricks-agents", specifier = ">=1.10.2" },
-    { name = "databricks-job-runner", specifier = ">=0.4.3" },
+    { name = "databricks-job-runner", specifier = ">=0.6.2" },
     { name = "databricks-langchain" },
     { name = "databricks-mcp" },
-    { name = "databricks-sdk", specifier = ">=0.108.0" },
+    { name = "databricks-sdk", specifier = ">=0.110.0" },
     { name = "langchain-core" },
     { name = "langgraph" },
     { name = "langgraph-prebuilt" },
@@ -2913,7 +2913,7 @@ wheels = [
 
 [[package]]
 name = "requests"
-version = "2.34.1"
+version = "2.34.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -2921,9 +2921,9 @@ dependencies = [
     { name = "idna" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/24/36/7180e7f077c38108945dbbdf60fe04db681c3feb6e96419f8c6dc8723741/requests-2.34.1.tar.gz", hash = "sha256:0fc5669f2b69704449fe1552360bd2a73a54512dfd03e65529157f1513322beb", size = 142783, upload-time = "2026-05-13T19:20:24.662Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/5a/4a949d170476de3c04ac036b5466422fbcbf348a917d8042eedf2cac7d1b/requests-2.34.1-py3-none-any.whl", hash = "sha256:bf38a3ff993960d3dd819c08862c40b3c703306eb7c744fcd9f4ddbb95b548f0", size = 73085, upload-time = "2026-05-13T19:20:22.827Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
 ]
 
 [[package]]
