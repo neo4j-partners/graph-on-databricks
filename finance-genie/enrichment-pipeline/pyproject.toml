@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Synthetic fraud dataset generator, verifier, and Databricks job runner for the finance-genie graph-enriched lakehouse demo."
 requires-python = ">=3.12"
 dependencies = [
-    "databricks-job-runner>=0.4.8",
-    "databricks-sdk>=0.108.0",
+    "databricks-job-runner>=0.6.2",
+    "databricks-sdk>=0.110.0",
     "databricks-tools-core",
     "neo4j",
     "faker>=40.18.0",
