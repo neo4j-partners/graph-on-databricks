@@ -265,29 +265,29 @@ wheels = [
 
 [[package]]
 name = "databricks-job-runner"
-version = "0.4.8"
+version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "databricks-sdk" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/a4/2eca16546967e0dd1a12d2b5ac04b49318b56ae4c7fb7c5fe6279e885790/databricks_job_runner-0.4.8.tar.gz", hash = "sha256:9daf3a66c48a42aaf89c79d08eefd7efe63d2cfae45a47ce32661bdd88a8ed1f", size = 27802, upload-time = "2026-04-25T01:39:41.905Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/76/356c4be32c7e858b6d0f3678f17be2d213eec1b4c8f094805cac1ddadce1/databricks_job_runner-0.6.2.tar.gz", hash = "sha256:ce8a6cf31a5ca319a91181bf947eeaf352f70f64d7d743197e89ac754671afad", size = 36718, upload-time = "2026-05-17T03:22:32.123Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/8d/a81fb93bbbfa589eb869be0b04dfbcb57d09feb6707de010d9974908c293/databricks_job_runner-0.4.8-py3-none-any.whl", hash = "sha256:0a1681039afe38e7a3a7c565fc827ce6ecbefb74819272f55d7a6162dafa0536", size = 34538, upload-time = "2026-04-25T01:39:40.623Z" },
+    { url = "https://files.pythonhosted.org/packages/17/be/996d649afd700532591f5ba25bafbb0df7e9c4c545f80bf2326b6df787f1/databricks_job_runner-0.6.2-py3-none-any.whl", hash = "sha256:35ff83bc8d8a8a5b06ccfc2300d06a775d4564b959af319f7e9d8236cf47ace2", size = 46455, upload-time = "2026-05-17T03:22:30.573Z" },
 ]
 
 [[package]]
 name = "databricks-sdk"
-version = "0.108.0"
+version = "0.112.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "google-auth" },
     { name = "protobuf" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/13/05a1dbf9c2c43639b032128c18227953777a2a2da66e4b97d1914ceacb68/databricks_sdk-0.108.0.tar.gz", hash = "sha256:c43f1099b8228e5e9ecb4569381ec8f49b739129d35a826be72a61bc5eaaf1a6", size = 940266, upload-time = "2026-05-12T09:04:03.75Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/b7/8b5579a3abce4c8b3b677bcab757d712df7bf4fff732c85dfa1d800180f1/databricks_sdk-0.112.0.tar.gz", hash = "sha256:39ed2fc6a0a1110e64ad8903a471daea0570ca544811ba88163bbb199a67dea7", size = 954943, upload-time = "2026-05-27T09:16:24.816Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/38/9b59ebb34ccaef79095f168eff1fab5f8d645b961680c7bcbc320434acd0/databricks_sdk-0.108.0-py3-none-any.whl", hash = "sha256:010528183abb475acf7f4058e331049dc7932e73a314d9808b123f5cbb722579", size = 887647, upload-time = "2026-05-12T09:04:01.771Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/c4/d7f2bc1125a0e68a3554cb96e656b117980633656921cbc03830d8839cc1/databricks_sdk-0.112.0-py3-none-any.whl", hash = "sha256:2121c0852eef39c20d6381e6a2ac52f580610b268891722e39a3b53d92da78b7", size = 901369, upload-time = "2026-05-27T09:16:22.893Z" },
 ]
 
 [[package]]
@@ -321,14 +321,14 @@ wheels = [
 
 [[package]]
 name = "faker"
-version = "40.18.0"
+version = "40.19.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/18/06/70886e82d8f1d2b73454f3a7c1b7405300128df22e70d85a828951366932/faker-40.18.0.tar.gz", hash = "sha256:2207575c0e8f90e6ccd6dbef764de875c614d16d3db4eee9712d9a00087f2e70", size = 1968243, upload-time = "2026-05-14T16:43:04.834Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/01/28c8ddae8caaf82c929655000963d83e3f01265a9af34e823c2ef2eee8ac/faker-40.19.1.tar.gz", hash = "sha256:76fa71fd3bf320db25e5504eb356f9a76b8a95cd6098524d006f446035b6b89d", size = 1969318, upload-time = "2026-05-22T15:57:37.433Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/0b/5c0b2d3a4b7a715f1835dd3f963bfbe841a02ae5cad1df8ee0325dfad235/faker-40.18.0-py3-none-any.whl", hash = "sha256:61a6b94b74605ddb090a065deb197a1c585ae7a874c094cf6693671d271e6083", size = 2006355, upload-time = "2026-05-14T16:43:02.489Z" },
+    { url = "https://files.pythonhosted.org/packages/49/b4/40a1ec12ec834604f3848143343baf1c67bc9a1096e401907eaa0d25876a/faker-40.19.1-py3-none-any.whl", hash = "sha256:265259b37c013838baaae34940207288170df385d6c5281413fce56a3504d580", size = 2007643, upload-time = "2026-05-22T15:57:35.867Z" },
 ]
 
 [[package]]
@@ -349,10 +349,10 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "databricks-job-runner", specifier = ">=0.4.8" },
-    { name = "databricks-sdk", specifier = ">=0.108.0" },
+    { name = "databricks-job-runner", specifier = ">=0.6.2" },
+    { name = "databricks-sdk", specifier = ">=0.112.0" },
     { name = "databricks-tools-core", git = "https://github.com/databricks-solutions/ai-dev-kit?subdirectory=databricks-tools-core" },
-    { name = "faker", specifier = ">=40.18.0" },
+    { name = "faker", specifier = ">=40.19.1" },
     { name = "graphdatascience", specifier = ">=1.12" },
     { name = "neo4j" },
     { name = "pandas" },
