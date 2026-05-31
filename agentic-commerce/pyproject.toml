@@ -1,6 +1,6 @@
 [project]
 name = "retail_agent"
-version = "0.1.28"
+version = "0.1.31"
 description = "Databricks Agentic Commerce assistant with Neo4j knowledge graph, GraphRAG, and agent memory."
 requires-python = ">=3.12"
 dependencies = [

@@ -1,0 +1,321 @@
+:ID(Component),system_id,type,name
+AC1001-S01-C01,AC1001-S01,Fan,Fan Module
+AC1001-S01-C02,AC1001-S01,Compressor,Compressor Stage
+AC1001-S01-C03,AC1001-S01,Turbine,High-Pressure Turbine
+AC1001-S01-C04,AC1001-S01,FuelPump,Main Fuel Pump
+AC1001-S01-C05,AC1001-S01,Bearing,Thrust Bearing
+AC1001-S02-C01,AC1001-S02,Fan,Fan Module
+AC1001-S02-C02,AC1001-S02,Compressor,Compressor Stage
+AC1001-S02-C03,AC1001-S02,Turbine,High-Pressure Turbine
+AC1001-S02-C04,AC1001-S02,FuelPump,Main Fuel Pump
+AC1001-S02-C05,AC1001-S02,Bearing,Thrust Bearing
+AC1001-S03-C01,AC1001-S03,FMS,Flight Management System
+AC1001-S03-C02,AC1001-S03,ADC,Air Data Computer
+AC1001-S03-C03,AC1001-S03,NAV,Navigation Receiver
+AC1001-S04-C01,AC1001-S04,HydraulicPump,Main Pump
+AC1001-S04-C02,AC1001-S04,Reservoir,Hydraulic Reservoir
+AC1001-S04-C03,AC1001-S04,Actuator,Flap Actuator
+AC1002-S01-C01,AC1002-S01,Fan,Fan Module
+AC1002-S01-C02,AC1002-S01,Compressor,Compressor Stage
+AC1002-S01-C03,AC1002-S01,Turbine,High-Pressure Turbine
+AC1002-S01-C04,AC1002-S01,FuelPump,Main Fuel Pump
+AC1002-S01-C05,AC1002-S01,Bearing,Thrust Bearing
+AC1002-S02-C01,AC1002-S02,Fan,Fan Module
+AC1002-S02-C02,AC1002-S02,Compressor,Compressor Stage
+AC1002-S02-C03,AC1002-S02,Turbine,High-Pressure Turbine
+AC1002-S02-C04,AC1002-S02,FuelPump,Main Fuel Pump
+AC1002-S02-C05,AC1002-S02,Bearing,Thrust Bearing
+AC1002-S03-C01,AC1002-S03,FMS,Flight Management System
+AC1002-S03-C02,AC1002-S03,ADC,Air Data Computer
+AC1002-S03-C03,AC1002-S03,NAV,Navigation Receiver
+AC1002-S04-C01,AC1002-S04,HydraulicPump,Main Pump
+AC1002-S04-C02,AC1002-S04,Reservoir,Hydraulic Reservoir
+AC1002-S04-C03,AC1002-S04,Actuator,Flap Actuator
+AC1003-S01-C01,AC1003-S01,Fan,Fan Module
+AC1003-S01-C02,AC1003-S01,Compressor,Compressor Stage
+AC1003-S01-C03,AC1003-S01,Turbine,High-Pressure Turbine
+AC1003-S01-C04,AC1003-S01,FuelPump,Main Fuel Pump
+AC1003-S01-C05,AC1003-S01,Bearing,Thrust Bearing
+AC1003-S02-C01,AC1003-S02,Fan,Fan Module
+AC1003-S02-C02,AC1003-S02,Compressor,Compressor Stage
+AC1003-S02-C03,AC1003-S02,Turbine,High-Pressure Turbine
+AC1003-S02-C04,AC1003-S02,FuelPump,Main Fuel Pump
+AC1003-S02-C05,AC1003-S02,Bearing,Thrust Bearing
+AC1003-S03-C01,AC1003-S03,FMS,Flight Management System
+AC1003-S03-C02,AC1003-S03,ADC,Air Data Computer
+AC1003-S03-C03,AC1003-S03,NAV,Navigation Receiver
+AC1003-S04-C01,AC1003-S04,HydraulicPump,Main Pump
+AC1003-S04-C02,AC1003-S04,Reservoir,Hydraulic Reservoir
+AC1003-S04-C03,AC1003-S04,Actuator,Flap Actuator
+AC1004-S01-C01,AC1004-S01,Fan,Fan Module
+AC1004-S01-C02,AC1004-S01,Compressor,Compressor Stage
+AC1004-S01-C03,AC1004-S01,Turbine,High-Pressure Turbine
+AC1004-S01-C04,AC1004-S01,FuelPump,Main Fuel Pump
+AC1004-S01-C05,AC1004-S01,Bearing,Thrust Bearing
+AC1004-S02-C01,AC1004-S02,Fan,Fan Module
+AC1004-S02-C02,AC1004-S02,Compressor,Compressor Stage
+AC1004-S02-C03,AC1004-S02,Turbine,High-Pressure Turbine
+AC1004-S02-C04,AC1004-S02,FuelPump,Main Fuel Pump
+AC1004-S02-C05,AC1004-S02,Bearing,Thrust Bearing
+AC1004-S03-C01,AC1004-S03,FMS,Flight Management System
+AC1004-S03-C02,AC1004-S03,ADC,Air Data Computer
+AC1004-S03-C03,AC1004-S03,NAV,Navigation Receiver
+AC1004-S04-C01,AC1004-S04,HydraulicPump,Main Pump
+AC1004-S04-C02,AC1004-S04,Reservoir,Hydraulic Reservoir
+AC1004-S04-C03,AC1004-S04,Actuator,Flap Actuator
+AC1005-S01-C01,AC1005-S01,Fan,Fan Module
+AC1005-S01-C02,AC1005-S01,Compressor,Compressor Stage
+AC1005-S01-C03,AC1005-S01,Turbine,High-Pressure Turbine
+AC1005-S01-C04,AC1005-S01,FuelPump,Main Fuel Pump
+AC1005-S01-C05,AC1005-S01,Bearing,Thrust Bearing
+AC1005-S02-C01,AC1005-S02,Fan,Fan Module
+AC1005-S02-C02,AC1005-S02,Compressor,Compressor Stage
+AC1005-S02-C03,AC1005-S02,Turbine,High-Pressure Turbine
+AC1005-S02-C04,AC1005-S02,FuelPump,Main Fuel Pump
+AC1005-S02-C05,AC1005-S02,Bearing,Thrust Bearing
+AC1005-S03-C01,AC1005-S03,FMS,Flight Management System
+AC1005-S03-C02,AC1005-S03,ADC,Air Data Computer
+AC1005-S03-C03,AC1005-S03,NAV,Navigation Receiver
+AC1005-S04-C01,AC1005-S04,HydraulicPump,Main Pump
+AC1005-S04-C02,AC1005-S04,Reservoir,Hydraulic Reservoir
+AC1005-S04-C03,AC1005-S04,Actuator,Flap Actuator
+AC1006-S01-C01,AC1006-S01,Fan,Fan Module
+AC1006-S01-C02,AC1006-S01,Compressor,Compressor Stage
+AC1006-S01-C03,AC1006-S01,Turbine,High-Pressure Turbine
+AC1006-S01-C04,AC1006-S01,FuelPump,Main Fuel Pump
+AC1006-S01-C05,AC1006-S01,Bearing,Thrust Bearing
+AC1006-S02-C01,AC1006-S02,Fan,Fan Module
+AC1006-S02-C02,AC1006-S02,Compressor,Compressor Stage
+AC1006-S02-C03,AC1006-S02,Turbine,High-Pressure Turbine
+AC1006-S02-C04,AC1006-S02,FuelPump,Main Fuel Pump
+AC1006-S02-C05,AC1006-S02,Bearing,Thrust Bearing
+AC1006-S03-C01,AC1006-S03,FMS,Flight Management System
+AC1006-S03-C02,AC1006-S03,ADC,Air Data Computer
+AC1006-S03-C03,AC1006-S03,NAV,Navigation Receiver
+AC1006-S04-C01,AC1006-S04,HydraulicPump,Main Pump
+AC1006-S04-C02,AC1006-S04,Reservoir,Hydraulic Reservoir
+AC1006-S04-C03,AC1006-S04,Actuator,Flap Actuator
+AC1007-S01-C01,AC1007-S01,Fan,Fan Module
+AC1007-S01-C02,AC1007-S01,Compressor,Compressor Stage
+AC1007-S01-C03,AC1007-S01,Turbine,High-Pressure Turbine
+AC1007-S01-C04,AC1007-S01,FuelPump,Main Fuel Pump
+AC1007-S01-C05,AC1007-S01,Bearing,Thrust Bearing
+AC1007-S02-C01,AC1007-S02,Fan,Fan Module
+AC1007-S02-C02,AC1007-S02,Compressor,Compressor Stage
+AC1007-S02-C03,AC1007-S02,Turbine,High-Pressure Turbine
+AC1007-S02-C04,AC1007-S02,FuelPump,Main Fuel Pump
+AC1007-S02-C05,AC1007-S02,Bearing,Thrust Bearing
+AC1007-S03-C01,AC1007-S03,FMS,Flight Management System
+AC1007-S03-C02,AC1007-S03,ADC,Air Data Computer
+AC1007-S03-C03,AC1007-S03,NAV,Navigation Receiver
+AC1007-S04-C01,AC1007-S04,HydraulicPump,Main Pump
+AC1007-S04-C02,AC1007-S04,Reservoir,Hydraulic Reservoir
+AC1007-S04-C03,AC1007-S04,Actuator,Flap Actuator
+AC1008-S01-C01,AC1008-S01,Fan,Fan Module
+AC1008-S01-C02,AC1008-S01,Compressor,Compressor Stage
+AC1008-S01-C03,AC1008-S01,Turbine,High-Pressure Turbine
+AC1008-S01-C04,AC1008-S01,FuelPump,Main Fuel Pump
+AC1008-S01-C05,AC1008-S01,Bearing,Thrust Bearing
+AC1008-S02-C01,AC1008-S02,Fan,Fan Module
+AC1008-S02-C02,AC1008-S02,Compressor,Compressor Stage
+AC1008-S02-C03,AC1008-S02,Turbine,High-Pressure Turbine
+AC1008-S02-C04,AC1008-S02,FuelPump,Main Fuel Pump
+AC1008-S02-C05,AC1008-S02,Bearing,Thrust Bearing
+AC1008-S03-C01,AC1008-S03,FMS,Flight Management System
+AC1008-S03-C02,AC1008-S03,ADC,Air Data Computer
+AC1008-S03-C03,AC1008-S03,NAV,Navigation Receiver
+AC1008-S04-C01,AC1008-S04,HydraulicPump,Main Pump
+AC1008-S04-C02,AC1008-S04,Reservoir,Hydraulic Reservoir
+AC1008-S04-C03,AC1008-S04,Actuator,Flap Actuator
+AC1009-S01-C01,AC1009-S01,Fan,Fan Module
+AC1009-S01-C02,AC1009-S01,Compressor,Compressor Stage
+AC1009-S01-C03,AC1009-S01,Turbine,High-Pressure Turbine
+AC1009-S01-C04,AC1009-S01,FuelPump,Main Fuel Pump
+AC1009-S01-C05,AC1009-S01,Bearing,Thrust Bearing
+AC1009-S02-C01,AC1009-S02,Fan,Fan Module
+AC1009-S02-C02,AC1009-S02,Compressor,Compressor Stage
+AC1009-S02-C03,AC1009-S02,Turbine,High-Pressure Turbine
+AC1009-S02-C04,AC1009-S02,FuelPump,Main Fuel Pump
+AC1009-S02-C05,AC1009-S02,Bearing,Thrust Bearing
+AC1009-S03-C01,AC1009-S03,FMS,Flight Management System
+AC1009-S03-C02,AC1009-S03,ADC,Air Data Computer
+AC1009-S03-C03,AC1009-S03,NAV,Navigation Receiver
+AC1009-S04-C01,AC1009-S04,HydraulicPump,Main Pump
+AC1009-S04-C02,AC1009-S04,Reservoir,Hydraulic Reservoir
+AC1009-S04-C03,AC1009-S04,Actuator,Flap Actuator
+AC1010-S01-C01,AC1010-S01,Fan,Fan Module
+AC1010-S01-C02,AC1010-S01,Compressor,Compressor Stage
+AC1010-S01-C03,AC1010-S01,Turbine,High-Pressure Turbine
+AC1010-S01-C04,AC1010-S01,FuelPump,Main Fuel Pump
+AC1010-S01-C05,AC1010-S01,Bearing,Thrust Bearing
+AC1010-S02-C01,AC1010-S02,Fan,Fan Module
+AC1010-S02-C02,AC1010-S02,Compressor,Compressor Stage
+AC1010-S02-C03,AC1010-S02,Turbine,High-Pressure Turbine
+AC1010-S02-C04,AC1010-S02,FuelPump,Main Fuel Pump
+AC1010-S02-C05,AC1010-S02,Bearing,Thrust Bearing
+AC1010-S03-C01,AC1010-S03,FMS,Flight Management System
+AC1010-S03-C02,AC1010-S03,ADC,Air Data Computer
+AC1010-S03-C03,AC1010-S03,NAV,Navigation Receiver
+AC1010-S04-C01,AC1010-S04,HydraulicPump,Main Pump
+AC1010-S04-C02,AC1010-S04,Reservoir,Hydraulic Reservoir
+AC1010-S04-C03,AC1010-S04,Actuator,Flap Actuator
+AC1011-S01-C01,AC1011-S01,Fan,Fan Module
+AC1011-S01-C02,AC1011-S01,Compressor,Compressor Stage
+AC1011-S01-C03,AC1011-S01,Turbine,High-Pressure Turbine
+AC1011-S01-C04,AC1011-S01,FuelPump,Main Fuel Pump
+AC1011-S01-C05,AC1011-S01,Bearing,Thrust Bearing
+AC1011-S02-C01,AC1011-S02,Fan,Fan Module
+AC1011-S02-C02,AC1011-S02,Compressor,Compressor Stage
+AC1011-S02-C03,AC1011-S02,Turbine,High-Pressure Turbine
+AC1011-S02-C04,AC1011-S02,FuelPump,Main Fuel Pump
+AC1011-S02-C05,AC1011-S02,Bearing,Thrust Bearing
+AC1011-S03-C01,AC1011-S03,FMS,Flight Management System
+AC1011-S03-C02,AC1011-S03,ADC,Air Data Computer
+AC1011-S03-C03,AC1011-S03,NAV,Navigation Receiver
+AC1011-S04-C01,AC1011-S04,HydraulicPump,Main Pump
+AC1011-S04-C02,AC1011-S04,Reservoir,Hydraulic Reservoir
+AC1011-S04-C03,AC1011-S04,Actuator,Flap Actuator
+AC1012-S01-C01,AC1012-S01,Fan,Fan Module
+AC1012-S01-C02,AC1012-S01,Compressor,Compressor Stage
+AC1012-S01-C03,AC1012-S01,Turbine,High-Pressure Turbine
+AC1012-S01-C04,AC1012-S01,FuelPump,Main Fuel Pump
+AC1012-S01-C05,AC1012-S01,Bearing,Thrust Bearing
+AC1012-S02-C01,AC1012-S02,Fan,Fan Module
+AC1012-S02-C02,AC1012-S02,Compressor,Compressor Stage
+AC1012-S02-C03,AC1012-S02,Turbine,High-Pressure Turbine
+AC1012-S02-C04,AC1012-S02,FuelPump,Main Fuel Pump
+AC1012-S02-C05,AC1012-S02,Bearing,Thrust Bearing
+AC1012-S03-C01,AC1012-S03,FMS,Flight Management System
+AC1012-S03-C02,AC1012-S03,ADC,Air Data Computer
+AC1012-S03-C03,AC1012-S03,NAV,Navigation Receiver
+AC1012-S04-C01,AC1012-S04,HydraulicPump,Main Pump
+AC1012-S04-C02,AC1012-S04,Reservoir,Hydraulic Reservoir
+AC1012-S04-C03,AC1012-S04,Actuator,Flap Actuator
+AC1013-S01-C01,AC1013-S01,Fan,Fan Module
+AC1013-S01-C02,AC1013-S01,Compressor,Compressor Stage
+AC1013-S01-C03,AC1013-S01,Turbine,High-Pressure Turbine
+AC1013-S01-C04,AC1013-S01,FuelPump,Main Fuel Pump
+AC1013-S01-C05,AC1013-S01,Bearing,Thrust Bearing
+AC1013-S02-C01,AC1013-S02,Fan,Fan Module
+AC1013-S02-C02,AC1013-S02,Compressor,Compressor Stage
+AC1013-S02-C03,AC1013-S02,Turbine,High-Pressure Turbine
+AC1013-S02-C04,AC1013-S02,FuelPump,Main Fuel Pump
+AC1013-S02-C05,AC1013-S02,Bearing,Thrust Bearing
+AC1013-S03-C01,AC1013-S03,FMS,Flight Management System
+AC1013-S03-C02,AC1013-S03,ADC,Air Data Computer
+AC1013-S03-C03,AC1013-S03,NAV,Navigation Receiver
+AC1013-S04-C01,AC1013-S04,HydraulicPump,Main Pump
+AC1013-S04-C02,AC1013-S04,Reservoir,Hydraulic Reservoir
+AC1013-S04-C03,AC1013-S04,Actuator,Flap Actuator
+AC1014-S01-C01,AC1014-S01,Fan,Fan Module
+AC1014-S01-C02,AC1014-S01,Compressor,Compressor Stage
+AC1014-S01-C03,AC1014-S01,Turbine,High-Pressure Turbine
+AC1014-S01-C04,AC1014-S01,FuelPump,Main Fuel Pump
+AC1014-S01-C05,AC1014-S01,Bearing,Thrust Bearing
+AC1014-S02-C01,AC1014-S02,Fan,Fan Module
+AC1014-S02-C02,AC1014-S02,Compressor,Compressor Stage
+AC1014-S02-C03,AC1014-S02,Turbine,High-Pressure Turbine
+AC1014-S02-C04,AC1014-S02,FuelPump,Main Fuel Pump
+AC1014-S02-C05,AC1014-S02,Bearing,Thrust Bearing
+AC1014-S03-C01,AC1014-S03,FMS,Flight Management System
+AC1014-S03-C02,AC1014-S03,ADC,Air Data Computer
+AC1014-S03-C03,AC1014-S03,NAV,Navigation Receiver
+AC1014-S04-C01,AC1014-S04,HydraulicPump,Main Pump
+AC1014-S04-C02,AC1014-S04,Reservoir,Hydraulic Reservoir
+AC1014-S04-C03,AC1014-S04,Actuator,Flap Actuator
+AC1015-S01-C01,AC1015-S01,Fan,Fan Module
+AC1015-S01-C02,AC1015-S01,Compressor,Compressor Stage
+AC1015-S01-C03,AC1015-S01,Turbine,High-Pressure Turbine
+AC1015-S01-C04,AC1015-S01,FuelPump,Main Fuel Pump
+AC1015-S01-C05,AC1015-S01,Bearing,Thrust Bearing
+AC1015-S02-C01,AC1015-S02,Fan,Fan Module
+AC1015-S02-C02,AC1015-S02,Compressor,Compressor Stage
+AC1015-S02-C03,AC1015-S02,Turbine,High-Pressure Turbine
+AC1015-S02-C04,AC1015-S02,FuelPump,Main Fuel Pump
+AC1015-S02-C05,AC1015-S02,Bearing,Thrust Bearing
+AC1015-S03-C01,AC1015-S03,FMS,Flight Management System
+AC1015-S03-C02,AC1015-S03,ADC,Air Data Computer
+AC1015-S03-C03,AC1015-S03,NAV,Navigation Receiver
+AC1015-S04-C01,AC1015-S04,HydraulicPump,Main Pump
+AC1015-S04-C02,AC1015-S04,Reservoir,Hydraulic Reservoir
+AC1015-S04-C03,AC1015-S04,Actuator,Flap Actuator
+AC1016-S01-C01,AC1016-S01,Fan,Fan Module
+AC1016-S01-C02,AC1016-S01,Compressor,Compressor Stage
+AC1016-S01-C03,AC1016-S01,Turbine,High-Pressure Turbine
+AC1016-S01-C04,AC1016-S01,FuelPump,Main Fuel Pump
+AC1016-S01-C05,AC1016-S01,Bearing,Thrust Bearing
+AC1016-S02-C01,AC1016-S02,Fan,Fan Module
+AC1016-S02-C02,AC1016-S02,Compressor,Compressor Stage
+AC1016-S02-C03,AC1016-S02,Turbine,High-Pressure Turbine
+AC1016-S02-C04,AC1016-S02,FuelPump,Main Fuel Pump
+AC1016-S02-C05,AC1016-S02,Bearing,Thrust Bearing
+AC1016-S03-C01,AC1016-S03,FMS,Flight Management System
+AC1016-S03-C02,AC1016-S03,ADC,Air Data Computer
+AC1016-S03-C03,AC1016-S03,NAV,Navigation Receiver
+AC1016-S04-C01,AC1016-S04,HydraulicPump,Main Pump
+AC1016-S04-C02,AC1016-S04,Reservoir,Hydraulic Reservoir
+AC1016-S04-C03,AC1016-S04,Actuator,Flap Actuator
+AC1017-S01-C01,AC1017-S01,Fan,Fan Module
+AC1017-S01-C02,AC1017-S01,Compressor,Compressor Stage
+AC1017-S01-C03,AC1017-S01,Turbine,High-Pressure Turbine
+AC1017-S01-C04,AC1017-S01,FuelPump,Main Fuel Pump
+AC1017-S01-C05,AC1017-S01,Bearing,Thrust Bearing
+AC1017-S02-C01,AC1017-S02,Fan,Fan Module
+AC1017-S02-C02,AC1017-S02,Compressor,Compressor Stage
+AC1017-S02-C03,AC1017-S02,Turbine,High-Pressure Turbine
+AC1017-S02-C04,AC1017-S02,FuelPump,Main Fuel Pump
+AC1017-S02-C05,AC1017-S02,Bearing,Thrust Bearing
+AC1017-S03-C01,AC1017-S03,FMS,Flight Management System
+AC1017-S03-C02,AC1017-S03,ADC,Air Data Computer
+AC1017-S03-C03,AC1017-S03,NAV,Navigation Receiver
+AC1017-S04-C01,AC1017-S04,HydraulicPump,Main Pump
+AC1017-S04-C02,AC1017-S04,Reservoir,Hydraulic Reservoir
+AC1017-S04-C03,AC1017-S04,Actuator,Flap Actuator
+AC1018-S01-C01,AC1018-S01,Fan,Fan Module
+AC1018-S01-C02,AC1018-S01,Compressor,Compressor Stage
+AC1018-S01-C03,AC1018-S01,Turbine,High-Pressure Turbine
+AC1018-S01-C04,AC1018-S01,FuelPump,Main Fuel Pump
+AC1018-S01-C05,AC1018-S01,Bearing,Thrust Bearing
+AC1018-S02-C01,AC1018-S02,Fan,Fan Module
+AC1018-S02-C02,AC1018-S02,Compressor,Compressor Stage
+AC1018-S02-C03,AC1018-S02,Turbine,High-Pressure Turbine
+AC1018-S02-C04,AC1018-S02,FuelPump,Main Fuel Pump
+AC1018-S02-C05,AC1018-S02,Bearing,Thrust Bearing
+AC1018-S03-C01,AC1018-S03,FMS,Flight Management System
+AC1018-S03-C02,AC1018-S03,ADC,Air Data Computer
+AC1018-S03-C03,AC1018-S03,NAV,Navigation Receiver
+AC1018-S04-C01,AC1018-S04,HydraulicPump,Main Pump
+AC1018-S04-C02,AC1018-S04,Reservoir,Hydraulic Reservoir
+AC1018-S04-C03,AC1018-S04,Actuator,Flap Actuator
+AC1019-S01-C01,AC1019-S01,Fan,Fan Module
+AC1019-S01-C02,AC1019-S01,Compressor,Compressor Stage
+AC1019-S01-C03,AC1019-S01,Turbine,High-Pressure Turbine
+AC1019-S01-C04,AC1019-S01,FuelPump,Main Fuel Pump
+AC1019-S01-C05,AC1019-S01,Bearing,Thrust Bearing
+AC1019-S02-C01,AC1019-S02,Fan,Fan Module
+AC1019-S02-C02,AC1019-S02,Compressor,Compressor Stage
+AC1019-S02-C03,AC1019-S02,Turbine,High-Pressure Turbine
+AC1019-S02-C04,AC1019-S02,FuelPump,Main Fuel Pump
+AC1019-S02-C05,AC1019-S02,Bearing,Thrust Bearing
+AC1019-S03-C01,AC1019-S03,FMS,Flight Management System
+AC1019-S03-C02,AC1019-S03,ADC,Air Data Computer
+AC1019-S03-C03,AC1019-S03,NAV,Navigation Receiver
+AC1019-S04-C01,AC1019-S04,HydraulicPump,Main Pump
+AC1019-S04-C02,AC1019-S04,Reservoir,Hydraulic Reservoir
+AC1019-S04-C03,AC1019-S04,Actuator,Flap Actuator
+AC1020-S01-C01,AC1020-S01,Fan,Fan Module
+AC1020-S01-C02,AC1020-S01,Compressor,Compressor Stage
+AC1020-S01-C03,AC1020-S01,Turbine,High-Pressure Turbine
+AC1020-S01-C04,AC1020-S01,FuelPump,Main Fuel Pump
+AC1020-S01-C05,AC1020-S01,Bearing,Thrust Bearing
+AC1020-S02-C01,AC1020-S02,Fan,Fan Module
+AC1020-S02-C02,AC1020-S02,Compressor,Compressor Stage
+AC1020-S02-C03,AC1020-S02,Turbine,High-Pressure Turbine
+AC1020-S02-C04,AC1020-S02,FuelPump,Main Fuel Pump
+AC1020-S02-C05,AC1020-S02,Bearing,Thrust Bearing
+AC1020-S03-C01,AC1020-S03,FMS,Flight Management System
+AC1020-S03-C02,AC1020-S03,ADC,Air Data Computer
+AC1020-S03-C03,AC1020-S03,NAV,Navigation Receiver
+AC1020-S04-C01,AC1020-S04,HydraulicPump,Main Pump
+AC1020-S04-C02,AC1020-S04,Reservoir,Hydraulic Reservoir
+AC1020-S04-C03,AC1020-S04,Actuator,Flap Actuator

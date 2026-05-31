@@ -1,0 +1,161 @@
+:ID(Sensor),system_id,type,name,unit
+AC1001-S01-SN01,AC1001-S01,EGT,Exhaust Gas Temperature,C
+AC1001-S01-SN02,AC1001-S01,Vibration,Engine Vibration,ips
+AC1001-S01-SN03,AC1001-S01,N1Speed,Fan Speed N1,rpm
+AC1001-S01-SN04,AC1001-S01,FuelFlow,Fuel Flow,kg/s
+AC1001-S02-SN01,AC1001-S02,EGT,Exhaust Gas Temperature,C
+AC1001-S02-SN02,AC1001-S02,Vibration,Engine Vibration,ips
+AC1001-S02-SN03,AC1001-S02,N1Speed,Fan Speed N1,rpm
+AC1001-S02-SN04,AC1001-S02,FuelFlow,Fuel Flow,kg/s
+AC1002-S01-SN01,AC1002-S01,EGT,Exhaust Gas Temperature,C
+AC1002-S01-SN02,AC1002-S01,Vibration,Engine Vibration,ips
+AC1002-S01-SN03,AC1002-S01,N1Speed,Fan Speed N1,rpm
+AC1002-S01-SN04,AC1002-S01,FuelFlow,Fuel Flow,kg/s
+AC1002-S02-SN01,AC1002-S02,EGT,Exhaust Gas Temperature,C
+AC1002-S02-SN02,AC1002-S02,Vibration,Engine Vibration,ips
+AC1002-S02-SN03,AC1002-S02,N1Speed,Fan Speed N1,rpm
+AC1002-S02-SN04,AC1002-S02,FuelFlow,Fuel Flow,kg/s
+AC1003-S01-SN01,AC1003-S01,EGT,Exhaust Gas Temperature,C
+AC1003-S01-SN02,AC1003-S01,Vibration,Engine Vibration,ips
+AC1003-S01-SN03,AC1003-S01,N1Speed,Fan Speed N1,rpm
+AC1003-S01-SN04,AC1003-S01,FuelFlow,Fuel Flow,kg/s
+AC1003-S02-SN01,AC1003-S02,EGT,Exhaust Gas Temperature,C
+AC1003-S02-SN02,AC1003-S02,Vibration,Engine Vibration,ips
+AC1003-S02-SN03,AC1003-S02,N1Speed,Fan Speed N1,rpm
+AC1003-S02-SN04,AC1003-S02,FuelFlow,Fuel Flow,kg/s
+AC1004-S01-SN01,AC1004-S01,EGT,Exhaust Gas Temperature,C
+AC1004-S01-SN02,AC1004-S01,Vibration,Engine Vibration,ips
+AC1004-S01-SN03,AC1004-S01,N1Speed,Fan Speed N1,rpm
+AC1004-S01-SN04,AC1004-S01,FuelFlow,Fuel Flow,kg/s
+AC1004-S02-SN01,AC1004-S02,EGT,Exhaust Gas Temperature,C
+AC1004-S02-SN02,AC1004-S02,Vibration,Engine Vibration,ips
+AC1004-S02-SN03,AC1004-S02,N1Speed,Fan Speed N1,rpm
+AC1004-S02-SN04,AC1004-S02,FuelFlow,Fuel Flow,kg/s
+AC1005-S01-SN01,AC1005-S01,EGT,Exhaust Gas Temperature,C
+AC1005-S01-SN02,AC1005-S01,Vibration,Engine Vibration,ips
+AC1005-S01-SN03,AC1005-S01,N1Speed,Fan Speed N1,rpm
+AC1005-S01-SN04,AC1005-S01,FuelFlow,Fuel Flow,kg/s
+AC1005-S02-SN01,AC1005-S02,EGT,Exhaust Gas Temperature,C
+AC1005-S02-SN02,AC1005-S02,Vibration,Engine Vibration,ips
+AC1005-S02-SN03,AC1005-S02,N1Speed,Fan Speed N1,rpm
+AC1005-S02-SN04,AC1005-S02,FuelFlow,Fuel Flow,kg/s
+AC1006-S01-SN01,AC1006-S01,EGT,Exhaust Gas Temperature,C
+AC1006-S01-SN02,AC1006-S01,Vibration,Engine Vibration,ips
+AC1006-S01-SN03,AC1006-S01,N1Speed,Fan Speed N1,rpm
+AC1006-S01-SN04,AC1006-S01,FuelFlow,Fuel Flow,kg/s
+AC1006-S02-SN01,AC1006-S02,EGT,Exhaust Gas Temperature,C
+AC1006-S02-SN02,AC1006-S02,Vibration,Engine Vibration,ips
+AC1006-S02-SN03,AC1006-S02,N1Speed,Fan Speed N1,rpm
+AC1006-S02-SN04,AC1006-S02,FuelFlow,Fuel Flow,kg/s
+AC1007-S01-SN01,AC1007-S01,EGT,Exhaust Gas Temperature,C
+AC1007-S01-SN02,AC1007-S01,Vibration,Engine Vibration,ips
+AC1007-S01-SN03,AC1007-S01,N1Speed,Fan Speed N1,rpm
+AC1007-S01-SN04,AC1007-S01,FuelFlow,Fuel Flow,kg/s
+AC1007-S02-SN01,AC1007-S02,EGT,Exhaust Gas Temperature,C
+AC1007-S02-SN02,AC1007-S02,Vibration,Engine Vibration,ips
+AC1007-S02-SN03,AC1007-S02,N1Speed,Fan Speed N1,rpm
+AC1007-S02-SN04,AC1007-S02,FuelFlow,Fuel Flow,kg/s
+AC1008-S01-SN01,AC1008-S01,EGT,Exhaust Gas Temperature,C
+AC1008-S01-SN02,AC1008-S01,Vibration,Engine Vibration,ips
+AC1008-S01-SN03,AC1008-S01,N1Speed,Fan Speed N1,rpm
+AC1008-S01-SN04,AC1008-S01,FuelFlow,Fuel Flow,kg/s
+AC1008-S02-SN01,AC1008-S02,EGT,Exhaust Gas Temperature,C
+AC1008-S02-SN02,AC1008-S02,Vibration,Engine Vibration,ips
+AC1008-S02-SN03,AC1008-S02,N1Speed,Fan Speed N1,rpm
+AC1008-S02-SN04,AC1008-S02,FuelFlow,Fuel Flow,kg/s
+AC1009-S01-SN01,AC1009-S01,EGT,Exhaust Gas Temperature,C
+AC1009-S01-SN02,AC1009-S01,Vibration,Engine Vibration,ips
+AC1009-S01-SN03,AC1009-S01,N1Speed,Fan Speed N1,rpm
+AC1009-S01-SN04,AC1009-S01,FuelFlow,Fuel Flow,kg/s
+AC1009-S02-SN01,AC1009-S02,EGT,Exhaust Gas Temperature,C
+AC1009-S02-SN02,AC1009-S02,Vibration,Engine Vibration,ips
+AC1009-S02-SN03,AC1009-S02,N1Speed,Fan Speed N1,rpm
+AC1009-S02-SN04,AC1009-S02,FuelFlow,Fuel Flow,kg/s
+AC1010-S01-SN01,AC1010-S01,EGT,Exhaust Gas Temperature,C
+AC1010-S01-SN02,AC1010-S01,Vibration,Engine Vibration,ips
+AC1010-S01-SN03,AC1010-S01,N1Speed,Fan Speed N1,rpm
+AC1010-S01-SN04,AC1010-S01,FuelFlow,Fuel Flow,kg/s
+AC1010-S02-SN01,AC1010-S02,EGT,Exhaust Gas Temperature,C
+AC1010-S02-SN02,AC1010-S02,Vibration,Engine Vibration,ips
+AC1010-S02-SN03,AC1010-S02,N1Speed,Fan Speed N1,rpm
+AC1010-S02-SN04,AC1010-S02,FuelFlow,Fuel Flow,kg/s
+AC1011-S01-SN01,AC1011-S01,EGT,Exhaust Gas Temperature,C
+AC1011-S01-SN02,AC1011-S01,Vibration,Engine Vibration,ips
+AC1011-S01-SN03,AC1011-S01,N1Speed,Fan Speed N1,rpm
+AC1011-S01-SN04,AC1011-S01,FuelFlow,Fuel Flow,kg/s
+AC1011-S02-SN01,AC1011-S02,EGT,Exhaust Gas Temperature,C
+AC1011-S02-SN02,AC1011-S02,Vibration,Engine Vibration,ips
+AC1011-S02-SN03,AC1011-S02,N1Speed,Fan Speed N1,rpm
+AC1011-S02-SN04,AC1011-S02,FuelFlow,Fuel Flow,kg/s
+AC1012-S01-SN01,AC1012-S01,EGT,Exhaust Gas Temperature,C
+AC1012-S01-SN02,AC1012-S01,Vibration,Engine Vibration,ips
+AC1012-S01-SN03,AC1012-S01,N1Speed,Fan Speed N1,rpm
+AC1012-S01-SN04,AC1012-S01,FuelFlow,Fuel Flow,kg/s
+AC1012-S02-SN01,AC1012-S02,EGT,Exhaust Gas Temperature,C
+AC1012-S02-SN02,AC1012-S02,Vibration,Engine Vibration,ips
+AC1012-S02-SN03,AC1012-S02,N1Speed,Fan Speed N1,rpm
+AC1012-S02-SN04,AC1012-S02,FuelFlow,Fuel Flow,kg/s
+AC1013-S01-SN01,AC1013-S01,EGT,Exhaust Gas Temperature,C
+AC1013-S01-SN02,AC1013-S01,Vibration,Engine Vibration,ips
+AC1013-S01-SN03,AC1013-S01,N1Speed,Fan Speed N1,rpm
+AC1013-S01-SN04,AC1013-S01,FuelFlow,Fuel Flow,kg/s
+AC1013-S02-SN01,AC1013-S02,EGT,Exhaust Gas Temperature,C
+AC1013-S02-SN02,AC1013-S02,Vibration,Engine Vibration,ips
+AC1013-S02-SN03,AC1013-S02,N1Speed,Fan Speed N1,rpm
+AC1013-S02-SN04,AC1013-S02,FuelFlow,Fuel Flow,kg/s
+AC1014-S01-SN01,AC1014-S01,EGT,Exhaust Gas Temperature,C
+AC1014-S01-SN02,AC1014-S01,Vibration,Engine Vibration,ips
+AC1014-S01-SN03,AC1014-S01,N1Speed,Fan Speed N1,rpm
+AC1014-S01-SN04,AC1014-S01,FuelFlow,Fuel Flow,kg/s
+AC1014-S02-SN01,AC1014-S02,EGT,Exhaust Gas Temperature,C
+AC1014-S02-SN02,AC1014-S02,Vibration,Engine Vibration,ips
+AC1014-S02-SN03,AC1014-S02,N1Speed,Fan Speed N1,rpm
+AC1014-S02-SN04,AC1014-S02,FuelFlow,Fuel Flow,kg/s
+AC1015-S01-SN01,AC1015-S01,EGT,Exhaust Gas Temperature,C
+AC1015-S01-SN02,AC1015-S01,Vibration,Engine Vibration,ips
+AC1015-S01-SN03,AC1015-S01,N1Speed,Fan Speed N1,rpm
+AC1015-S01-SN04,AC1015-S01,FuelFlow,Fuel Flow,kg/s
+AC1015-S02-SN01,AC1015-S02,EGT,Exhaust Gas Temperature,C
+AC1015-S02-SN02,AC1015-S02,Vibration,Engine Vibration,ips
+AC1015-S02-SN03,AC1015-S02,N1Speed,Fan Speed N1,rpm
+AC1015-S02-SN04,AC1015-S02,FuelFlow,Fuel Flow,kg/s
+AC1016-S01-SN01,AC1016-S01,EGT,Exhaust Gas Temperature,C
+AC1016-S01-SN02,AC1016-S01,Vibration,Engine Vibration,ips
+AC1016-S01-SN03,AC1016-S01,N1Speed,Fan Speed N1,rpm
+AC1016-S01-SN04,AC1016-S01,FuelFlow,Fuel Flow,kg/s
+AC1016-S02-SN01,AC1016-S02,EGT,Exhaust Gas Temperature,C
+AC1016-S02-SN02,AC1016-S02,Vibration,Engine Vibration,ips
+AC1016-S02-SN03,AC1016-S02,N1Speed,Fan Speed N1,rpm
+AC1016-S02-SN04,AC1016-S02,FuelFlow,Fuel Flow,kg/s
+AC1017-S01-SN01,AC1017-S01,EGT,Exhaust Gas Temperature,C
+AC1017-S01-SN02,AC1017-S01,Vibration,Engine Vibration,ips
+AC1017-S01-SN03,AC1017-S01,N1Speed,Fan Speed N1,rpm
+AC1017-S01-SN04,AC1017-S01,FuelFlow,Fuel Flow,kg/s
+AC1017-S02-SN01,AC1017-S02,EGT,Exhaust Gas Temperature,C
+AC1017-S02-SN02,AC1017-S02,Vibration,Engine Vibration,ips
+AC1017-S02-SN03,AC1017-S02,N1Speed,Fan Speed N1,rpm
+AC1017-S02-SN04,AC1017-S02,FuelFlow,Fuel Flow,kg/s
+AC1018-S01-SN01,AC1018-S01,EGT,Exhaust Gas Temperature,C
+AC1018-S01-SN02,AC1018-S01,Vibration,Engine Vibration,ips
+AC1018-S01-SN03,AC1018-S01,N1Speed,Fan Speed N1,rpm
+AC1018-S01-SN04,AC1018-S01,FuelFlow,Fuel Flow,kg/s
+AC1018-S02-SN01,AC1018-S02,EGT,Exhaust Gas Temperature,C
+AC1018-S02-SN02,AC1018-S02,Vibration,Engine Vibration,ips
+AC1018-S02-SN03,AC1018-S02,N1Speed,Fan Speed N1,rpm
+AC1018-S02-SN04,AC1018-S02,FuelFlow,Fuel Flow,kg/s
+AC1019-S01-SN01,AC1019-S01,EGT,Exhaust Gas Temperature,C
+AC1019-S01-SN02,AC1019-S01,Vibration,Engine Vibration,ips
+AC1019-S01-SN03,AC1019-S01,N1Speed,Fan Speed N1,rpm
+AC1019-S01-SN04,AC1019-S01,FuelFlow,Fuel Flow,kg/s
+AC1019-S02-SN01,AC1019-S02,EGT,Exhaust Gas Temperature,C
+AC1019-S02-SN02,AC1019-S02,Vibration,Engine Vibration,ips
+AC1019-S02-SN03,AC1019-S02,N1Speed,Fan Speed N1,rpm
+AC1019-S02-SN04,AC1019-S02,FuelFlow,Fuel Flow,kg/s
+AC1020-S01-SN01,AC1020-S01,EGT,Exhaust Gas Temperature,C
+AC1020-S01-SN02,AC1020-S01,Vibration,Engine Vibration,ips
+AC1020-S01-SN03,AC1020-S01,N1Speed,Fan Speed N1,rpm
+AC1020-S01-SN04,AC1020-S01,FuelFlow,Fuel Flow,kg/s
+AC1020-S02-SN01,AC1020-S02,EGT,Exhaust Gas Temperature,C
+AC1020-S02-SN02,AC1020-S02,Vibration,Engine Vibration,ips
+AC1020-S02-SN03,AC1020-S02,N1Speed,Fan Speed N1,rpm
+AC1020-S02-SN04,AC1020-S02,FuelFlow,Fuel Flow,kg/s

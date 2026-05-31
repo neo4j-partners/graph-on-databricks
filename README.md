@@ -31,6 +31,14 @@ Start here:
 - [finance-genie/automated/README.md](./finance-genie/automated/README.md): CLI-driven job runner, Genie non-determinism discussion, and automated validation.
 - [finance-genie/workshop/README.md](./finance-genie/workshop/README.md): notebook sequence for live demo delivery.
 
+### [Aircraft GraphRAG](./aircraft-graphrag/README.md)
+
+A standalone GraphRAG starter over an Aircraft Digital Twin graph, extracted from the databricks-neo4j-lab workshop and trimmed to the retrieval core. A short notebook series loads the aircraft topology into Neo4j with the Python driver, runs Louvain community detection over the maintenance chain, then embeds two maintenance manuals and builds vector, graph-enhanced, and hybrid retrievers over them. The data ships with the project and loads straight from the repo over HTTPS, so the notebooks run from a fresh clone with no Unity Catalog volume, no setup CLI, and no Spark Connector add-on.
+
+Start here:
+
+- [aircraft-graphrag/README.md](./aircraft-graphrag/README.md): project overview, run order, prerequisites, and the `DATA_SOURCE` switch.
+
 ---
 
 ## Neo4j + Databricks Integrations Showcased
