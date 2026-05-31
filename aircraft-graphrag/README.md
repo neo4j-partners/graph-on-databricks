@@ -15,7 +15,8 @@ aircraft-graphrag/
     03_data_and_embeddings.ipynb       # chunk + embed two manuals, build indexes, cross-link
     04_graphrag_retrievers.ipynb       # vector + VectorCypher retrievers
     05_hybrid_retrievers.ipynb         # hybrid (vector + fulltext) retrievers
-  data_utils.py          # data loader, Databricks model wrappers, Neo4j + pipeline helpers
+  data_loader.py         # data loader + Neo4j connection (neo4j + stdlib only)
+  data_utils.py          # Databricks model wrappers + SimpleKGPipeline (re-exports data_loader)
   .env.sample            # Neo4j credentials
 ```
 
@@ -37,7 +38,7 @@ Required path: **01 -> 03 -> 04 -> 05**. Notebook **02** is an optional Graph Da
 - For notebooks 03-05, a **Databricks workspace with Foundation Model APIs enabled**. Embeddings use `databricks-bge-large-en` and generation uses `databricks-meta-llama-3-3-70b-instruct`, both reached through the MLflow deployments client.
 - Python packages: `neo4j` (notebooks 01-02) and `neo4j-graphrag` plus `mlflow` (notebooks 03-05). Each notebook installs what it needs with `%pip` in its first cell.
 
-Notebooks 01 and 02 use only the Neo4j driver and the committed data, so they run anywhere. The Foundation Model dependency starts at notebook 03.
+Notebooks 01 and 02 use only the Neo4j driver and the committed data, so they run anywhere. Notebook 01 imports `data_loader` (neo4j + stdlib only); notebook 02 uses the driver directly. The heavier `data_utils` module (Databricks model wrappers, SimpleKGPipeline) and the Foundation Model dependency start at notebook 03.
 
 ## Where the data comes from: the `DATA_SOURCE` switch
 
