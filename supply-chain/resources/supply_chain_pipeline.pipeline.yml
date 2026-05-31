@@ -1,0 +1,13 @@
+resources:
+  pipelines:
+    supply_chain_pipeline:
+      name: supply_chain_medallion_pipeline
+      catalog: ${var.catalog}
+      schema: supply_chain_medallion
+      serverless: true
+      libraries:
+        - glob:
+            include: ../src/supply_chain_pipeline/transformations/**
+      configuration:
+        volume_path: /Volumes/${var.catalog}/supply_chain_raw/landing
+        catalog: ${var.catalog}

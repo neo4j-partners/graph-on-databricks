@@ -1,0 +1,11 @@
+command: ["python", "app.py"]
+
+env:
+  - name: NEO4J_URI
+    valueFrom: neo4j-uri
+  - name: NEO4J_USER
+    valueFrom: neo4j-username
+  - name: NEO4J_PASS
+    valueFrom: neo4j-password
+  - name: NEO4J_DATABASE
+    valueFrom: neo4j-database

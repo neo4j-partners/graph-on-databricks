@@ -1,0 +1,25 @@
+bundle:
+  name: supply-chain-optimizer
+
+workspace:
+  host: https://dbc-768fa6aa-1875.cloud.databricks.com
+
+variables:
+  catalog:
+    description: Unity Catalog catalog name
+    default: supplychain
+
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog: supplychain
+
+  prod:
+    mode: production
+    variables:
+      catalog: supplychain

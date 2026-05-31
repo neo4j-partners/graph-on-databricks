@@ -1,0 +1,13 @@
+command: ["python", "app.py"]
+
+env:
+  - name: NEO4J_URI
+    value: "neo4j+s://26bf512b.databases.neo4j.io"
+  - name: NEO4J_USERNAME
+    value: "neo4j"
+  - name: NEO4J_DATABASE
+    value: "neo4j"
+  - name: SUPPLYCHAIN_CATALOG
+    value: "supplychain"
+  - name: SUPPLYCHAIN_SCHEMA
+    value: "supply_chain_medallion"

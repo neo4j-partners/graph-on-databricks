@@ -13,6 +13,6 @@
     "serve": "npm run build:all && python3 -m http.server 8080 --directory build"
   },
   "devDependencies": {
-    "@marp-team/marp-cli": "^4.1.1"
+    "@marp-team/marp-cli": "^4.4.0"
   }
 }

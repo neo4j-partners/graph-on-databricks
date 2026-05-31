@@ -1,0 +1,4 @@
+anthropic>=0.49.0
+neo4j>=5.18.0
+databricks-sdk>=0.25.0
+python-dotenv>=1.0.0
