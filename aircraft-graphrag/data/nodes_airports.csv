@@ -1,0 +1,13 @@
+:ID(Airport),name,city,country,iata,icao,lat,lon
+JFK,John F. Kennedy International,New York,USA,JFK,KJFK,40.6413,-73.7781
+LAX,Los Angeles International,Los Angeles,USA,LAX,KLAX,33.9416,-118.4085
+ORD,O'Hare International,Chicago,USA,ORD,KORD,41.9742,-87.9073
+DFW,Dallas/Fort Worth International,Dallas-Fort Worth,USA,DFW,KDFW,32.8998,-97.0403
+SEA,Seattle-Tacoma International,Seattle,USA,SEA,KSEA,47.4502,-122.3088
+DEN,Denver International,Denver,USA,DEN,KDEN,39.8561,-104.6737
+ATL,Hartsfield-Jackson Atlanta Intl,Atlanta,USA,ATL,KATL,33.6407,-84.4277
+SFO,San Francisco International,San Francisco,USA,SFO,KSFO,37.6213,-122.379
+BOS,Logan International,Boston,USA,BOS,KBOS,42.3656,-71.0096
+MIA,Miami International,Miami,USA,MIA,KMIA,25.7959,-80.2871
+PHX,Phoenix Sky Harbor,Phoenix,USA,PHX,KPHX,33.4353,-112.0007
+MSP,Minneapolis–Saint Paul,Minneapolis,USA,MSP,KMSP,44.8848,-93.2223

@@ -1,0 +1,81 @@
+:ID(System),aircraft_id,type,name
+AC1001-S01,AC1001,Engine,CFM56-7B #1
+AC1001-S02,AC1001,Engine,CFM56-7B #2
+AC1001-S03,AC1001,Avionics,Generic Avionics Suite
+AC1001-S04,AC1001,Hydraulics,Main Hydraulic System
+AC1002-S01,AC1002,Engine,V2500 #1
+AC1002-S02,AC1002,Engine,V2500 #2
+AC1002-S03,AC1002,Avionics,Generic Avionics Suite
+AC1002-S04,AC1002,Hydraulics,Main Hydraulic System
+AC1003-S01,AC1003,Engine,LEAP-1A #1
+AC1003-S02,AC1003,Engine,LEAP-1A #2
+AC1003-S03,AC1003,Avionics,Generic Avionics Suite
+AC1003-S04,AC1003,Hydraulics,Main Hydraulic System
+AC1004-S01,AC1004,Engine,GE CF34-10E #1
+AC1004-S02,AC1004,Engine,GE CF34-10E #2
+AC1004-S03,AC1004,Avionics,Generic Avionics Suite
+AC1004-S04,AC1004,Hydraulics,Main Hydraulic System
+AC1005-S01,AC1005,Engine,CFM56-7B #1
+AC1005-S02,AC1005,Engine,CFM56-7B #2
+AC1005-S03,AC1005,Avionics,Generic Avionics Suite
+AC1005-S04,AC1005,Hydraulics,Main Hydraulic System
+AC1006-S01,AC1006,Engine,V2500 #1
+AC1006-S02,AC1006,Engine,V2500 #2
+AC1006-S03,AC1006,Avionics,Generic Avionics Suite
+AC1006-S04,AC1006,Hydraulics,Main Hydraulic System
+AC1007-S01,AC1007,Engine,LEAP-1A #1
+AC1007-S02,AC1007,Engine,LEAP-1A #2
+AC1007-S03,AC1007,Avionics,Generic Avionics Suite
+AC1007-S04,AC1007,Hydraulics,Main Hydraulic System
+AC1008-S01,AC1008,Engine,GE CF34-10E #1
+AC1008-S02,AC1008,Engine,GE CF34-10E #2
+AC1008-S03,AC1008,Avionics,Generic Avionics Suite
+AC1008-S04,AC1008,Hydraulics,Main Hydraulic System
+AC1009-S01,AC1009,Engine,CFM56-7B #1
+AC1009-S02,AC1009,Engine,CFM56-7B #2
+AC1009-S03,AC1009,Avionics,Generic Avionics Suite
+AC1009-S04,AC1009,Hydraulics,Main Hydraulic System
+AC1010-S01,AC1010,Engine,V2500 #1
+AC1010-S02,AC1010,Engine,V2500 #2
+AC1010-S03,AC1010,Avionics,Generic Avionics Suite
+AC1010-S04,AC1010,Hydraulics,Main Hydraulic System
+AC1011-S01,AC1011,Engine,LEAP-1A #1
+AC1011-S02,AC1011,Engine,LEAP-1A #2
+AC1011-S03,AC1011,Avionics,Generic Avionics Suite
+AC1011-S04,AC1011,Hydraulics,Main Hydraulic System
+AC1012-S01,AC1012,Engine,GE CF34-10E #1
+AC1012-S02,AC1012,Engine,GE CF34-10E #2
+AC1012-S03,AC1012,Avionics,Generic Avionics Suite
+AC1012-S04,AC1012,Hydraulics,Main Hydraulic System
+AC1013-S01,AC1013,Engine,CFM56-7B #1
+AC1013-S02,AC1013,Engine,CFM56-7B #2
+AC1013-S03,AC1013,Avionics,Generic Avionics Suite
+AC1013-S04,AC1013,Hydraulics,Main Hydraulic System
+AC1014-S01,AC1014,Engine,V2500 #1
+AC1014-S02,AC1014,Engine,V2500 #2
+AC1014-S03,AC1014,Avionics,Generic Avionics Suite
+AC1014-S04,AC1014,Hydraulics,Main Hydraulic System
+AC1015-S01,AC1015,Engine,LEAP-1A #1
+AC1015-S02,AC1015,Engine,LEAP-1A #2
+AC1015-S03,AC1015,Avionics,Generic Avionics Suite
+AC1015-S04,AC1015,Hydraulics,Main Hydraulic System
+AC1016-S01,AC1016,Engine,GE CF34-10E #1
+AC1016-S02,AC1016,Engine,GE CF34-10E #2
+AC1016-S03,AC1016,Avionics,Generic Avionics Suite
+AC1016-S04,AC1016,Hydraulics,Main Hydraulic System
+AC1017-S01,AC1017,Engine,CFM56-7B #1
+AC1017-S02,AC1017,Engine,CFM56-7B #2
+AC1017-S03,AC1017,Avionics,Generic Avionics Suite
+AC1017-S04,AC1017,Hydraulics,Main Hydraulic System
+AC1018-S01,AC1018,Engine,V2500 #1
+AC1018-S02,AC1018,Engine,V2500 #2
+AC1018-S03,AC1018,Avionics,Generic Avionics Suite
+AC1018-S04,AC1018,Hydraulics,Main Hydraulic System
+AC1019-S01,AC1019,Engine,LEAP-1A #1
+AC1019-S02,AC1019,Engine,LEAP-1A #2
+AC1019-S03,AC1019,Avionics,Generic Avionics Suite
+AC1019-S04,AC1019,Hydraulics,Main Hydraulic System
+AC1020-S01,AC1020,Engine,GE CF34-10E #1
+AC1020-S02,AC1020,Engine,GE CF34-10E #2
+AC1020-S03,AC1020,Avionics,Generic Avionics Suite
+AC1020-S04,AC1020,Hydraulics,Main Hydraulic System
