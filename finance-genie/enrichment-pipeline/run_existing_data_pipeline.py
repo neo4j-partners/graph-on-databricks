@@ -2,7 +2,7 @@
 """Run the enrichment pipeline with existing data.
 
 This runner intentionally skips setup/generate_data.py. It is for repeatable
-end-to-end tests when enrichment-pipeline/data already contains the expected CSV files
+end-to-end tests when finance-genie/data already contains the expected CSV files
 and ground_truth.json.
 """
 
@@ -57,7 +57,7 @@ def require_existing_data() -> None:
     missing = []
     empty = []
     for file_name in REQUIRED_DATA_FILES:
-        path = ROOT_DIR / "data" / file_name
+        path = ROOT_DIR.parent / "data" / file_name
         if not path.is_file():
             missing.append(str(path))
         elif path.stat().st_size == 0:
@@ -74,7 +74,7 @@ def require_existing_data() -> None:
                 emit(f"  - {path}", file=sys.stderr)
         sys.exit(1)
 
-    emit("OK existing enrichment-pipeline/data files are present")
+    emit("OK existing finance-genie/data files are present")
 
 
 def run_step(index: int, total: int, step: Step) -> None:

@@ -1,122 +1,117 @@
 # Workshop Guide
 
-This workshop is the hands-on notebook path for the Finance Genie graph
-enrichment demo. It is aligned with the `demo-guide/` narrative, but it is a
-separate executable asset. Each notebook maps to a live demo stage: the
-**Anchor** (one fraud question, two answers) runs in Genie; the **Pipeline**
-(load, enrich, land in Gold) runs as three Databricks notebooks. Same
-Databricks catalog, same Genie, new dimensions. The enrichment pipeline runs
-Neo4j GDS as a silver-to-gold stage that writes community membership, risk
-centrality, and structural similarity back as scalar columns.
+The hands-on notebook path for the Finance Genie graph enrichment demo. Each
+notebook maps to a live demo stage. The **Anchor**, one fraud question with two
+answers, runs in Genie. The **Pipeline** runs as three Databricks notebooks that
+load, enrich, and land data in Gold. The enrichment pipeline runs Neo4j GDS as a
+silver-to-gold stage that writes community membership, risk centrality, and
+structural similarity back as scalar columns. Same Databricks spend, strictly
+more answers.
 
-**Same Databricks spend. Strictly more answers.**
+This workshop is aligned with the `docs/demo-guide/` narrative but is a separate
+executable asset. The guide is the story; the workshop is the execution.
 
 **Audience:** Workshop participants running the demo interactively on Databricks.
 
-**Prerequisite state:** The demo owner has already run the `enrichment-pipeline/` setup
-steps: data generated, tables loaded into Unity Catalog, and credentials stored
-in the `neo4j-graph-engineering` secret scope.
+## Quick Start (from scratch)
 
----
+Confirm the [Prerequisites](#prerequisites) are in place, then run the notebooks
+in order on the right compute:
+
+| Order | Notebook | Compute | Stage |
+|---|---|---|---|
+| 1 | `00_required_setup.ipynb` | dedicated cluster | Store Neo4j credentials and Genie Space IDs, verify the Aura connection |
+| 2 | `01_genie_silver_questions.ipynb` | serverless | Anchor: run the before/after reveal against both Genie Spaces |
+| 3 | `02_neo4j_ingest.ipynb` | dedicated cluster | Load Silver tables into Neo4j |
+| 4 | `03_gds_enrichment.ipynb` | dedicated cluster | Run GDS; patterns become columns |
+| 5 | `04_pull_gold_tables.ipynb` | dedicated cluster | Enrich; results land in Gold |
+
+`00_required_setup.ipynb` is only needed if the admin has not already populated
+the `neo4j-graph-engineering` secret scope.
 
 ## Prerequisites
 
-Three things must be in place before the first notebook:
+The demo owner runs the `enrichment-pipeline/` setup first, so that before the
+first notebook:
 
-1. **Neo4j Spark Connector** installed as a cluster library on the dedicated
+1. **Neo4j Spark Connector** is installed as a cluster library on the dedicated
    cluster:
    ```
    org.neo4j:neo4j-connector-apache-spark_2.12:5.3.1_for_spark_3
    ```
+2. **The `neo4j-graph-engineering` secret scope** contains `uri`, `username`,
+   `password`, `genie_space_id_before`, and `genie_space_id_after`. The demo
+   owner populates these through the root
+   [Common Setup](../README.md#common-setup) (`./setup_secrets.sh`). Participants
+   can also store them interactively by running `00_required_setup.ipynb`.
+3. **The base tables** (`accounts`, `merchants`, `transactions`,
+   `account_links`, `account_labels`) exist in
+   `graph-on-databricks.graph-enriched-schema`. The demo owner loads them with
+   `enrichment-pipeline/upload_and_create_tables.sh`.
 
-2. **Secret scope populated:** the `neo4j-graph-engineering` scope must contain
-   `uri`, `username`, `password`, `genie_space_id_before`, and
-   `genie_space_id_after`. The demo owner populates these by running
-   `enrichment-pipeline/setup_secrets.sh`. Participants can also store them interactively
-   by running `00_required_setup.ipynb`.
+## Alternative Options
 
-3. **Tables loaded:** `accounts`, `merchants`, `transactions`, `account_links`,
-   and `account_labels` must exist in
-   `graph-on-databricks.graph-enriched-schema`. The demo owner loads them
-   with `enrichment-pipeline/upload_and_create_tables.sh`.
+- **Skip 02–04** if the demo owner already ran the full `enrichment-pipeline/`
+  pipeline. The Gold tables and enriched graph already exist, so you can run
+  `01_genie_silver_questions.ipynb` for the before/after reveal and go straight
+  to analysis.
+- **Run GDS in the Aura Query tab** instead of the Python-client notebook
+  (`03_gds_enrichment.ipynb`). See `aura_gds_guide.md` for the step-by-step
+  algorithm guide.
+- **`06_train_model.ipynb`** is off the 15-minute demo path. It trains a baseline
+  gradient-boosting classifier on tabular features and a graph-augmented
+  classifier on tabular plus `risk_score` / `community_id` / `similarity_score`,
+  logs both to MLflow, and translates the lift into estimated dollar impact.
+  Useful for ML-focused Q&A; skip for the analyst-workflow demo.
 
----
+## Notebook Reference
 
-## Notebook Sequence
+**`00_required_setup.ipynb`**: Stores Neo4j credentials and both Genie Space IDs
+in the `neo4j-graph-engineering` scope, then verifies the Aura connection. Run
+once on the dedicated cluster if the admin has not already populated the scope.
 
-The notebooks are grouped by which slide section they support. A workshop
-participant following along with the deck can jump between slide and notebook
-without losing the thread.
-
-### Demo prep
-
-**`00_required_setup.ipynb`** — Stores Neo4j credentials and both Genie Space
-IDs in the `neo4j-graph-engineering` Databricks secret scope, then verifies
-the Aura connection. Run once on the dedicated cluster if the admin has not
-already populated the scope.
-
-### Anchor section (slides 6–7, plus validations)
-
-**`01_genie_silver_questions.ipynb`** *(serverless)* — Runs the before/after
+**`01_genie_silver_questions.ipynb`** *(serverless)*: Runs the before/after
 reveal live against both Genie Spaces. A tabular warm-up confirms Genie is
 working. An analytics challenge shows it handling joins and conditional
-aggregates correctly. Then three anchor before/after pairs run side by side —
-merchant favorites, book share, and investigator review queue — followed by
-two validation pairs (merchant ring-candidate share; high-volume account
-community membership). The gap between each before and after answer is the
-argument for the enrichment pipeline.
+aggregates. Then three anchor before/after pairs run side by side (merchant
+favorites, book share, investigator review queue), followed by two validation
+pairs (merchant ring-candidate share; high-volume account community membership).
+The gap between each before and after answer is the argument for the pipeline.
 
-### Pipeline section (slides 12–14)
+**`02_neo4j_ingest.ipynb`** *(dedicated cluster)*: Load Silver into Neo4j. Reads
+the five Delta tables and writes them as a property graph: `:Account` and
+`:Merchant` nodes, `TRANSACTED_WITH` (Account → Merchant) and `TRANSFERRED_TO`
+(Account → Account) relationships.
 
-Three notebooks that convert network topology into catalog columns. Each
-maps to one step on the "Enrichment Pipeline" slide.
-
-**`02_neo4j_ingest.ipynb`** *(dedicated cluster)* — **Load Silver into Neo4j.**
-Reads the five Delta tables and writes them to Neo4j as a property graph:
-`:Account` and `:Merchant` nodes, `TRANSACTED_WITH` (Account → Merchant) and
-`TRANSFERRED_TO` (Account → Account) relationships.
-
-**`03_gds_enrichment.ipynb`** *(dedicated cluster)* — **Run GDS, patterns
-become columns.** Runs three GDS algorithms via the `graphdatascience` Python
-client and writes the results back to each Account node:
+**`03_gds_enrichment.ipynb`** *(dedicated cluster)*: Run GDS, patterns become
+columns. Runs three GDS algorithms via the `graphdatascience` Python client and
+writes the results back to each Account node:
 - **PageRank** → `risk_score` (centrality in the transfer network)
 - **Louvain** → `community_id` (each fraud ring becomes one community)
 - **Node Similarity** → `similarity_score` (Jaccard overlap of shared-merchant sets)
 
-**`04_pull_gold_tables.ipynb`** *(dedicated cluster)* — **Enrich, results land
-in Gold.** Reads the enriched Account nodes and similarity relationships back
-from Neo4j and writes three Gold tables to Unity Catalog. These are what the
-AFTER Genie space queries.
-- **`gold_accounts`** — account metadata plus `risk_score`, `community_id`,
+**`04_pull_gold_tables.ipynb`** *(dedicated cluster)*: Enrich, results land in
+Gold. Reads the enriched Account nodes and similarity relationships back from
+Neo4j and writes three Gold tables that the AFTER Genie space queries:
+- **`gold_accounts`**: account metadata plus `risk_score`, `community_id`,
   `similarity_score`, community aggregates (`community_size`,
   `community_avg_risk_score`, `community_risk_rank`, `inbound_transfer_events`),
   and the derived flags `is_ring_community` and `fraud_risk_tier`
-- **`gold_account_similarity_pairs`** — pairwise similarity scores with a
+- **`gold_account_similarity_pairs`**: pairwise similarity scores with a
   `same_community` flag
-- **`gold_fraud_ring_communities`** — one row per Louvain community with
-  `member_count`, `avg_risk_score`, `avg_similarity_score`,
-  `is_ring_candidate`, and `top_account_id`
-
-### Off the 15-minute demo path
-
-**`06_train_model.ipynb`** *(optional)* — Supplementary. Not part of the
-live demo flow. Trains a baseline gradient-boosting classifier on tabular
-features and a graph-augmented classifier on tabular plus
-`risk_score` / `community_id` / `similarity_score`, logs both runs to MLflow,
-and translates the lift into estimated dollar impact. Useful for ML-focused
-Q&A; skip for the analyst-workflow demo.
-
----
+- **`gold_fraud_ring_communities`**: one row per Louvain community with
+  `member_count`, `avg_risk_score`, `avg_similarity_score`, `is_ring_candidate`,
+  and `top_account_id`
 
 ## Reference Material
 
-- `genie-guide.md` — copy-paste questions organized as Primary Anchor,
-  Backup Anchor, Validation Pairs, Extended Questions, and Fill-In / Q&A
-- `GENIE_SETUP.md` — pointer file that explains where the live Genie Space
-  configuration comes from (`enrichment-pipeline/setup/provision_genie_spaces.py` +
+- [`../docs/demo-guide/genie-questions.md`](../docs/demo-guide/genie-questions.md):
+  copy-paste question bank organized by category
+- `GENIE_SETUP.md`: where the live Genie Space configuration comes from
+  (`enrichment-pipeline/setup/provision_genie_spaces.py` +
   `enrichment-pipeline/genie_instructions.md` + UC column comments), plus the
-  workshop-specific before/after narrative for the "hub of a money
-  movement network" question
-- `aura_gds_guide.md` — step-by-step GDS algorithm guide for running in the
-  Neo4j Aura Query tab, an alternative to the Python-client notebook
-- `diagrams/` — architecture diagrams for the workshop
+  workshop-specific before/after narrative for the "hub of a money movement
+  network" question
+- `aura_gds_guide.md`: step-by-step GDS algorithm guide for the Neo4j Aura Query
+  tab, an alternative to the Python-client notebook
+- `diagrams/`: architecture diagrams for the workshop

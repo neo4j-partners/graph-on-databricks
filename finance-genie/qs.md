@@ -1,8 +1,17 @@
 # Finance Genie Documentation Cleanup & Organize Plan
 
 This is a working plan for reorganizing three READMEs so a reader can find one
-common setup, one happy path per project, and clearly-labeled alternatives. It
-guides the later README edits; it is not the edits themselves.
+common setup, one happy path per project, and clearly-labeled alternatives.
+
+## Status
+
+- [x] Resolve the `SCOPING_GUIDE.md` link → remove it (file does not exist)
+- [x] Decide data location → committed in `finance-genie/data/` for visibility
+- [x] Repoint the three hardcoded `enrichment-pipeline/data/` references at the
+      shared `finance-genie/data/` (verified)
+- [x] Rewrite `README.md`, `enrichment-pipeline/README.md`,
+      `workshop/README.md` per the outlines below (links verified; fixed the
+      stale `workshop/genie-guide.md` reference → `docs/demo-guide/genie-questions.md`)
 
 ## Problem
 
@@ -198,20 +207,21 @@ Proposed structure:
 - Same heading vocabulary everywhere:
   `Quick Start (from scratch)` → `Prerequisites` → `Alternative options` → `Reference`.
 
-## Code changes required for the moved data directory
+## Code changes for the moved data directory — DONE
 
-The dataset now lives in `finance-genie/data/`, but three references still
-hardcode `enrichment-pipeline/data/`. These must be repointed at the parent
-`finance-genie/data/` before the upload/orchestrator steps work:
+The dataset now lives in `finance-genie/data/`. The three references that
+hardcoded `enrichment-pipeline/data/` have been repointed at the shared parent
+dir, and the resolved paths were verified to land on `finance-genie/data/` with
+all six files present:
 
-| File | Reference | Change |
+| File | Change | Status |
 |---|---|---|
-| `enrichment-pipeline/upload_and_create_tables.sh` | `DATA_DIR="${SCRIPT_DIR}/data"` (L59) | point at `${SCRIPT_DIR}/../data` |
-| `enrichment-pipeline/run_existing_data_pipeline.py` | `ROOT_DIR / "data" / file_name` (L60) | use `ROOT_DIR.parent / "data"` |
-| `enrichment-pipeline/setup/generate_data.py` | `--output` default `./data` (L451) | default to `../data` |
+| `enrichment-pipeline/upload_and_create_tables.sh` | `DATA_DIR="${ROOT_DIR}/data"` (ROOT_DIR is the finance-genie root) | done |
+| `enrichment-pipeline/run_existing_data_pipeline.py` | `ROOT_DIR.parent / "data"` | done |
+| `enrichment-pipeline/setup/generate_data.py` | `--output` default `Path(__file__).resolve().parents[2] / "data"` | done |
 
-Also update the script header comments and any prose referencing
-`enrichment-pipeline/data/` to say `finance-genie/data/`.
+Script header comments, the orchestrator docstring/message, and the
+`generate_data.py` usage text were updated to reference `finance-genie/data/`.
 
 ## Files this plan will touch (in the follow-up edit pass)
 

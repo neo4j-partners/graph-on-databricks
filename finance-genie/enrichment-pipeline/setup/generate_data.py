@@ -36,7 +36,7 @@ for per-phase tuning values.
 
 Usage:
     From the enrichment-pipeline/ directory (which contains pyproject.toml):
-        uv run setup/generate_data.py
+        uv run setup/generate_data.py                 # writes to finance-genie/data/
         uv run setup/generate_data.py --output ./data/
 """
 
@@ -448,8 +448,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--output",
-        default="./data",
-        help="Output directory for CSV files (default: ./data)",
+        default=Path(__file__).resolve().parents[2] / "data",
+        help="Output directory for CSV files (default: finance-genie/data/)",
     )
     args   = parser.parse_args()
     output = Path(args.output)

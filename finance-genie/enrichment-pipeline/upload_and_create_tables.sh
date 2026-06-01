@@ -3,7 +3,7 @@
 #
 # 1. Applies schema.sql — creates all five base tables with column-level
 #    Unity Catalog comments (DDL only, no data).
-# 2. Uploads CSVs from enrichment-pipeline/data/ to the Unity Catalog Volume.
+# 2. Uploads CSVs from finance-genie/data/ to the Unity Catalog Volume.
 # 3. Inserts data into each table from the uploaded CSVs.
 #
 # Schema and data are intentionally separate:
@@ -56,7 +56,7 @@ if [[ -z "${DATABRICKS_WAREHOUSE_ID:-}" ]]; then
   exit 1
 fi
 
-DATA_DIR="${SCRIPT_DIR}/data"
+DATA_DIR="${ROOT_DIR}/data"
 SCHEMA_FILE="${SCRIPT_DIR}/sql/schema.sql"
 CLI="databricks --profile ${PROFILE}"
 

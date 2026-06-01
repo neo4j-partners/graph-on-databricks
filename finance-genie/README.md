@@ -2,41 +2,71 @@
 
 [Project website and slides](https://neo4j-partners.github.io/graph-on-databricks/)
 
-## Quick Start: Shared Environment
+Finance Genie shows what becomes possible when Neo4j GDS runs as a silver-to-gold
+enrichment stage inside a Databricks Lakehouse. The demo has a before and an
+after. The BEFORE space answers standard BI questions over flat Silver tables but
+silently substitutes a different answer when asked about network structure such
+as centrality and community membership. The AFTER space queries graph-derived columns
+(`risk_score`, `community_id`, `similarity_score`) that GDS materialized back into
+Gold, and answers a question class that did not exist in the Silver layer.
 
-All Finance Genie subprojects now use a shared environment file at the repo
-root. Create it once, then reuse it for `enrichment-pipeline/`,
-`simple-finance-analyst/`, `neo4j-mcp-demo/`, `simple-finance-agent/`, and
-`apx-demo/`.
+## Common Setup
 
-```bash
-cd finance-genie
-cp .env.sample .env
-# Edit .env and fill in Databricks, Neo4j, Genie, and MCP values.
-```
+Every subproject shares one environment file and one set of Databricks secrets,
+defined once at the repo root.
 
-Provision Databricks secrets from the same root env file:
+1. **Create the shared `.env`:**
 
-```bash
-./setup_secrets.sh --profile <databricks-profile>
-```
+   ```bash
+   cd finance-genie
+   cp .env.sample .env
+   # Edit .env: fill in Databricks, Neo4j, Genie, and MCP values.
+   ```
 
-The root setup writes separate Databricks secret scopes for separate runtime
-surfaces. This keeps one operator workflow without giving every app access to
-every secret:
+2. **Provision Databricks secrets** from the same root env file:
 
-| Scope | Used by | Contents |
+   ```bash
+   ./setup_secrets.sh --profile <databricks-profile>
+   ```
+
+   The setup writes separate secret scopes for separate runtime surfaces, so one
+   operator workflow does not give every app access to every secret:
+
+   | Scope | Used by | Contents |
+   |---|---|---|
+   | `neo4j-graph-engineering` | `enrichment-pipeline/` jobs and workshop notebooks | Neo4j URI, username, password, before/after Genie Space IDs |
+   | `simple-finance-analyst` | `simple-finance-analyst` real backend | Neo4j URI, username, password, analyst Genie Space ID |
+   | `mcp-neo4j-secrets` | `neo4j-mcp-demo` and MCP-backed agents | AgentCore OAuth gateway/client credentials, when `.mcp-credentials.json` is available |
+
+3. **Upload data and create the base tables:**
+
+   ```bash
+   cd enrichment-pipeline
+   ./upload_and_create_tables.sh
+   ```
+
+   The synthetic dataset is committed in `finance-genie/data/`, so you can browse
+   the five CSVs and `ground_truth.json` directly. This step uploads them to the
+   Unity Catalog Volume, applies `sql/schema.sql` to create the five base tables
+   with column-level comments (the contract Genie reads), then loads the data via
+   `INSERT OVERWRITE`. Requires `DATABRICKS_WAREHOUSE_ID` in `finance-genie/.env`.
+   Regenerating the dataset is optional and covered in
+   [enrichment-pipeline/README.md](./enrichment-pipeline/README.md).
+
+Now pick a path below.
+
+## Choose Your Path
+
+| You want to... | Follow | Runnable assets |
 |---|---|---|
-| `neo4j-graph-engineering` | `enrichment-pipeline/` jobs and workshop notebooks | Neo4j URI, username, password, before/after Genie Space IDs |
-| `simple-finance-analyst` | `simple-finance-analyst` real backend | Neo4j URI, username, password, analyst Genie Space ID |
-| `mcp-neo4j-secrets` | `neo4j-mcp-demo` and MCP-backed agents | AgentCore OAuth gateway/client credentials, when `.mcp-credentials.json` is available |
+| Show graph structure becoming reusable Databricks data products (enriched Gold columns) | **Path A: Graph-Enriched Lakehouse** | [enrichment-pipeline/](./enrichment-pipeline/README.md), [workshop/](./workshop/README.md) |
+| Show live graph evidence retrieved through MCP by an agent, beside Genie | **Path B: MCP-Backed Simple Agent** | [simple-finance-agent/](./simple-finance-agent/README.md), [neo4j-mcp-demo/](./neo4j-mcp-demo/README.md) |
 
-Existing per-project `.env` files remain fallback-only for compatibility. New
-setup should use `finance-genie/.env`.
+## Path A: Graph-Enriched Lakehouse
 
-## Graph-Enriched Lakehouse Path
-
-This is the original before/after demo path. Neo4j GDS runs as a silver-to-gold enrichment stage, and Databricks Genie queries graph-derived features after they have been materialized as ordinary Gold Delta columns.
+The original before/after demo path. Neo4j GDS runs as a silver-to-gold
+enrichment stage, and Databricks Genie queries graph-derived features after they
+have been materialized as ordinary Gold Delta columns.
 
 ```text
                      finance-genie/enrichment-pipeline
@@ -72,16 +102,28 @@ This is the original before/after demo path. Neo4j GDS runs as a silver-to-gold 
 | AFTER Genie Space, dashboards, SQL, ML                             |
 | Queries graph-derived columns like normal warehouse fields          |
 +--------------------------------------------------------------------+
-
-Participant path: finance-genie/workshop
-Presenter path:   finance-genie/demo-guide
 ```
 
-Use this path when the point is to show that graph structure can become reusable Databricks data products. The graph evidence enters Databricks as stable Gold columns that any downstream Databricks workflow can consume without calling Neo4j at query time.
+How to run each piece:
 
-## MCP-Backed Simple Agent Path
+- **Admin / CI setup** (data, tables, secrets, jobs, GDS, validation):
+  [enrichment-pipeline/README.md](./enrichment-pipeline/README.md)
+- **Hands-on notebooks** (the participant-facing walkthrough):
+  [workshop/README.md](./workshop/README.md)
+- **Presenter narrative** (talk track, questions, slides):
+  [docs/demo-guide/](./docs/demo-guide/)
 
-This is the live graph-evidence path. Neo4j GDS still computes the structural evidence, but the evidence is retrieved through MCP by a simple finance agent. A Databricks Supervisor Agent can be configured manually to route graph questions to this endpoint and Silver-table business questions to the BEFORE Genie Space.
+Use this path when the point is that graph structure can become reusable
+Databricks data products. The graph evidence enters Databricks as stable Gold
+columns that any downstream Databricks workflow can consume without calling Neo4j
+at query time.
+
+## Path B: MCP-Backed Simple Agent
+
+The live graph-evidence path. Neo4j GDS still computes the structural evidence,
+but the evidence is retrieved through MCP by a simple finance agent. A Databricks
+Supervisor Agent can be configured manually to route graph questions to this
+endpoint and Silver-table business questions to the BEFORE Genie Space.
 
 ```text
 +--------------------------------------------------------------------+
@@ -125,65 +167,44 @@ This is the live graph-evidence path. Neo4j GDS still computes the structural ev
 +--------------------------------------------------------------------+
 ```
 
-Use this path when the point is to show live graph tool access beside Genie, without persisting graph-enriched Gold tables. This repo deploys the MCP-backed agent endpoint; Supervisor Agent and Genie wiring are Databricks-side setup.
+How to run each piece:
 
-## Overview
+- **Agent endpoint** (the deployable MCP-backed finance agent):
+  [simple-finance-agent/README.md](./simple-finance-agent/README.md)
+- **MCP connection it depends on** (UC HTTP connection, AgentCore gateway):
+  [neo4j-mcp-demo/README.md](./neo4j-mcp-demo/README.md)
 
-The Finance Genie demo shows what becomes possible when Neo4j GDS runs as a silver-to-gold enrichment stage inside a Databricks Lakehouse. The pipeline reads relationships from the existing Silver tables, runs three deterministic graph algorithms in Neo4j Aura, and writes three scalar columns (`risk_score`, `community_id`, `similarity_score`) back into the Gold layer. Genie, SQL warehouses, dashboards, and downstream ML read those columns without any interface change.
-
-The demo has a before and an after. The BEFORE space runs against unenriched Silver tables. The first questions are standard BI: account balances, transfer volumes, top merchants. Genie handles them cleanly. The next questions target network structure: which accounts are central hubs, which groups of accounts move money tightly among themselves. Genie answers the question it can answer with the data it has, not the question that was asked. Transfer volume is not network centrality. No amount of SQL over flat rows produces eigenvector centrality. The gap is genuine.
-
-The AFTER space runs against the enriched Gold tables. GDS has already done the structural work. `risk_score` is PageRank eigenvector centrality. `community_id` is a Louvain community partition. `similarity_score` is Jaccard overlap of shared-merchant sets. These are features with published mathematical definitions, not fraud verdicts. The analyst, investigator, or downstream model adjudicates. Genie reads those columns the same way it reads any other column in the catalog and answers a different class of question: portfolio composition by community, cohort comparisons across risk tiers, community rollups, operational workload by region, merchant-side analysis conditioned on structural membership.
-
-The enrichment pipeline is not better algorithms applied to the same data. It converts network topology into columns, making a question class available to Genie that did not exist in the Silver layer.
-
-For guidance on where this enrichment pattern fits in production and how to calibrate it for a customer dataset, see [SCOPING_GUIDE.md](./SCOPING_GUIDE.md).
+Use this path when the point is live graph tool access beside Genie, without
+persisting graph-enriched Gold tables. This repo deploys the MCP-backed agent
+endpoint; Supervisor Agent and Genie wiring are Databricks-side setup.
 
 ## Project Map
 
-Finance Genie now contains several related but separate projects. They share the same core claim: relationship structure belongs in the Databricks analytical workflow, either as graph-enriched Gold columns or as live graph evidence routed through an agent.
+Finance Genie contains several related but separate projects. They share the same
+core claim: relationship structure belongs in the Databricks analytical workflow,
+either as graph-enriched Gold columns or as live graph evidence routed through an
+agent.
 
-### `demo-guide/`
+| Directory | What it is | When to use |
+|---|---|---|
+| [`enrichment-pipeline/`](./enrichment-pipeline/README.md) | Admin and CI implementation of the Gold-table pipeline: generates data, uploads tables, configures secrets, provisions Genie Spaces, submits jobs, runs ingest and GDS, pulls Gold tables, validates output. | Preparing the shared environment before a workshop or demo, and unattended/regression runs. |
+| [`workshop/`](./workshop/README.md) | Participant-facing notebooks that walk through the same enrichment idea interactively. | Running the demo hands-on on Databricks. |
+| [`docs/demo-guide/`](./docs/demo-guide/) | Narrative and presenter collateral: before/after framing, recommended questions, speaker notes, slides. | Preparing the positioning and talk track. |
+| [`neo4j-mcp-demo/`](./neo4j-mcp-demo/README.md) | The external MCP integration: AgentCore OAuth, UC HTTP connection with MCP, tool discovery, LangGraph agent, Model Serving endpoint. | Enabling live graph access through MCP. |
+| [`simple-finance-agent/`](./simple-finance-agent/README.md) | The deployable graph-only MCP-backed finance agent endpoint. | Pairing with a Supervisor Agent that routes graph vs business questions. |
+| [`simple-finance-analyst/`](./simple-finance-analyst/) | Flask web app for exploring fraud rings in Neo4j and analyzing via Genie. | A UI for analysts over the graph evidence. |
+| [`graph-fraud-analyst/`](./graph-fraud-analyst/) | Full-stack React + FastAPI Fraud Signal Workbench (Search, Load, Analyze). | A production-style investigation workbench. |
 
-`demo-guide/` is the narrative and presenter collateral for the graph-enriched lakehouse story. It explains the before/after Genie framing, the GDS enrichment pattern, recommended questions, speaker notes, and slide material. It is not the executable workshop. Treat it as the story source for preparing and delivering the demo.
+Quick pointers:
 
-Start here when you need the positioning, talk track, customer objections, or slide flow.
+- **Presenter prep:** [docs/demo-guide/prep-guide.md](./docs/demo-guide/prep-guide.md) for the story, questions, and slides.
+- **Workshop participants:** [workshop/README.md](./workshop/README.md) for the notebook sequence and cluster prerequisites.
+- **Demo owner / CI:** [enrichment-pipeline/README.md](./enrichment-pipeline/README.md) for data, tables, secrets, validation, and CLI commands.
+- **MCP setup:** [neo4j-mcp-demo/README.md](./neo4j-mcp-demo/README.md) for the Databricks external MCP connection and validation.
+- **Simple finance agent:** [simple-finance-agent/README.md](./simple-finance-agent/README.md) for endpoint deployment and Supervisor handoff.
 
-### `enrichment-pipeline/`
+## Further Reading
 
-`enrichment-pipeline/` is the admin and CI-oriented implementation of the original graph-enriched Gold-table pipeline. It generates the synthetic finance dataset, uploads base tables to Unity Catalog, configures secrets, provisions Genie Spaces, submits Databricks Jobs, runs Neo4j ingest and GDS, pulls enriched results back into Gold tables, and validates the output.
-
-Use this before a workshop or live demo to prepare the shared environment. It is also the repeatable path for unattended setup and regression checks.
-
-### `workshop/`
-
-`workshop/` is the participant-facing notebook experience. It walks through the same graph-enrichment idea interactively: query the Silver-only Genie baseline, load Silver tables into Neo4j, run GDS, pull enriched Gold tables back into Databricks, and query the enriched result.
-
-The workshop is separate from `demo-guide/`. The guide is narrative collateral; the workshop is hands-on execution. They should stay aligned, but they serve different audiences and should not be treated as the same artifact.
-
-### `neo4j-mcp-demo/`
-
-`neo4j-mcp-demo/` builds the external MCP integration path. It configures AgentCore OAuth credentials, creates the Databricks Unity Catalog HTTP connection with MCP enabled, validates MCP tool discovery, registers a LangGraph agent, and deploys a Databricks Model Serving endpoint that can call Neo4j MCP tools through the Databricks MCP proxy.
-
-Use this when the demo needs live graph access through MCP rather than only precomputed Gold columns.
-
-### `simple-finance-agent/`
-
-`simple-finance-agent/` contains the deployable MCP-backed finance agent endpoint. The agent is graph-only: it calls Neo4j through the Unity Catalog external MCP proxy, can inspect schema, and can run read-only Cypher. It does not query Genie directly and does not depend on the graph-enriched Gold tables.
-
-Use this with a manually configured Supervisor Agent that routes graph questions to this endpoint and business impact analysis over Silver/base tables to the BEFORE Genie Space.
-
-**Presenter prep:** see [demo-guide/prep-guide.md](./demo-guide/prep-guide.md) for the story, questions, and slides.
-
-**Workshop participants:** see [workshop/README.md](./workshop/README.md) for the notebook sequence and cluster prerequisites.
-
-**Demo owner / CI:** see [enrichment-pipeline/README.md](./enrichment-pipeline/README.md) for data generation, table upload, secret management, pipeline validation, and CLI commands.
-
-**MCP setup:** see [neo4j-mcp-demo/README.md](./neo4j-mcp-demo/README.md) for Databricks external MCP connection setup and validation.
-
-**Simple finance agent:** see [simple-finance-agent/README.md](./simple-finance-agent/README.md) for the MCP-backed endpoint deployment and Supervisor handoff guidance.
-
-## Slides
-
+- [ARCHITECTURE.md](./ARCHITECTURE.md): design rationale, GDS algorithm choices, and integration patterns.
 - [Full Finance Genie deck](https://neo4j-partners.github.io/graph-on-databricks/slides.html)
 - [15-minute Finance Genie deck](https://neo4j-partners.github.io/graph-on-databricks/slides-15min.html)
