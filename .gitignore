@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+.env.aws
+.env.azure
 
 # Python
 __pycache__/
@@ -122,8 +124,7 @@ package-lock.json
 finance-genie/docs/demo-guide/slides/*.pdf
 finance-genie/docs/demo-guide/slides/*.html
 
-# Generated data files
-finance-genie/enrichment-pipeline/data/
+# Generated log files
 finance-genie/enrichment-pipeline/logs/
 .mcp-credentials.json
 
