@@ -1,0 +1,181 @@
+# Virtual Graph for Finance Genie
+
+Neo4j Virtual Graph lets you query Databricks tables as a property graph in Aura without copying the data into Neo4j first. This walkthrough sets up a Virtual Graph over the Finance Genie Silver tables, so you can explore accounts and transfers with Cypher while the data stays in Unity Catalog.
+
+> Virtual Graph is in private preview. Do not use sensitive or production data with it during the preview.
+
+## 1. Complete the Common Setup
+
+Before setting up the Virtual Graph, run the **Common Setup** in [README.md](./README.md). That step creates the shared `.env`, provisions the Databricks secrets, uploads the synthetic dataset, and applies `sql/schema.sql` to create the base tables. The Virtual Graph reads those tables, so they must exist first.
+
+The tables you will model are the Finance Genie Silver tables: `accounts`, `merchants`, `transactions`, and `account_links`. The `account_labels` table stays out of the graph. It holds the fraud ground truth used for evaluation, not graph structure.
+
+## 2. Prepare Databricks
+
+Aura connects to Databricks over a SQL warehouse using a personal access token. Collect the following from your Databricks workspace.
+
+### Create an access token
+
+1. Select **Settings** from the user menu at the top right.
+2. Select **Developer** under **User** in the **Settings** menu.
+3. Select **Manage** next to **Access tokens**.
+4. In the **Generate new token** menu, enter a name and a lifetime in days, and select `sql` as the API scope.
+5. Select **Generate** and copy the token.
+
+### Look up the server information
+
+To find your **Server hostname** and **HTTP Path**:
+
+1. Select **SQL Warehouses** from the left-side navigation.
+2. Select the SQL warehouse you want to query through.
+3. Open the **Connection details** tab to read the **Server hostname** and **HTTP Path**.
+
+To find your catalog and schema:
+
+1. Select **Catalog** from the left-side navigation.
+2. Select your catalog.
+3. The **Overview** tab lists the available schemas.
+
+For Finance Genie, the catalog and schema are the ones holding the Silver tables created during Common Setup.
+
+## 3. Create the Virtual Graph in Aura
+
+In the Aura console:
+
+1. Select **Instances** from the left-side navigation.
+2. Open the **Virtual Graphs** tab and select **Create virtual graph**.
+3. In the **Configure Virtual Graph** step, choose a name, a cloud provider, and a memory volume.
+
+### Connect Databricks as the data source
+
+1. Select **Add new data source** and choose **Databricks**.
+2. Complete the form:
+   - Assign the data source a name.
+   - Enter the **Server hostname** and **HTTP Path** from the SQL warehouse connection details.
+   - Enter the personal access token you generated.
+   - Enter the **Catalog** and **Schema** that hold the Finance Genie tables.
+3. Select **Next** and wait for the connection to be verified, then **Confirm**.
+
+### Confirm the setup worked
+
+When the connection verifies, the **Confirm** step lists your Databricks data source along with the discovered tables and columns. A successful Finance Genie setup looks like this:
+
+![Finance Genie Virtual Graph connection confirmed](./docs/images/finance-genie-vg.png)
+
+The panel shows the data source set to Databricks with the server hostname, HTTP path, catalog, and schema you entered, and the discovered tables on the right. The table list is scrollable; the screenshot shows the top of it:
+
+- `account_labels` with `account_id` and `is_fraud`
+- `account_links` with `link_id`, `src_account_id`, `dst_account_id`, `amount`, and `transfer_timestamp`
+- `accounts` with `account_id`, `account_hash`, `account_type`, `region`, `balance`, `opened_date`, and `holder_age`
+
+Scroll down to see the remaining two tables, `merchants` and `transactions`. All five Silver tables are discovered. Seeing these tables and columns confirms that Aura can reach the warehouse and read the Finance Genie schema.
+
+## 4. Select a graph model
+
+Under **Select graph model**, choose **Create new graph model**. You populate this empty model in the next step.
+
+## 5. Define your schema
+
+**Generate from schema** turns every discovered table into a node, including the `transactions` and `account_links` join tables. The Finance Genie graph needs those two tables modeled as relationships instead, and it leaves `account_labels` out of the graph entirely. The label is the fraud ground truth, so keeping it out of the graph preserves it as a held-out evaluation target rather than a feature.
+
+The target model is two node types and two relationship types:
+
+- `:Account` nodes from the `accounts` table
+- `:Merchant` nodes from the `merchants` table
+- `TRANSACTED_WITH` relationships (`:Account` → `:Merchant`) from the `transactions` table
+- `TRANSFERRED_TO` relationships (`:Account` → `:Account`) from the `account_links` table
+
+Build that model with the following steps.
+
+1. Remove `account_labels` from the data source so Aura does not model it.
+2. Select **Generate from schema**. Aura infers nodes and relationships from the remaining table schema and foreign keys.
+3. Remove every relationship Aura generated. You will recreate the two you need by hand so the node ID mappings are explicit.
+4. Remove the `transactions` and `account_links` nodes. These are edge tables and become relationships, not nodes. Keep the `accounts` and `merchants` nodes.
+5. Create the `TRANSACTED_WITH` relationship, as shown below:
+
+   - Set the **Relationship type** to `TRANSACTED_WITH`.
+   - Under **Properties**, map from the `transactions` table.
+   - Under **Node ID mapping**, set **From** to `accounts`, with ID property `account_id` mapped from ID column `account_id`.
+   - Set **To** to `merchants`, with ID property `merchant_id` mapped from ID column `merchant_id`.
+
+   ![Create the TRANSACTED_WITH relationship](./docs/images/load-vg-step-1.png)
+
+6. Create the `TRANSFERRED_TO` relationship, as shown below. Both ends map to the `accounts` node; the source and destination differ only by which column supplies the ID:
+
+   - Set the **Relationship type** to `TRANSFERRED_TO`.
+   - Under **Properties**, map from the `account_links` table.
+   - Under **Node ID mapping**, set **From** to `accounts`, with ID property `account_id` mapped from ID column `src_account_id`.
+   - Set **To** to `accounts`, with ID property `account_id` mapped from ID column `dst_account_id`.
+
+   ![Create the TRANSFERRED_TO relationship](./docs/images/load-vg-step-2.png)
+
+7. Select **Create Virtual Graph** to save the model.
+
+## 6. Inspect your graph
+
+Select **Query** from the left-side navigation and run Cypher against the Virtual Graph. Aura translates each query to SQL and runs it on your Databricks warehouse.
+
+> The queries below use `:accounts` for the node label. The actual label depends on how you named the nodes when you defined the model in step 5. If you kept the generated table names, use `:accounts` and `:merchants`; if you renamed them, use `:Account` and `:Merchant`. Adjust the labels in these queries to match your model.
+
+### Transfers between accounts
+
+To see transfers between accounts:
+
+```cypher
+MATCH (a:accounts)-[t:TRANSFERRED_TO]->(b:accounts)
+RETURN a, t, b LIMIT 100
+```
+
+To see the Cypher-to-SQL translation, add `EXPLAIN` to the front of the query:
+
+```cypher
+EXPLAIN MATCH (a:accounts)-[t:TRANSFERRED_TO]->(b:accounts)
+RETURN a, t, b LIMIT 100
+```
+
+`EXPLAIN` returns the query plan with the generated SQL instead of running the query:
+
+![Virtual Graph query plan showing the generated SQL](./docs/images/explain-vg-plan.png)
+
+### Account balance tiers
+
+To group accounts into balance tiers and summarize each tier:
+
+```cypher
+MATCH (a:accounts)
+WITH a,
+     CASE WHEN a.balance < 10000 THEN 'low'
+          WHEN a.balance < 100000 THEN 'mid'
+          ELSE 'high' END AS balance_tier
+RETURN balance_tier,
+       count(a) AS accounts,
+       round(avg(a.balance), 2) AS avg_balance,
+       min(a.holder_age) AS min_age,
+       max(a.holder_age) AS max_age
+ORDER BY accounts DESC
+```
+
+Add `EXPLAIN` to the front to see its SQL translation:
+
+```cypher
+EXPLAIN MATCH (a:accounts)
+WITH a,
+     CASE WHEN a.balance < 10000 THEN 'low'
+          WHEN a.balance < 100000 THEN 'mid'
+          ELSE 'high' END AS balance_tier
+RETURN balance_tier,
+       count(a) AS accounts,
+       round(avg(a.balance), 2) AS avg_balance,
+       min(a.holder_age) AS min_age,
+       max(a.holder_age) AS max_age
+ORDER BY accounts DESC
+```
+
+When the queries return accounts and their transfers, the Finance Genie Virtual Graph is live and reading directly from Databricks.
+
+## Keep learning
+
+- [Quickstart: Databricks](https://neo4j.com/docs/virtual-graph/aura/getting-started-databricks/) for the source workflow this walkthrough is based on.
+- [Virtual Graph data sources](https://neo4j.com/docs/virtual-graph/aura/data-sources/) for other connection options.
+- [Virtual graph models](https://neo4j.com/docs/virtual-graph/aura/models/) for schema fine-tuning and entity type uniqueness.
+- [Cypher coverage](https://neo4j.com/docs/virtual-graph/aura/cypher-coverage/) for the current Cypher limitations.

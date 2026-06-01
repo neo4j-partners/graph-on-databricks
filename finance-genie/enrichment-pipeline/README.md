@@ -52,6 +52,17 @@ uv run diagnostics/verify_fraud_patterns.py
 
 ## Prerequisites
 
+- **Local `.env` symlink to the parent.** The CLI job runner (`uv run python -m
+  cli submit ...`) reads `.env` from the current directory, so it does not pick
+  up the shared `finance-genie/.env` on its own. Link the local file to the
+  parent so the CLI and the pipeline scripts share one source of truth (and one
+  `DATABRICKS_PROFILE`):
+
+  ```bash
+  cd enrichment-pipeline
+  ln -sf ../.env .env
+  ```
+
 - **Databricks CLI** authenticated against your workspace. The shell scripts call
   the CLI directly, so an expired or missing token causes a
   `failed during request visitor` error.
