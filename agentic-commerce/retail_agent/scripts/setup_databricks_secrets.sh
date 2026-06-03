@@ -8,7 +8,7 @@
 #
 #   Examples:
 #     ./retail_agent/scripts/setup_databricks_secrets.sh
-#     ./retail_agent/scripts/setup_databricks_secrets.sh --profile azure-rk-knight
+#     ./retail_agent/scripts/setup_databricks_secrets.sh --profile aws-partner-rk
 #
 # Prerequisites:
 #   - Databricks CLI installed and authenticated (databricks auth login --profile PROFILE)
