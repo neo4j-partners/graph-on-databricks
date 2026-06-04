@@ -1,0 +1,26 @@
+{"n": 1, "feature": "baseline MATCH + RETURN prop", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 4.2}
+{"n": 2, "feature": "WHERE on raw node property", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.9}
+{"n": 3, "feature": "aggregation in RETURN (no WITH)", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.9}
+{"n": 4, "feature": "aggregating WITH then RETURN", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 4.1}
+{"n": 5, "feature": "aggregating WITH then HAVING-style WHERE", "mode": "EXPLAIN", "verdict": "FAIL", "detail": "Neo.ClientError.Statement.SyntaxError: 42NG0: Unsupported syntax. (line 4, column 1 (offset: 58))", "seconds": 3.2}
+{"n": 8, "feature": "sum() in WITH", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 5.6}
+{"n": 6, "feature": "count(DISTINCT x) in WITH", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.9}
+{"n": 7, "feature": "count(DISTINCT x) in RETURN", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 12, "feature": "datetime() literal", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 4.2}
+{"n": 13, "feature": "datetime() - duration()", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 14, "feature": "date() literal", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 4.0}
+{"n": 15, "feature": "WHERE temporal arithmetic before WITH", "mode": "EXPLAIN", "verdict": "FAIL", "detail": "Neo.ClientError.Statement.SyntaxError: 42NG0: Unsupported syntax. (line 4, column 31 (offset: 93))", "seconds": 3.4}
+{"n": 16, "feature": "date(property) projection", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.1}
+{"n": 23, "feature": "CASE expression in RETURN", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 17, "feature": "two-hop path RETURN", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 18, "feature": "reciprocal 2-cycle (query 4 shape)", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 19, "feature": "collect() in WITH", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 6.2}
+{"n": 20, "feature": "collect(DISTINCT) in WITH", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 21, "feature": "OPTIONAL MATCH", "mode": "EXPLAIN", "verdict": "FAIL", "detail": "Neo.ClientError.Statement.SyntaxError: 42NG1: Unsupported syntax: `OPTIONAL MATCH`. (line 4, column 1 (offset: 27))", "seconds": 3.2}
+{"n": 22, "feature": "undirected relationship pattern", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.9}
+{"n": 9, "feature": "round(sum()) in WITH", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 10, "feature": "avg() in WITH", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.7}
+{"n": 11, "feature": "multiple aggregates in one WITH", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 24, "feature": "DISTINCT in RETURN (row-level)", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 3.8}
+{"n": 25, "feature": "variable-length path {2,4}", "mode": "EXPLAIN", "verdict": "FAIL", "detail": "Neo.ClientError.Statement.SyntaxError: 42NG0: Unsupported syntax. (line 3, column 14 (offset: 22))", "seconds": 5.4}
+{"n": 26, "feature": "two aggregating WITH chained", "mode": "EXPLAIN", "verdict": "PASS", "detail": "0 row(s)", "seconds": 6.3}

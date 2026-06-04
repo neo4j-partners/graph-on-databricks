@@ -179,3 +179,25 @@ When the queries return accounts and their transfers, the Finance Genie Virtual 
 - [Virtual Graph data sources](https://neo4j.com/docs/virtual-graph/aura/data-sources/) for other connection options.
 - [Virtual graph models](https://neo4j.com/docs/virtual-graph/aura/models/) for schema fine-tuning and entity type uniqueness.
 - [Cypher coverage](https://neo4j.com/docs/virtual-graph/aura/cypher-coverage/) for the current Cypher limitations.
+
+## When to model transactions as nodes
+
+This walkthrough maps the `transactions` and `account_links` fact tables to relationships rather than nodes. That is a deliberate modeling choice, and it is the correct one for the current scope.
+
+The Neo4j rule is to model a connection as a relationship and only promote it to a node when one of these holds:
+
+- The connection links three or more entities, so a relationship cannot express it.
+- Something else needs to point at the event itself, such as a dispute, a chargeback, a device, or another transaction in a chain.
+- The event is a first-class entity you traverse to, sequence over time, or run graph algorithms over.
+- The event carries rich attributes you expect to grow well beyond a few scalar fields.
+
+A Finance Genie transaction meets none of these today. It is a clean bipartite fact: one account, one merchant, with `amount`, `txn_timestamp`, and `txn_hour` mapping directly onto relationship properties. The `txn_id` primary key carries over as a relationship property when you need stable edge identity. Transfers in `account_links` are the same shape: a single account-to-account dyad that belongs on a `TRANSFERRED_TO` relationship. The relationship model is also cheaper in a Virtual Graph, where every node hop becomes an additional SQL join against Databricks.
+
+Reconsider and promote transactions to a `:Transaction` node when the data crosses one of the thresholds above. The common triggers in fraud work are:
+
+- Money-flow chains, where you trace funds through a sequence of linked transactions to detect layering or mule activity.
+- A third entity attaching to the event, such as a device, IP, session, or a dispute record that references a specific transaction.
+- Shared-event motifs, where many accounts funnel into one event and the transaction node is the shared center.
+- Graph algorithms run over the event graph itself.
+
+When that happens, the upgrade path is `(:Account)-[:PERFORMED]->(:Transaction)-[:PAID_TO]->(:Merchant)`, using `txn_id` as the node key.
