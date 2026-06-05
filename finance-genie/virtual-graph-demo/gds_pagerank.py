@@ -102,10 +102,12 @@ def override_bolt_read_timeout(seconds: float | None) -> None:
     ``BoltSocket`` and clamps every read timeout up to ``seconds``, or removes it
     entirely when ``seconds`` is ``None``.
 
-    This is an unsupported workaround. With no read timeout a genuinely dead connection
-    blocks instead of erroring, so it is opt-in via ``--read-timeout``, never the
-    default. The correct fix is server-side: Aura should emit keepalives during
-    provisioning.
+    This is an unsupported workaround, and necessary but not sufficient. It only removes
+    the client-side trip. A long provisioning that survives past 60s can still be torn
+    down by the server with ``ConnectionResetError`` / ``SessionExpired``, observed
+    empirically, which the client cannot control. With no read timeout a genuinely dead
+    connection also blocks instead of erroring, so it is opt-in, never the default. The
+    correct fix is server-side: Aura should emit keepalives during provisioning.
     """
     original = BoltSocket.set_read_timeout
 
@@ -158,9 +160,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keep", action="store_true",
                         help="skip the final drop so the projection/session can be reused")
     parser.add_argument("--read-timeout", type=float, default=None, metavar="SECONDS",
-                        help="override the 60s Bolt read timeout Aura pins, so a long, silent "
-                             "session provisioning does not kill the connection. 0 disables the "
-                             "timeout entirely. Unsupported workaround; unset keeps the 60s default")
+                        help="override the 60s Bolt read timeout Aura pins, to get past the "
+                             "client-side trip on a long, silent provisioning. 0 disables it "
+                             "entirely. Necessary but not sufficient: the server can still reset "
+                             "the connection on long provisions. Unsupported; unset keeps 60s")
     return parser.parse_args()
 
 

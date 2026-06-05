@@ -138,12 +138,13 @@ Scaling the window up exposed the real failure mode. A sweep of larger windows g
 | 109h   | 14,991 | connection read timeout |
 | 145h   | 20,019 | survived 263s, then stopped manually |
 
-The failures are not a server error. They surface client side as
-`Failed to read from defunct connection ... TimeoutError('The read operation timed
-out')`. The cause is a Bolt connection hint: Aura sends
-`connection.recv_timeout_seconds: 60`, and the Neo4j driver applies it as a 60 second
-socket read timeout, read directly off the live connection here. This is not a total
-query budget. It trips when a single socket read waits more than 60 seconds with no
+There are two independent ways a long projection dies, and they stack.
+
+The first surfaces client side as `Failed to read from defunct connection ...
+TimeoutError('The read operation timed out')`. The cause is a Bolt connection hint: Aura
+sends `connection.recv_timeout_seconds: 60`, and the Neo4j driver applies it as a 60
+second socket read timeout, read directly off the live connection here. This is not a
+total query budget. It trips when a single socket read waits more than 60 seconds with no
 bytes from the server, meaning no data and no NOOP keepalive.
 
 That explains the whole pattern. While the server streams keepalives with gaps under 60
@@ -158,26 +159,42 @@ stopped after 16 and 29 minutes, are this same mechanism. They were stopped with
 `driver.execute_query`, whose managed retry masked the read timeout as an apparent hang.
 The plain `session.run` path used now surfaces it as a clean `TimeoutError`.
 
+The second mechanism is a server side connection reset. Disabling the client read
+timeout with `--read-timeout 0` was tested against the 10,000 edge window. The
+connection then lived past 60 seconds, confirming the client trip was bypassed, but the
+projection still failed, this time with `ConnectionResetError(54, 'Connection reset by
+peer')` raised as `SessionExpired`, from an AWS fronted endpoint in front of the
+graph-engine. So even with no client timeout, the server or an intermediary tears down a
+long, silent provisioning, and the client cannot control that.
+
+Both mechanisms are nondeterministic. A separate no-override probe on the same 10,000
+edge window happened to survive past six minutes before it was stopped manually, while
+the override run was reset earlier. The trip depends on the keepalive and reset cadence
+during provisioning, not on a fixed wall-clock or strictly on edge volume.
+
 ### Workarounds
 
 - There is no public driver config to raise this. The driver applies the server hint
   unconditionally in `hello()` for every Bolt version, and the only client timeout knobs
   are `connection_acquisition_timeout`, which governs pool checkout, and the per query
   `timeout`, which is a server side query deadline.
-- The correct fix is server side: Aura Graph Analytics should emit Bolt keepalives during
-  session provisioning so the 60 second read gap never elapses. The driver log even
-  advises checking that the server is set up correctly.
-- As an unsupported client workaround, the harness adds `--read-timeout`, which patches
-  the sync `BoltSocket` to clamp or remove the read timeout before any connection opens.
-  `--read-timeout 0` disables it entirely, so a long silent provisioning no longer kills
-  the connection. The tradeoff is that a genuinely dead connection then blocks instead of
-  erroring, so it is opt-in and never the default.
+- The correct fix is server side, and it is the only one that addresses both mechanisms:
+  Aura Graph Analytics should emit Bolt keepalives during session provisioning so neither
+  the 60 second client read gap nor the server reset elapses. The driver log even advises
+  checking that the server is set up correctly.
+- The harness adds `--read-timeout` as an unsupported client workaround. It patches the
+  sync `BoltSocket` to clamp or remove the read timeout before any connection opens, and
+  `--read-timeout 0` disables it entirely. This is necessary but not sufficient: it only
+  removes the client side trip. Testing showed a long provisioning then survives past 60
+  seconds but can still be reset by the server, so it does not on its own make a large
+  projection complete. A genuinely dead connection also blocks instead of erroring with
+  the timeout off, so the flag is opt-in and never the default.
+- The reliable path today is a small projection. The 233 edge window completed cleanly,
+  and small projections provision faster, so they are far more likely to stay inside both
+  the keepalive gap and the server reset window. Use `--count-only` to size the window for
+  free and `--keep` to reuse a provisioned session.
 - The classic in-database `CALL gds.graph.project('g','Account',...)` form still fails
   fast with `42NG0`. The Cypher projection Sessions form is the working path.
-- Scoping the projection with a time window remains useful, both as a Databricks side
-  optimization and because a smaller projection provisions faster and is more likely to
-  stay under the 60 second keepalive gap. Use `--count-only` to size the window for free,
-  `--keep` to reuse a provisioned session, and `--read-timeout 0` for large projections.
 
 ---
 *Compiled from internal #team-graph-engine discussion (June 2026). Verify against the

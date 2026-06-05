@@ -59,7 +59,7 @@ uv run gds_pagerank.py --count-only   # only size the window; never provision a 
 uv run gds_pagerank.py --limit 25     # stream the top 25
 uv run gds_pagerank.py --memory 4GB   # request a larger session instance
 uv run gds_pagerank.py --keep         # leave the projection/session in place for reuse
-uv run gds_pagerank.py --since-hours 72 --read-timeout 0  # large projection, disable the 60s read timeout
+uv run gds_pagerank.py --since-hours 72 --read-timeout 0  # disable the client 60s read timeout (see caveat below)
 ```
 
 `uv run` resolves and installs the dependencies (`neo4j`, `python-dotenv`) into a
@@ -82,13 +82,15 @@ the sizing query so you can tune `--since-days` without provisioning a session.
   cancel server-side queries when the client gives up, so run on a clean instance, let
   each statement finish, and never abandon a run. Scale the warehouse up if the
   projection is slow.
-- **60s Bolt read timeout.** Aura pins `connection.recv_timeout_seconds: 60`, so the
-  driver drops the connection after any 60s gap with no server bytes. GDS Session
-  provisioning can go silent longer than that for projections above a few thousand
-  edges, which fails the project call with `TimeoutError('The read operation timed
-  out')`. There is no public driver config for this; the correct fix is server-side
-  keepalives. As an opt-in workaround, `--read-timeout 0` disables the read timeout so a
-  long, silent provisioning completes. See `../docs/gds-guide.md` for the full analysis.
+- **Two ways a large projection dies.** First, Aura pins
+  `connection.recv_timeout_seconds: 60`, so the driver drops the connection after any 60s
+  gap with no server bytes, failing the project call with `TimeoutError('The read
+  operation timed out')`. `--read-timeout 0` disables that client-side trip, but it is
+  necessary not sufficient: testing showed the connection then survives past 60s only to
+  be reset by the server with `ConnectionResetError` / `SessionExpired`, which the client
+  cannot control. There is no public driver config for the read timeout, and the only
+  reliable path today is a small projection (the 233-edge window completed cleanly). The
+  correct fix is server-side keepalives. See `../docs/gds-guide.md` for the full analysis.
 - This is a genuine probe of an actively changing surface (see the note at the bottom
   of `../docs/gds-guide.md`); the classic in-database GDS form was previously rejected
   on the Virtual Graph, so a clean failure is a valid outcome to record.
