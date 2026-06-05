@@ -91,7 +91,7 @@ The client-side aggregation, for reference: group the rows by `recipient`; `send
 
 #### Q2-pair. Fan-out by distinct recipients (pushdown-friendly, full fidelity)
 
-The mirror of Q1-pair for fan-out. The faithful smurfing signal is distinct recipients per sender, which is `count(DISTINCT dst)` grouped by the `src` node, and that does not push down. The scalar version, grouping by `src.account_id` but keeping `count(DISTINCT dst.account_id)`, does not push down either: it ran past 5 minutes without returning on the same warehouse where the pair form finishes in seconds. The DISTINCT is the blocker, not just the node group key.
+The mirror of Q1-pair for fan-out. The faithful smurfing signal is distinct recipients per sender, which is `count(DISTINCT dst)` grouped by the `src` node, and that does not push down. The scalar version, grouping by `src.account_id` but keeping `count(DISTINCT dst.account_id)`, does not push down either: it ran over an hour and then errored on the same warehouse where the pair form finishes in seconds. The DISTINCT is the blocker, not just the node group key.
 
 The fix is the same pair-grouping trick: group by the pair `(src.account_id, dst.account_id)` on the server, which dedupes sender-recipient pairs with a plain `GROUP BY` and needs no `DISTINCT`, so the aggregation pushes down. The server returns one row per pair; the application groups those by `sender`, and the row count per sender is the distinct-recipient count, with `pair_transfers` and `pair_outflow` summed for the transfer count and total outflow. The `recipients >= 5` threshold, the sort, and the top-N stay client-side. Give the two endpoints distinct aliases (`sender` and `recipient`); aliasing both to `account_id` fails with `AMBIGUOUS_REFERENCE`.
 

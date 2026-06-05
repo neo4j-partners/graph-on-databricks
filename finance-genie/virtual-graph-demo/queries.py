@@ -48,7 +48,12 @@ class Query:
     note: str = ""  # how this differs from the doc version
 
 
-QUERIES: list[Query] = [
+# NOTE: The sample fraud-signal queries below are commented out while the demo is
+# repurposed to test a GDS Session + PageRank (see ``gds_pagerank.py`` and
+# ``../docs/gds-guide.md``). Uncomment to restore the plain-Cypher fraud queries.
+QUERIES: list[Query] = []
+
+_DISABLED_QUERIES: list[Query] = [
     Query(
         number=1,
         title="Fan-in (mule collection accounts)",
