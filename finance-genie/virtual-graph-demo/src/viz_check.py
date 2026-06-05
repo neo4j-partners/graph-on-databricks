@@ -4,21 +4,20 @@ For each laundering shape (collection account, spray account, round-trip pair) t
 finds a real flagged account, then runs the matching anchored ego-network query and
 reports how many rows come back, confirming each visualization renders small and fast.
 
-Loads ``../.env.azure`` by default; set ``PROBE_ENV`` to point at another dotenv.
+Reads the parent ``finance-genie/.env`` by default; set ``PROBE_ENV`` to point at
+another dotenv.
 
-    uv run viz_check.py
+    uv run vg-viz
 """
 
 from __future__ import annotations
 
-import os
 import time
-from pathlib import Path
 
-from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
-DEFAULT_ENV = Path(__file__).resolve().parent.parent / ".env.azure"
+from connection import load_connection
+
 CUTOFF = "2024-03-23T23:58:00Z"  # dataset max transfer_timestamp minus 7 days
 
 
@@ -31,10 +30,7 @@ def timed(driver, label: str, cypher: str, **params: object) -> list:
 
 
 def main() -> None:
-    env_file = Path(os.environ.get("PROBE_ENV", DEFAULT_ENV)).expanduser()
-    load_dotenv(env_file, override=True)
-    uri = os.environ["NEO4J_URI"]
-    auth = (os.environ["NEO4J_USERNAME"], os.environ["NEO4J_PASSWORD"])
+    uri, auth = load_connection()
 
     with GraphDatabase.driver(uri, auth=auth) as driver:
         driver.verify_connectivity()

@@ -1,9 +1,0 @@
-[project]
-name = "virtual-graph-demo"
-version = "0.1.0"
-description = "Run Finance Genie plain-Cypher fraud queries against the Neo4j Virtual Graph"
-requires-python = ">=3.11"
-dependencies = [
-    "neo4j>=5.26",
-    "python-dotenv>=1.0",
-]

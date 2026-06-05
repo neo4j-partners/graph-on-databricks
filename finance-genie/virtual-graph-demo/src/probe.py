@@ -3,30 +3,27 @@
 Runs one Cypher statement, measures wall-clock time, prints the result, and never
 abandons the query (no thread cap, no client timeout). Pass the Cypher as argv[1].
 
-    uv run probe.py "RETURN 1 AS ok"
+    uv run vg-probe "RETURN 1 AS ok"
+
+Reads the parent ``finance-genie/.env`` by default; set ``PROBE_ENV`` to point at
+another dotenv.
 """
 
 from __future__ import annotations
 
-import os
 import sys
 import time
-from pathlib import Path
 
-from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
-PARENT_ENV = Path(__file__).resolve().parent.parent / ".env"
+from connection import load_connection
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        sys.exit('usage: uv run probe.py "<cypher>"')
+        sys.exit('usage: uv run vg-probe "<cypher>"')
     cypher = sys.argv[1]
-    env_file = Path(os.environ["PROBE_ENV"]).expanduser() if os.environ.get("PROBE_ENV") else PARENT_ENV
-    load_dotenv(env_file, override=True)
-    uri = os.environ["NEO4J_URI"]
-    auth = (os.environ["NEO4J_USERNAME"], os.environ["NEO4J_PASSWORD"])
+    uri, auth = load_connection()
 
     with GraphDatabase.driver(uri, auth=auth) as driver:
         driver.verify_connectivity()

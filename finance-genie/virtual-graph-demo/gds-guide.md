@@ -16,6 +16,30 @@ A few consequences of this:
 - The `CALL` form of the procedure isn't supported yet on Virtual Graph (support is planned for a later release). Use a **Cypher projection** instead.
 - GDS does not currently work in Bloom for Virtual Graph.
 
+## When you need GDS, and when plain Cypher is enough
+
+Most local fraud signal can be expressed in plain Cypher over the base entities, so reach
+for a GDS Session only when you need a global, transitive score. The table maps each GDS
+algorithm to its plain-Cypher stand-in.
+
+| Signal | GDS version | Plain-Cypher equivalent |
+|---|---|---|
+| Mule / hub detection | PageRank | Degree counting (local proxy) |
+| Fraud ring discovery | WCC / Louvain | Bounded-depth connectivity, shared-merchant co-occurrence |
+| Bridge / layering node | Betweenness | Pass-through pattern (receives then forwards) |
+| Coordinated bursts | community + temporal | Same-merchant / same-window grouping |
+
+What plain Cypher keeps: degree, reciprocity, cycles, fan-in/out, velocity, and
+co-occurrence, the workhorses of rules-based fraud detection. What it loses is ranking
+quality. PageRank weights a hub by the importance of who points at it, not just how many,
+so it catches mules one layer removed from the obvious hubs. Louvain and WCC partition the
+whole graph into rings rather than surfacing the fixed-shape patterns you anticipated.
+
+The trade-off: plain Cypher gives fast, explainable, rules-based candidates, excellent for
+triage and the "find the suspects" step. GDS gives the global scores that catch the rings
+your rules did not think to look for. For the plain-Cypher forms of these signals, see
+[`best-practices.md`](best-practices.md).
+
 ## The key: how a session gets created
 
 A GDS Session is triggered by passing a **configuration** to `gds.graph.project` that
@@ -111,7 +135,7 @@ A live test ran the Cypher projection form for PageRank over `Account` nodes and
 `TRANSFERRED_TO` relationships against instance `ge224c32`, backed by a 2X-Small
 Serverless Starter warehouse. The Sessions path works end to end: it provisions a
 session, registers an in-memory graph, streams PageRank, and drops cleanly. The harness
-is `finance-genie/virtual-graph-demo/gds_pagerank.py`.
+is the `fast-gds` demo (`src/demos/gds_fast.py`, run with `uv run vg-demo --demo fast-gds`).
 
 A 1.5 hour window of 233 transfers ran the full path successfully:
 

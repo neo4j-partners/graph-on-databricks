@@ -312,7 +312,7 @@ RETURN a, t, b
 
 For more warm-up and visualization queries (ego networks around merchants, two accounts
 linked through a shared merchant, transfer chains), see
-[`../docs/basic-graph-examples.md`](../docs/basic-graph-examples.md). The same anchoring
+[`basic-graph-examples.md`](basic-graph-examples.md). The same anchoring
 rule applies to all of them.
 
 ## How it all ties together
@@ -337,7 +337,21 @@ away. The same account showing up in placement, then layering, then at the cente
 the integration step is the story that holds up.
 
 One honest limitation worth saying out loud in the demo: these queries surface
-candidates, not proven fraud. Legitimate payment processors, payroll accounts, and
-marketplace settlement accounts share some of these fingerprints. The power is in the
-funnel. An account that lights up at every stage is far more interesting than one that
-trips a single rule.
+candidates, not proven fraud. The power is in the funnel. An account that lights up at
+every stage is far more interesting than one that trips a single rule.
+
+## Candidates, not verdicts
+
+Three caveats keep the demo honest:
+
+- **Validate against ground truth.** The dataset includes a held-out
+  `account_labels.is_fraud` table. Measure the precision and recall of any rule against
+  it before trusting it. Confident language such as "clearly fraud" is not earned until
+  you have.
+- **Legitimate accounts share the fingerprint.** Payment aggregators, payroll
+  processors, marketplace settlement accounts, and P2P-app float accounts show the same
+  high fan-in, rapid turnover, and low own-merchant activity. The hard part is separating
+  these from fraud, not finding high-throughput accounts.
+- **Watch confounded metrics.** The velocity ratio in query 4 divides by current
+  balance, which the behavior itself drives toward zero. Combine signals rather than
+  ranking on any single confounded one.

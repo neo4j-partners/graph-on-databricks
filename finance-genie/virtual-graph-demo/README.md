@@ -1,37 +1,23 @@
 # Virtual Graph Demo
 
-A small [uv](https://docs.astral.sh/uv/) Python demo that connects to the Finance
-Genie Neo4j Virtual Graph. It is currently set up to **test a GDS Session + PageRank**
-against the Virtual Graph, following [`../docs/gds-guide.md`](../docs/gds-guide.md).
+A small [uv](https://docs.astral.sh/uv/) Python demo that runs Cypher against the
+Finance Genie Neo4j **Virtual Graph** (Aura translates the Cypher to SQL and runs it on
+a backing Databricks SQL warehouse). One entry point, `vg-demo` (`src/cli.py`), runs
+four demo sets selected with `--demo`:
 
-GDS is not an in-database plugin on the Virtual Graph, so the classic
-`CALL gds.graph.project('account_transfers', 'Account', ...)` form is rejected. The
-supported path is a **GDS Session**: pass a memory config to the Cypher-projection form
-of `gds.graph.project(...)` to provision an ephemeral session, then stream PageRank
-against the named in-memory graph. `gds_pagerank.py` probes that path over the Account
-peer-to-peer transfer network (`Account` nodes + `TRANSFERRED_TO` relationships) and
-reports the exact outcome, so a clean rejection is itself an informative result.
+| `--demo` | What it is | Everything works? |
+|---|---|---|
+| `basic` | warm-up exploration and visualization queries | yes |
+| `fraud` (default) | the fast fraud-signal queries from `finding-fraud.md` | yes; `--all` adds slow / unsupported ones |
+| `fast-gds` | the working GDS Session + PageRank path | yes, on a small window |
+| `slow-gds` | the GDS forms that do not work, kept as a demonstration | no, by design |
 
-**Keeping the projection small.** Projecting all ~300k transfers is a full edge scan
-and the slow step. Following the performance lessons in
-[`../docs/plain-cypher-examples-v2.md`](../docs/plain-cypher-examples-v2.md) (a 7-day
-window cut a comparable query from ~223k rows / ~24.8s to ~22k rows / ~3.5s), the
-projection is scoped by a **time window**: only `TRANSFERRED_TO` edges newer than
-`max(transfer_timestamp) - N days` are projected. The script runs in two steps: a cheap
-`count(t)` **sizing query** first (no session, so you can see the projection size and
-tune `--since-days` before paying to provision one), then the same windowed `MATCH`
-projected into the session. The resulting PageRank measures centrality in the recent
-money-flow graph.
+## Quick start
 
-The original plain-Cypher fraud-signal queries from
-[`../docs/plain-cypher-examples.md`](../docs/plain-cypher-examples.md) are **commented
-out** (the `QUERIES` list in `queries.py` and the runner in `main.py`). To restore
-them, uncomment both.
-
-## Prerequisites
+Prerequisites:
 
 - `uv` installed.
-- A `finance-genie/.env` (the parent directory) with the Aura connection set:
+- A `finance-genie/.env` (the parent directory) with the Aura connection:
 
   ```
   NEO4J_URI=neo4j+s://<instance>.graph-engine.neo4j.io
@@ -39,58 +25,138 @@ them, uncomment both.
   NEO4J_PASSWORD=<password>
   ```
 
-  This is the same `.env` produced by the Common Setup in
-  [`../README.md`](../README.md). The demo reads it directly; no copy is needed.
+- A Virtual Graph over the Finance Genie Silver tables with node labels `:Account` and
+  `:Merchant`. If your model uses table-name labels (`:accounts` / `:merchants`), adjust
+  the labels in `src/queries.py` and in the GDS projection in `src/demos/gds_fast.py`.
 
-- A Virtual Graph created over the Finance Genie Silver tables, following
-  [`../VIRTUAL_GRAPH.md`](../VIRTUAL_GRAPH.md), with the node types named
-  `:Account` and `:Merchant`. If your model uses the generated table-name labels
-  (`:accounts` / `:merchants`), adjust the labels in `gds_pagerank.py` (and in
-  `queries.py` if you restore the fraud queries).
-
-## Run
+Run any demo (`uv run` installs the project and its dependencies on first use):
 
 ```bash
 cd virtual-graph-demo
-uv run gds_pagerank.py                # 7-day window: size, project, stream top 10, drop
-uv run gds_pagerank.py --since-days 3 # tighter window (smaller projection)
-uv run gds_pagerank.py --since-hours 2 # thin sub-day slice (~a couple hundred edges)
-uv run gds_pagerank.py --count-only   # only size the window; never provision a session
-uv run gds_pagerank.py --limit 25     # stream the top 25
-uv run gds_pagerank.py --memory 4GB   # request a larger session instance
-uv run gds_pagerank.py --keep         # leave the projection/session in place for reuse
-uv run gds_pagerank.py --since-hours 72 --read-timeout 0  # disable the client 60s read timeout (see caveat below)
+
+uv run vg-demo                          # fraud demo (default): the 7 fast queries
+uv run vg-demo --all                    # also attempt the slow / unsupported queries
+uv run vg-demo --demo basic             # exploration / visualization queries
+uv run vg-demo --demo fast-gds --since-hours 2   # working PageRank path (thin window)
+uv run vg-demo --demo slow-gds          # demonstrate the GDS forms that fail
 ```
 
-`uv run` resolves and installs the dependencies (`neo4j`, `python-dotenv`) into a
-local virtual environment on first run.
+Useful flags: `--rows N` caps printed rows per query, `--timeout S` sets the per-query
+server timeout (default 120s), `--query N` / `--only N M` pick specific fraud queries.
 
-`gds_pagerank.py` runs its statements one at a time: a cheap `count(t)` sizing query
-for the window, then drop any stale projection, create the session + windowed
-projection (the `{ memory }` argument is what provisions the session), then
-`gds.pageRank.stream`. Each statement reports its wall-clock time and, on failure, the
-exact Neo4j error code (e.g. `42NG0: Unsupported syntax`). `--count-only` stops after
-the sizing query so you can tune `--since-days` without provisioning a session.
+## `basic` demo
+
+Counts, breakdowns, and small anchored traversals that show the value of the
+relationships without any fraud logic. All run. The `graph` queries return nodes and
+relationships, so the CLI prints only a row count and timing; paste them into the Aura
+Workspace Query tab to see the picture. The demo prints the anchor account and merchant
+ids it picked.
+
+| # | What it does | Kind |
+|---|---|---|
+| 1 | Count of accounts | table |
+| 2 | Count of merchants | table |
+| 3 | Accounts grouped by type | table |
+| 4 | Accounts grouped by region | table |
+| 5 | Merchants grouped by category | table |
+| 6 | Top 10 merchants by distinct customers | table |
+| 7 | Ego network: one account and the merchants it shops at | graph |
+| 8 | Ego network: one account and its transfer partners | graph |
+| 9 | Merchant star: one merchant and the accounts that use it | graph |
+| 10 | Two hops: accounts linked through a shared merchant | graph |
+| 11 | Two hops: a transfer chain (who your counterparty pays) | graph |
+
+## `fraud` demo
+
+The seven fast queries (1-7) are the pushdown-friendly forms from
+[`finding-fraud.md`](finding-fraud.md). They group by scalar ids,
+reshape a `count(DISTINCT)` into pair-grouping plus a client-side rollup (fan-in and
+fan-out), and split a cross product into two merged halves (courier). The server
+aggregates and orders; the threshold filters and top-N run in Python; recent windows are
+passed as a precomputed `$since` parameter. Each returns in a few seconds.
+
+| # | What it does | Status |
+|---|---|---|
+| 1 | Structuring: accounts with many transfers sized just under $10,000 | works |
+| 2 | Busy brand-new accounts: recently opened accounts already moving large volume | works |
+| 3 | Round trips: account pairs paying each other both ways (wash activity) | works |
+| 4 | Velocity ratio: accounts moving far more money than they hold | works |
+| 5 | Collection accounts (fan-in): many distinct senders into one account | works |
+| 6 | Spray accounts (fan-out): one account paying many distinct recipients | works |
+| 7 | Courier accounts: heavy peer-to-peer transfers, little merchant spend | works |
+
+The slow tier (8-11) has no fast equivalent and is skipped unless you pass `--all`. It
+is kept to demonstrate what does not work. With `--all` these run behind a printed
+warning, bounded by `--timeout`, and any error is caught and printed so the run
+continues.
+
+| # | What it does | Status |
+|---|---|---|
+| 8 | Pass-through mule (local betweenness proxy) | slow: unbounded two-hop join, usually times out |
+| 9 | Shared-merchant burst (coordinated ring) | slow: `collect(DISTINCT)` over a node group, hit the 120s timeout |
+| 10 | Rapid-turnover per account | slow: unbounded two-hop join, usually times out |
+| 11 | Layering cycles | unsupported: variable-length path `{2,4}` fails with `42NG0` |
+
+## `fast-gds` demo
+
+GDS is not an in-database plugin on the Virtual Graph. The supported path is a **GDS
+Session**: the Cypher-projection form of `gds.graph.project(...)` with a `{ memory }`
+config provisions an ephemeral session, then PageRank streams against the named
+in-memory graph. The demo runs its statements one at a time: size the window, drop any
+stale projection, project (this provisions the session), stream PageRank, drop.
+
+What it looks like on a thin window:
+
+```
+--- size window (count edges, last 2.0h)        OK 0.6s, 298 edges
+--- project ... (provisions the session)        OK 90.9s, 556 nodes / 298 rels
+--- PageRank stream (top 10)                     OK 3.9s, 10 rows
+--- drop projection                              OK 1.0s
+```
+
+Almost all the time is session cold-start, not the query or the algorithm. Streamed
+`nodeId`s are GDS-internal ids, not `account_id`s; resolving them back is not reliable on
+the Virtual Graph yet, so the demo streams the raw id and score.
+
+**Keep the window small.** `--count-only` sizes a window for free. A thin window
+(`--since-hours 2`, a few hundred edges) provisions and completes. The default 7-day
+window is about 23,000 edges, which trips the read timeout during provisioning (see Slow
+GDS). Use `--since-hours` / `--since-days` to scope it, `--limit` to change the top-N,
+`--memory` to size the session, and `--keep` to leave the projection in place for reuse.
+
+## `slow-gds` demo
+
+Demonstrates the two GDS failure modes on the Virtual Graph, both caught and printed:
+
+| Statement | What happens |
+|---|---|
+| Classic `CALL gds.graph.project('g', 'Account', 'TRANSFERRED_TO')` | rejected fast with `42NG0` (the label/type form is not supported) |
+| Full-graph Cypher projection (every transfer) | provisions a session whose long, silent provisioning trips the 60s Bolt read timeout (observed at ~240s) or is reset by the server |
+
+`--read-timeout 0` lets the full projection survive past 60s to show the later server
+reset. The full projection cannot be cancelled once started and can saturate the pool,
+so run this on a clean instance.
+
+## Support scripts
+
+These standalone scripts probe and stress the Virtual Graph; they share the connection
+helper in `src/connection.py` (reads the parent `.env`, or `PROBE_ENV` if set):
+
+- `vg-probe` (`src/probe.py`): run a single ad-hoc Cypher statement and time it
+  (`uv run vg-probe "<cypher>"`).
+- `vg-heavy` (`src/heavy_run.py`): run the slow fraud queries sequentially with a
+  per-query cap and a pool health check between each.
+- `vg-viz` (`src/viz_check.py`): find real flagged accounts and confirm each anchored
+  visualization renders small and fast.
 
 ## Notes
 
-- **No write-back** to the relational source exists on a Virtual Graph, so PageRank is
-  streamed to the app rather than written to `Account` nodes.
-- **Pool / performance.** The projection's `MATCH (src)-[:TRANSFERRED_TO]->(dst)` is a
-  full ~300k-edge scan, comparable to the heavier fraud queries (~54s on a Small
-  warehouse). The Virtual Graph holds ~10 JDBC connections to Databricks and does not
-  cancel server-side queries when the client gives up, so run on a clean instance, let
-  each statement finish, and never abandon a run. Scale the warehouse up if the
-  projection is slow.
-- **Two ways a large projection dies.** First, Aura pins
-  `connection.recv_timeout_seconds: 60`, so the driver drops the connection after any 60s
-  gap with no server bytes, failing the project call with `TimeoutError('The read
-  operation timed out')`. `--read-timeout 0` disables that client-side trip, but it is
-  necessary not sufficient: testing showed the connection then survives past 60s only to
-  be reset by the server with `ConnectionResetError` / `SessionExpired`, which the client
-  cannot control. There is no public driver config for the read timeout, and the only
-  reliable path today is a small projection (the 233-edge window completed cleanly). The
-  correct fix is server-side keepalives. See `../docs/gds-guide.md` for the full analysis.
-- This is a genuine probe of an actively changing surface (see the note at the bottom
-  of `../docs/gds-guide.md`); the classic in-database GDS form was previously rejected
-  on the Virtual Graph, so a clean failure is a valid outcome to record.
+- **No write-back.** A Virtual Graph has no write-back to the relational source, so
+  PageRank is streamed to the app rather than written to `Account` nodes. See
+  [`gds-guide.md`](gds-guide.md).
+- **Connection pool.** The Virtual Graph holds about 10 JDBC connections to Databricks
+  and does not cancel a server-side query when the client gives up. Run on a clean
+  instance, let each statement finish, and do not abandon a run. The full hazard and the
+  performance rules are in [`best-practices.md`](best-practices.md).
+- **Candidates, not verdicts.** These queries surface candidates, not confirmed fraud.
+  See the interpretation caveats in [`finding-fraud.md`](finding-fraud.md).

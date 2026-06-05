@@ -5,7 +5,7 @@ keeps running server-side and holds a connection-pool slot), so after every quer
 health-check the pool with ``RETURN 1`` and stop the batch if the pool degrades or
 after two timeouts. One query at a time, never run concurrently.
 
-    uv run python -u heavy_run.py        # logs progress to stdout
+    uv run vg-heavy                      # logs progress to stdout
 """
 
 from __future__ import annotations
@@ -15,16 +15,21 @@ import threading
 import time
 
 from neo4j import GraphDatabase
+from neo4j.exceptions import Neo4jError
 
-from main import data_max_dates, load_connection, since_param
+from connection import load_connection
+from helpers import data_max_dates, since_param
 from queries import QUERIES, Query
 
 CAP = 600.0  # 10 minutes per query
 HEALTH_CAP = 60.0
-ORDER = [11, 1, 2, 8, 9, 12, 6, 3, 10]  # cheapest single-hop first, 2-hop joins last
+# The heavy queries are the slow tier (unbounded two-hop joins, collect(DISTINCT) over a
+# node group). Derived from queries.py so it stays correct as the query set changes.
+ORDER = [q.number for q in QUERIES if q.tier == "slow" and q.vg_supported]
 NOTES = {
-    12: "uses UNDIRECTED -[tr:TRANSFERRED_TO]- ; checking the undirected pattern runs",
-    6: "uses date(t.txn_timestamp) grouping with collect(DISTINCT ...) ; checking it runs",
+    8: "unbounded two-hop pass-through join; checking how slow it runs",
+    9: "date(t.txn_timestamp) grouping with collect(DISTINCT ...) ; checking it runs",
+    10: "unbounded two-hop rapid-turnover join with epochMillis turnaround",
 }
 
 

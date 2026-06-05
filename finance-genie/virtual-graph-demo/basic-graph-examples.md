@@ -3,14 +3,14 @@
 Warm-up queries for the Finance Genie Virtual Graph: simple counts and small
 relationship traversals that show the value of the graph without any fraud
 logic. They are the queries to open a demo with, before the structural fraud
-signals in [`plain-cypher-examples.md`](plain-cypher-examples.md).
+signals in [`finding-fraud.md`](finding-fraud.md).
 
 Every query here was verified live against the Aura Virtual Graph backed by the
-Databricks Silver tables. Each one runs through `virtual-graph-demo-v3`:
+Databricks Silver tables. Each one runs through the `basic` demo:
 
 ```bash
-cd virtual-graph-demo-v3
-uv run main.py --basic
+cd virtual-graph-demo
+uv run vg-demo --demo basic
 ```
 
 The dataset is 25,000 accounts, 7,500 merchants, 300,000 transfers, and 250,000
@@ -168,7 +168,6 @@ pattern with no anchor becomes a full join across the relationship table, which
 is slow and returns far too many rows to draw. For demos and visualizations,
 always start from a specific account or merchant.
 
-For the operational hazards of the Virtual Graph (the small JDBC connection pool,
-slow queries that cannot be canceled, the read-only constraint), see the
-"patterns, tips, and what does not work" section of
-[`plain-cypher-examples.md`](plain-cypher-examples.md).
+For the operational hazards of the Virtual Graph, the small JDBC connection pool,
+slow queries that cannot be canceled, and the read-only constraint, see the
+"Operational hazards" section of [`best-practices.md`](best-practices.md).
