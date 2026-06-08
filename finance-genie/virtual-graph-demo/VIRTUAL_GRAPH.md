@@ -90,22 +90,22 @@ Build that model with the following steps.
 1. Remove `account_labels` from the data source so Aura does not model it.
 2. Select **Generate from schema**. Aura infers nodes and relationships from the remaining table schema and foreign keys.
 3. Remove every relationship Aura generated. You will recreate the two you need by hand so the node ID mappings are explicit.
-4. Remove the `transactions` and `account_links` nodes. These are edge tables and become relationships, not nodes. Keep the `accounts` and `merchants` nodes.
+4. Remove the `transactions` and `account_links` nodes. These are edge tables and become relationships, not nodes. Keep the `accounts` and `merchants` nodes, renaming their labels to `Account` and `Merchant` to match the target model.
 5. Create the `TRANSACTED_WITH` relationship, as shown below:
 
    - Set the **Relationship type** to `TRANSACTED_WITH`.
    - Under **Properties**, map from the `transactions` table.
-   - Under **Node ID mapping**, set **From** to `accounts`, with ID property `account_id` mapped from ID column `account_id`.
-   - Set **To** to `merchants`, with ID property `merchant_id` mapped from ID column `merchant_id`.
+   - Under **Node ID mapping**, set **From** to `Account`, with ID property `account_id` mapped from ID column `account_id`.
+   - Set **To** to `Merchant`, with ID property `merchant_id` mapped from ID column `merchant_id`.
 
    ![Create the TRANSACTED_WITH relationship](./docs/images/load-vg-step-1.png)
 
-6. Create the `TRANSFERRED_TO` relationship, as shown below. Both ends map to the `accounts` node; the source and destination differ only by which column supplies the ID:
+6. Create the `TRANSFERRED_TO` relationship, as shown below. Both ends map to the `Account` node; the source and destination differ only by which column supplies the ID:
 
    - Set the **Relationship type** to `TRANSFERRED_TO`.
    - Under **Properties**, map from the `account_links` table.
-   - Under **Node ID mapping**, set **From** to `accounts`, with ID property `account_id` mapped from ID column `src_account_id`.
-   - Set **To** to `accounts`, with ID property `account_id` mapped from ID column `dst_account_id`.
+   - Under **Node ID mapping**, set **From** to `Account`, with ID property `account_id` mapped from ID column `src_account_id`.
+   - Set **To** to `Account`, with ID property `account_id` mapped from ID column `dst_account_id`.
 
    ![Create the TRANSFERRED_TO relationship](./docs/images/load-vg-step-2.png)
 
@@ -115,21 +115,19 @@ Build that model with the following steps.
 
 Select **Query** from the left-side navigation and run Cypher against the Virtual Graph. Aura translates each query to SQL and runs it on your Databricks warehouse.
 
-> The queries below use `:accounts` for the node label. The actual label depends on how you named the nodes when you defined the model in step 5. If you kept the generated table names, use `:accounts` and `:merchants`; if you renamed them, use `:Account` and `:Merchant`. Adjust the labels in these queries to match your model.
-
 ### Transfers between accounts
 
 To see transfers between accounts:
 
 ```cypher
-MATCH (a:accounts)-[t:TRANSFERRED_TO]->(b:accounts)
+MATCH (a:Account)-[t:TRANSFERRED_TO]->(b:Account)
 RETURN a, t, b LIMIT 100
 ```
 
 To see the Cypher-to-SQL translation, add `EXPLAIN` to the front of the query:
 
 ```cypher
-EXPLAIN MATCH (a:accounts)-[t:TRANSFERRED_TO]->(b:accounts)
+EXPLAIN MATCH (a:Account)-[t:TRANSFERRED_TO]->(b:Account)
 RETURN a, t, b LIMIT 100
 ```
 
@@ -142,7 +140,7 @@ RETURN a, t, b LIMIT 100
 To group accounts into balance tiers and summarize each tier:
 
 ```cypher
-MATCH (a:accounts)
+MATCH (a:Account)
 WITH a,
      CASE WHEN a.balance < 10000 THEN 'low'
           WHEN a.balance < 100000 THEN 'mid'
@@ -158,7 +156,7 @@ ORDER BY accounts DESC
 Add `EXPLAIN` to the front to see its SQL translation:
 
 ```cypher
-EXPLAIN MATCH (a:accounts)
+EXPLAIN MATCH (a:Account)
 WITH a,
      CASE WHEN a.balance < 10000 THEN 'low'
           WHEN a.balance < 100000 THEN 'mid'

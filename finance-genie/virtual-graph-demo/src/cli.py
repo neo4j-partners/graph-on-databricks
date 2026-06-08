@@ -17,6 +17,9 @@ A single entry point with four demos, selected with ``--demo``:
 * ``--demo slow-gds`` — the GDS forms that do not work, kept to demonstrate the
   failures: the classic ``CALL gds.graph.project('g', 'Account', ...)`` form (rejected
   with ``42NG0``) and a large-window projection (trips the 60s Bolt read timeout).
+* ``--demo gds-probe`` — sweep projections that add node / relationship properties one
+  at a time on a thin window, to isolate which property configs the projection rejects
+  (the edge-case bug in ``gds-limitations.md``). See ``src/demos/gds_probe.py``.
 
 Connection details come from the parent ``finance-genie/.env`` (NEO4J_URI,
 NEO4J_USERNAME, NEO4J_PASSWORD), which points at the Aura Virtual Graph engine.
@@ -38,6 +41,8 @@ Usage:
     uv run vg-demo --demo fast-gds --keep            # leave the projection/session in place
 
     uv run vg-demo --demo slow-gds          # demonstrate the GDS forms that fail
+
+    uv run vg-demo --demo gds-probe --since-hours 2   # sweep property projections to isolate the edge-case bug
 """
 
 from __future__ import annotations
@@ -51,13 +56,15 @@ from demos.basic import run_basic
 from demos.fraud import run_fraud
 from demos.gds_common import override_bolt_read_timeout
 from demos.gds_fast import run_gds
+from demos.gds_probe import run_probe
 from demos.gds_slow import run_slow_gds
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--demo", choices=("fraud", "basic", "fast-gds", "slow-gds"),
+    parser.add_argument("--demo",
+                        choices=("fraud", "basic", "fast-gds", "slow-gds", "gds-probe"),
                         default="fraud", help="which demo to run (default: fraud)")
 
     fraud = parser.add_argument_group("fraud demo")
@@ -95,6 +102,10 @@ def parse_args() -> argparse.Namespace:
                           "client-side trip on a long, silent provisioning. 0 disables it "
                           "entirely. Necessary but not sufficient: the server can still reset "
                           "the connection on long provisions. Unsupported; unset keeps 60s")
+    gds.add_argument("--probe-read-timeout", type=float, default=300.0, metavar="SECONDS",
+                     help="gds-probe only: default Bolt read-timeout clamp so a known-good "
+                          "~130s provisioning is not aborted by the 60s client trip while the "
+                          "sweep measures property failures (default: 300; --read-timeout wins)")
     return parser.parse_args()
 
 
@@ -110,6 +121,10 @@ def main() -> None:
         return
     if args.demo == "slow-gds":
         run_slow_gds(args)
+        print(f"\n{'=' * 78}\nDone.")
+        return
+    if args.demo == "gds-probe":
+        run_probe(args)
         print(f"\n{'=' * 78}\nDone.")
         return
 

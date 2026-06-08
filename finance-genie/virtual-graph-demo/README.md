@@ -1,5 +1,9 @@
 # Virtual Graph Demo
 
+> **First, set up the Virtual Graph.** Follow [VIRTUAL_GRAPH.md](VIRTUAL_GRAPH.md) to
+> create the Virtual Graph over the Finance Genie Silver tables before running any demo
+> here.
+
 A small [uv](https://docs.astral.sh/uv/) Python demo that runs Cypher against the
 Finance Genie Neo4j **Virtual Graph** (Aura translates the Cypher to SQL and runs it on
 a backing Databricks SQL warehouse). One entry point, `vg-demo` (`src/cli.py`), runs
@@ -11,6 +15,7 @@ four demo sets selected with `--demo`:
 | `fraud` (default) | the fast fraud-signal queries from `finding-fraud.md` | yes; `--all` adds slow / unsupported ones |
 | `fast-gds` | the working GDS Session + PageRank path | yes, on a small window |
 | `slow-gds` | the GDS forms that do not work, kept as a demonstration | no, by design |
+| `gds-probe` | sweep projections that add node / relationship properties, to isolate which property types the projection rejects | mixed, by design |
 
 ## Quick start
 
@@ -26,8 +31,7 @@ Prerequisites:
   ```
 
 - A Virtual Graph over the Finance Genie Silver tables with node labels `:Account` and
-  `:Merchant`. If your model uses table-name labels (`:accounts` / `:merchants`), adjust
-  the labels in `src/queries.py` and in the GDS projection in `src/demos/gds_fast.py`.
+  `:Merchant`, set up as described in [VIRTUAL_GRAPH.md](VIRTUAL_GRAPH.md).
 
 Run any demo (`uv run` installs the project and its dependencies on first use):
 
@@ -39,6 +43,7 @@ uv run vg-demo --all                    # also attempt the slow / unsupported qu
 uv run vg-demo --demo basic             # exploration / visualization queries
 uv run vg-demo --demo fast-gds --since-hours 2   # working PageRank path (thin window)
 uv run vg-demo --demo slow-gds          # demonstrate the GDS forms that fail
+uv run vg-demo --demo gds-probe --since-hours 2   # sweep property projections (thin window)
 ```
 
 Useful flags: `--rows N` caps printed rows per query, `--timeout S` sets the per-query
@@ -105,7 +110,12 @@ config provisions an ephemeral session, then PageRank streams against the named
 in-memory graph. The demo runs its statements one at a time: size the window, drop any
 stale projection, project (this provisions the session), stream PageRank, drop.
 
-What it looks like on a thin window:
+The "window" is a time-range filter on the transfer rows: `--since-hours` / `--since-days`
+keep only transfers from the most recent N hours or days of the data, and that row count
+is the edge count projected into the graph. "Size the window" counts those rows without
+provisioning a session.
+
+What it looks like on a thin window (the most recent 2 hours of transfers):
 
 ```
 --- size window (count edges, last 2.0h)        OK 0.6s, 298 edges
@@ -118,10 +128,10 @@ Almost all the time is session cold-start, not the query or the algorithm. Strea
 `nodeId`s are GDS-internal ids, not `account_id`s; resolving them back is not reliable on
 the Virtual Graph yet, so the demo streams the raw id and score.
 
-**Keep the window small.** `--count-only` sizes a window for free. A thin window
-(`--since-hours 2`, a few hundred edges) provisions and completes. The default 7-day
-window is about 23,000 edges, which trips the read timeout during provisioning (see Slow
-GDS). Use `--since-hours` / `--since-days` to scope it, `--limit` to change the top-N,
+**Keep the window small.** `--count-only` counts the rows in a window for free. A thin
+window (`--since-hours 2`, the most recent 2 hours of transfers, a few hundred edges)
+provisions and completes. The default 7-day window is about 23,000 edges, which trips the
+read timeout during provisioning (see Slow GDS). Use `--since-hours` / `--since-days` to scope it, `--limit` to change the top-N,
 `--memory` to size the session, and `--keep` to leave the projection in place for reuse.
 
 ## `slow-gds` demo
@@ -136,6 +146,32 @@ Demonstrates the two GDS failure modes on the Virtual Graph, both caught and pri
 `--read-timeout 0` lets the full projection survive past 60s to show the later server
 reset. The full projection cannot be cancelled once started and can saturate the pool,
 so run this on a clean instance.
+
+## `gds-probe` demo
+
+The fast-gds projection carries only labels and the relationship type; it never projects
+`amount` or `transfer_timestamp` as graph properties. This demo isolates what happens when
+you add properties: a GDS in-memory graph only accepts **numeric** property types, so it
+sweeps a series of projections on a thin window (the timeout stays out of the picture),
+adding one node or relationship property at a time, and reports which project and which the
+server rejects. It first introspects the live schema and prints each property's type, then
+runs:
+
+| Scenario | Projection adds | Result |
+|---|---|---|
+| A_control | labels + `relationshipType` only | projects |
+| B_rel_amount | `relationshipProperties { amount }` (float) + weighted PageRank | projects, weight usable |
+| C_rel_timestamp | `relationshipProperties { transfer_timestamp }` (`DateTime`) | rejected fast |
+| D_rel_both | `amount` + `transfer_timestamp` | rejected on the temporal one |
+| E_node_numeric | a numeric node property on both endpoints | projects |
+| F_node_nonnumeric | a string node property on both endpoints | rejected fast |
+
+Each rejection comes back in under a second, before the session provisions, as
+`IllegalArgumentException: The property ... contained a value of type DateTime/String,
+which is not supported`. This is standard GDS typing, not a Virtual Graph defect: project
+only numeric columns, and cast or drop temporal and string ones. See the modeling note in
+[`gds-guide.md`](gds-guide.md). Use `--count-only` to introspect the schema without
+provisioning, and `--since-hours` / `--since-days` to size the window.
 
 ## Support scripts
 
