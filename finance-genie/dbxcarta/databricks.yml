@@ -10,6 +10,16 @@ bundle:
 # source tree, which a published consumer does not have. The jobs run the
 # published console entry points (dbxcarta-ingest, dbxcarta-client) directly.
 #
+# SINGLE SOURCE OF CONFIG: this file holds NO dbxcarta config (catalog, schema,
+# volume, secret scope, embedding/client settings). All of that lives once in
+# dbxcarta-overlay.env. scripts/run_jobs.py reads the overlay and forwards every
+# KEY=VALUE pair to the job at run time as task parameters
+# (`databricks bundle run <job> -- KEY=VALUE ...`), the same way dbxcarta-submit
+# forwards an overlay. So the jobs below declare no `parameters`: editing the
+# overlay is the only place config changes, and the two can never diverge. A
+# bare `databricks bundle run` with no forwarded params fails loud at config
+# load rather than running with stale values.
+#
 # SIMULATE-PUBLISH: while dbxcarta is not on PyPI, the dbxcarta wheels are
 # shipped to the cluster as local `whl:` libraries from the vendored ./dbxcarta-dist
 # directory (the same committed wheels uv resolves from locally via uv.toml). The
@@ -22,33 +32,16 @@ bundle:
 
 variables:
   cluster_id:
-    description: ID of a preprovisioned classic single-user cluster (data_security_mode=SINGLE_USER). Required at deploy time. Owns the Spark runtime and node type; needed for the task-level Neo4j Maven connector on the ingest job.
-  warehouse_id:
-    description: SQL warehouse ID for catalog metadata reads and client evaluation queries. Required at deploy time.
-  chat_endpoint:
-    description: Model Serving endpoint the client evaluation calls to generate SQL. Client job only; the ingest job does not generate SQL.
-    default: databricks-claude-sonnet-4-6
+    description: ID of a preprovisioned classic single-user cluster (data_security_mode=SINGLE_USER). Required at deploy and run time. Owns the Spark runtime and node type; needed for the task-level Neo4j Maven connector on the ingest job.
   dbxcarta_version:
-    description: dbxcarta version to install on the cluster. Matches the pins in pyproject.toml. Used only when the libraries flip from local wheels to pypi after publication.
+    description: dbxcarta version installed on the cluster. Matches the pins in pyproject.toml. Used only when the libraries flip from local wheels to pypi after publication.
     default: 1.1.0
-  secret_scope:
-    description: Databricks secret scope holding NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD. The ingest entry point reads these from the scope itself via dbutils.
-    default: dbxcarta-neo4j-finance-genie
-  catalog:
-    description: Finance Genie Unity Catalog the semantic layer is built over.
-    default: graph-enriched-lakehouse
-  schema:
-    description: Schema within the catalog.
-    default: graph-enriched-schema
-  volume_path:
-    description: UC volume holding dbxcarta run summaries, the generation cache, and the uploaded question set.
-    default: /Volumes/graph-enriched-lakehouse/graph-enriched-schema/graph-enriched-volume
   neo4j_connector_maven:
     description: Neo4j Spark Connector Maven coordinate. Ingest job only; pip cannot install it. Tracks dbxcarta-submit's pinned coordinate.
     default: org.neo4j:neo4j-connector-apache-spark_2.13:5.3.10_for_spark_3
   neo4j_python_version:
-    description: Neo4j Python driver pin. A bare wheel install does not apply the dbxcarta-client[graph] extra, so the driver is added explicitly. Tracks dbxcarta-submit's pinned closure.
-    default: 6.1.0
+    description: Neo4j Python driver pin. A bare wheel install does not apply the dbxcarta-client[graph] extra, so the driver is added explicitly. Set to match the neo4j version already cluster-installed on the target cluster; a different version triggers ERROR_DUPLICATE_INSTALLATION.
+    default: 6.0.2
 
 targets:
   dev:
@@ -69,27 +62,11 @@ resources:
           python_wheel_task:
             package_name: dbxcarta-spark
             entry_point: dbxcarta-ingest
-            # Leading KEY=VALUE positional args; the entry point's inject_params()
-            # parses them into the environment, then run_dbxcarta() reads settings
-            # from the environment and fetches NEO4J_* from the secret scope.
-            parameters:
-              - "DATABRICKS_SECRET_SCOPE=${var.secret_scope}"
-              - "DATABRICKS_WAREHOUSE_ID=${var.warehouse_id}"
-              - "DBXCARTA_CATALOG=${var.catalog}"
-              - "DBXCARTA_SCHEMAS=${var.schema}"
-              - "DATABRICKS_VOLUME_PATH=${var.volume_path}"
-              - "DBXCARTA_SUMMARY_VOLUME=${var.volume_path}/dbxcarta/runs"
-              - "DBXCARTA_SUMMARY_TABLE=${var.catalog}.${var.schema}.dbxcarta_run_summary"
-              - "DBXCARTA_INCLUDE_VALUES=true"
-              - "DBXCARTA_SAMPLE_LIMIT=10"
-              - "DBXCARTA_SAMPLE_CARDINALITY_THRESHOLD=50"
-              - "DBXCARTA_INCLUDE_EMBEDDINGS_TABLES=true"
-              - "DBXCARTA_INCLUDE_EMBEDDINGS_COLUMNS=true"
-              - "DBXCARTA_INCLUDE_EMBEDDINGS_VALUES=true"
-              - "DBXCARTA_INCLUDE_EMBEDDINGS_SCHEMAS=true"
-              - "DBXCARTA_INCLUDE_EMBEDDINGS_DATABASES=true"
-              - "DBXCARTA_EMBEDDING_ENDPOINT=databricks-gte-large-en"
-              - "DBXCARTA_EMBEDDING_DIMENSION=1024"
+            # No parameters here. scripts/run_jobs.py forwards the overlay (plus
+            # DATABRICKS_WAREHOUSE_ID) at run time as leading KEY=VALUE args. The
+            # entry point's inject_params() parses them into the environment,
+            # then run_dbxcarta() reads settings and fetches NEO4J_* from the
+            # secret scope.
           libraries:
             # dbxcarta packages: vendored wheels in ./dbxcarta-dist (simulate-publish).
             # After publication, replace these two lines with:
@@ -111,24 +88,10 @@ resources:
           python_wheel_task:
             package_name: dbxcarta-client
             entry_point: dbxcarta-client
-            parameters:
-              - "DATABRICKS_SECRET_SCOPE=${var.secret_scope}"
-              - "DATABRICKS_WAREHOUSE_ID=${var.warehouse_id}"
-              - "DBXCARTA_CATALOG=${var.catalog}"
-              - "DBXCARTA_SCHEMAS=${var.schema}"
-              - "DATABRICKS_VOLUME_PATH=${var.volume_path}"
-              - "DBXCARTA_SUMMARY_VOLUME=${var.volume_path}/dbxcarta/runs"
-              - "DBXCARTA_SUMMARY_TABLE=${var.catalog}.${var.schema}.dbxcarta_run_summary"
-              # Chat endpoint generates SQL; embedding endpoint embeds the question
-              # for graph_rag retrieval. Both are required for a meaningful client run.
-              - "DBXCARTA_CHAT_ENDPOINT=${var.chat_endpoint}"
-              - "DBXCARTA_EMBEDDING_ENDPOINT=databricks-gte-large-en"
-              - "DBXCARTA_EMBEDDING_DIMENSION=1024"
-              - "DBXCARTA_CLIENT_QUESTIONS=${var.volume_path}/dbxcarta/questions.json"
-              - "DBXCARTA_CLIENT_ARMS=no_context,schema_dump,graph_rag"
-              - "DBXCARTA_SCHEMA_DUMP_MAX_CHARS=50000"
-              - "DBXCARTA_INJECT_CRITERIA=false"
-              - "DBXCARTA_CLIENT_MAX_EXPANSION_TABLES=20"
+            # No parameters here; forwarded from the overlay at run time, same as
+            # the ingest job above. The overlay carries the chat endpoint,
+            # embedding endpoint, client questions path, and arms the client
+            # reads.
           libraries:
             # After publication, replace these two lines with:
             #   - pypi: { package: "dbxcarta-core==${var.dbxcarta_version}" }

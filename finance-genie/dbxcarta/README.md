@@ -27,6 +27,14 @@ uv sync
 cp .env.sample .env
 ```
 
+Provision the Neo4j secret scope the cluster jobs read from. `setup_secrets.sh`
+reads the scope name from `dbxcarta-overlay.env` and the `NEO4J_*` values from
+the `.env` you just filled in:
+
+```bash
+./setup_secrets.sh --profile <your-profile>
+```
+
 Check readiness and upload the question set. These use the dbxcarta CLI but run here,
 against this project's overlay and preset, so the work is finance-genie-side:
 
@@ -59,12 +67,14 @@ run-summary table is created automatically on the first ingest.
 ```text
 finance-genie/dbxcarta/
 ├── pyproject.toml              # pinned dbxcarta deps, no source overrides
-├── databricks.yml              # ingest + client jobs (consumer-owned DAB)
-├── dbxcarta-overlay.env        # committed, secret-free dbxcarta CLI config
+├── databricks.yml              # ingest + client jobs (consumer-owned DAB, config-free)
+├── dbxcarta-overlay.env        # committed, secret-free dbxcarta config (single source)
 ├── .env.sample                 # standalone local-demo config (copy to .env)
+├── setup_secrets.sh            # provision the Neo4j secret scope from the overlay + .env
 ├── questions.json              # 12-question eval fixture (graph-enriched-lakehouse)
 ├── dbxcarta-dist/              # vendored dbxcarta wheels (committed simulate-publish index)
 ├── scripts/refresh_dbxcarta_dist.sh # maintainer: refresh dbxcarta-dist from a dbxcarta build
+├── scripts/run_jobs.py         # deploy + run ingest then client, forwarding the overlay
 ├── src/finance_genie_dbxcarta/
 │   ├── __init__.py             # re-exports `preset`
 │   ├── preset.py               # StandardPreset(questions_file=...)
@@ -157,22 +167,13 @@ dbxcarta. The full flow spans three places:
 
 ## Run the jobs in finance-genie/dbxcarta (ingest then client)
 
-The vendored `dbxcarta-dist/` wheels are shipped as bundle `whl:` libraries, so
-no staging step is needed here.
-
-```bash
-# Deploy and run. Provide the preprovisioned cluster and warehouse.
-databricks bundle deploy \
-  --var="cluster_id=<cluster-id>" --var="warehouse_id=<warehouse-id>"
-databricks bundle run finance_genie_dbxcarta_ingest \
-  --var="cluster_id=<cluster-id>" --var="warehouse_id=<warehouse-id>"
-# After ingest finishes:
-databricks bundle run finance_genie_dbxcarta_client \
-  --var="cluster_id=<cluster-id>" --var="warehouse_id=<warehouse-id>"
-```
-
-`scripts/run_jobs.py` automates this whole sequence (deploy, then ingest, then
-client, since `bundle run` blocks until each job finishes):
+`databricks.yml` carries no dbxcarta config: the jobs declare no parameters, and
+the catalog, schema, volume, secret scope, and client settings live once in
+`dbxcarta-overlay.env`. `scripts/run_jobs.py` is the supported run path. It
+reads the overlay, deploys, then runs ingest, then the client (each `bundle run`
+blocks until the job finishes), forwarding the overlay plus the warehouse to each
+job as run-time parameters. Because the overlay is the only source, the bundle
+and the config can never diverge.
 
 ```bash
 uv run scripts/run_jobs.py \
@@ -181,6 +182,19 @@ uv run scripts/run_jobs.py \
 
 Add `--target prod` to run against the prod target, `--no-deploy` to reuse the
 last deployment, or `--no-client` to stop after ingest.
+
+Running `databricks bundle` by hand works, but you must forward the overlay
+yourself, since the bundle holds no config. Deploy needs only the cluster; each
+run needs the overlay pairs and the warehouse appended after `--`:
+
+```bash
+databricks bundle deploy --var="cluster_id=<cluster-id>"
+databricks bundle run finance_genie_dbxcarta_ingest --var="cluster_id=<cluster-id>" \
+  -- $(grep -vE '^\s*(#|$)' dbxcarta-overlay.env) DATABRICKS_WAREHOUSE_ID=<warehouse-id>
+```
+
+A bare `databricks bundle run` with nothing forwarded fails loud at config load
+rather than running with stale values, by design.
 
 The cluster must allow `SINGLE_USER` classic compute with task-level Maven
 libraries (the Neo4j Spark connector), and the secret scope
