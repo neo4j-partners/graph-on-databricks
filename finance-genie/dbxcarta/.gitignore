@@ -1,0 +1,12 @@
+# uv.toml and uv.lock are COMMITTED: with the vendored ./dbxcarta-dist wheels and
+# a relative find-links path, the lock records a portable in-repo registry, so a
+# new developer needs only `uv sync` and no sibling dbxcarta checkout.
+
+# Virtual environment.
+.venv/
+
+# Consumer wheel built by the databricks bundle (build output, not source).
+dist/
+
+# Databricks CLI bundle state.
+.databricks/

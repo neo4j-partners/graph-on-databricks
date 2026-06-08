@@ -1,0 +1,143 @@
+bundle:
+  name: finance-genie-dbxcarta
+
+# Consumer-owned Databricks Asset Bundle for the two dbxcarta Databricks jobs:
+# ingest (build the Neo4j semantic layer over the Finance Genie catalog) and
+# client (text-to-SQL evaluation across no_context / schema_dump / graph_rag).
+#
+# This bundle deliberately does NOT use the dbxcarta-submit operator CLI: that
+# package is unpublished and rebuilds the dbxcarta wheels from the dbxcarta
+# source tree, which a published consumer does not have. The jobs run the
+# published console entry points (dbxcarta-ingest, dbxcarta-client) directly.
+#
+# SIMULATE-PUBLISH: while dbxcarta is not on PyPI, the dbxcarta wheels are
+# shipped to the cluster as local `whl:` libraries from the vendored ./dbxcarta-dist
+# directory (the same committed wheels uv resolves from locally via uv.toml). The
+# bundle uploads them to the workspace. Third-party dependencies (neo4j, pydantic)
+# still install from PyPI normally. Refresh ./dbxcarta-dist from a dbxcarta build
+# with scripts/stage_wheelhouse.sh. When dbxcarta is published, delete the
+# `whl: ./dbxcarta-dist/...` lines and uncomment the `pypi:` block beneath each,
+# then bump var.dbxcarta_version to the first published version. See
+# dbxcarta/docs/reference/simulate-publish.md.
+
+variables:
+  cluster_id:
+    description: ID of a preprovisioned classic single-user cluster (data_security_mode=SINGLE_USER). Required at deploy time. Owns the Spark runtime and node type; needed for the task-level Neo4j Maven connector on the ingest job.
+  warehouse_id:
+    description: SQL warehouse ID for catalog metadata reads and client evaluation queries. Required at deploy time.
+  dbxcarta_version:
+    description: dbxcarta version to install on the cluster. Matches the pins in pyproject.toml. Used only when the libraries flip from local wheels to pypi after publication.
+    default: 1.1.0
+  secret_scope:
+    description: Databricks secret scope holding NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD. The ingest entry point reads these from the scope itself via dbutils.
+    default: dbxcarta-neo4j-finance-genie
+  catalog:
+    description: Finance Genie Unity Catalog the semantic layer is built over.
+    default: graph-enriched-lakehouse
+  schema:
+    description: Schema within the catalog.
+    default: graph-enriched-schema
+  volume_path:
+    description: UC volume holding dbxcarta run summaries, the generation cache, and the uploaded question set.
+    default: /Volumes/graph-enriched-lakehouse/graph-enriched-schema/graph-enriched-volume
+  neo4j_connector_maven:
+    description: Neo4j Spark Connector Maven coordinate. Ingest job only; pip cannot install it. Tracks dbxcarta-submit's pinned coordinate.
+    default: org.neo4j:neo4j-connector-apache-spark_2.13:5.3.10_for_spark_3
+  neo4j_python_version:
+    description: Neo4j Python driver pin. A bare wheel install does not apply the dbxcarta-client[graph] extra, so the driver is added explicitly. Tracks dbxcarta-submit's pinned closure.
+    default: 6.1.0
+
+artifacts:
+  finance_genie_dbxcarta_wheel:
+    type: whl
+    path: .
+    build: uv build --wheel
+
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+resources:
+  jobs:
+    finance_genie_dbxcarta_ingest:
+      name: "[${bundle.target}] finance-genie-dbxcarta ingest"
+      tasks:
+        - task_key: ingest
+          existing_cluster_id: ${var.cluster_id}
+          python_wheel_task:
+            package_name: dbxcarta-spark
+            entry_point: dbxcarta-ingest
+            # Leading KEY=VALUE positional args; the entry point's inject_params()
+            # parses them into the environment, then run_dbxcarta() reads settings
+            # from the environment and fetches NEO4J_* from the secret scope.
+            parameters:
+              - "DATABRICKS_SECRET_SCOPE=${var.secret_scope}"
+              - "DATABRICKS_WAREHOUSE_ID=${var.warehouse_id}"
+              - "DBXCARTA_CATALOG=${var.catalog}"
+              - "DBXCARTA_SCHEMAS=${var.schema}"
+              - "DATABRICKS_VOLUME_PATH=${var.volume_path}"
+              - "DBXCARTA_SUMMARY_VOLUME=${var.volume_path}/dbxcarta/runs"
+              - "DBXCARTA_SUMMARY_TABLE=${var.catalog}.${var.schema}.dbxcarta_run_summary"
+              - "DBXCARTA_INCLUDE_VALUES=true"
+              - "DBXCARTA_SAMPLE_LIMIT=10"
+              - "DBXCARTA_SAMPLE_CARDINALITY_THRESHOLD=50"
+              - "DBXCARTA_INCLUDE_EMBEDDINGS_TABLES=true"
+              - "DBXCARTA_INCLUDE_EMBEDDINGS_COLUMNS=true"
+              - "DBXCARTA_INCLUDE_EMBEDDINGS_VALUES=true"
+              - "DBXCARTA_INCLUDE_EMBEDDINGS_SCHEMAS=true"
+              - "DBXCARTA_INCLUDE_EMBEDDINGS_DATABASES=true"
+              - "DBXCARTA_EMBEDDING_ENDPOINT=databricks-gte-large-en"
+              - "DBXCARTA_EMBEDDING_DIMENSION=1024"
+          libraries:
+            # dbxcarta packages: vendored wheels in ./dbxcarta-dist (simulate-publish).
+            # After publication, replace these two lines with:
+            #   - pypi: { package: "dbxcarta-core==${var.dbxcarta_version}" }
+            #   - pypi: { package: "dbxcarta-spark==${var.dbxcarta_version}" }
+            - whl: ./dbxcarta-dist/dbxcarta_core-*.whl
+            - whl: ./dbxcarta-dist/dbxcarta_spark-*.whl
+            # This consumer's preset wheel, so DBXCARTA_PRESET resolves on-cluster.
+            - whl: ./dist/*.whl
+            - pypi:
+                package: "neo4j==${var.neo4j_python_version}"
+            - maven:
+                coordinates: ${var.neo4j_connector_maven}
+          timeout_seconds: 7200
+
+    finance_genie_dbxcarta_client:
+      name: "[${bundle.target}] finance-genie-dbxcarta client"
+      tasks:
+        - task_key: client
+          existing_cluster_id: ${var.cluster_id}
+          python_wheel_task:
+            package_name: dbxcarta-client
+            entry_point: dbxcarta-client
+            parameters:
+              - "DATABRICKS_SECRET_SCOPE=${var.secret_scope}"
+              - "DATABRICKS_WAREHOUSE_ID=${var.warehouse_id}"
+              - "DBXCARTA_CATALOG=${var.catalog}"
+              - "DBXCARTA_SCHEMAS=${var.schema}"
+              - "DATABRICKS_VOLUME_PATH=${var.volume_path}"
+              - "DBXCARTA_SUMMARY_VOLUME=${var.volume_path}/dbxcarta/runs"
+              - "DBXCARTA_SUMMARY_TABLE=${var.catalog}.${var.schema}.dbxcarta_run_summary"
+              - "DBXCARTA_CLIENT_QUESTIONS=${var.volume_path}/dbxcarta/questions.json"
+              - "DBXCARTA_CLIENT_ARMS=no_context,schema_dump,graph_rag"
+              - "DBXCARTA_SCHEMA_DUMP_MAX_CHARS=50000"
+              - "DBXCARTA_INJECT_CRITERIA=false"
+              - "DBXCARTA_CLIENT_MAX_EXPANSION_TABLES=20"
+          libraries:
+            # After publication, replace these two lines with:
+            #   - pypi: { package: "dbxcarta-core==${var.dbxcarta_version}" }
+            #   - pypi: { package: "dbxcarta-client[graph]==${var.dbxcarta_version}" }
+            - whl: ./dbxcarta-dist/dbxcarta_core-*.whl
+            - whl: ./dbxcarta-dist/dbxcarta_client-*.whl
+            - whl: ./dist/*.whl
+            # graph_rag retrieval needs the Neo4j driver; the bare client wheel
+            # does not pull the [graph] extra, so add it explicitly.
+            - pypi:
+                package: "neo4j==${var.neo4j_python_version}"
+          timeout_seconds: 3600

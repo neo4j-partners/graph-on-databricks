@@ -1,0 +1,11 @@
+# Simulate-publish override: resolve the pinned dbxcarta-* dependencies from the
+# vendored wheels in ./dbxcarta-dist instead of PyPI, while PyPI publishing is
+# unavailable. The path is relative and the wheels are committed, so this file
+# is committed too and a new developer needs only `uv sync`, with no sibling
+# dbxcarta checkout.
+#
+# Refresh ./dbxcarta-dist from a dbxcarta build with scripts/stage_wheelhouse.sh.
+# Once dbxcarta is published to PyPI, delete this file and ./dbxcarta-dist: the
+# pins in pyproject.toml then resolve from PyPI unchanged. See
+# dbxcarta/docs/reference/simulate-publish.md.
+find-links = ["./dbxcarta-dist"]
