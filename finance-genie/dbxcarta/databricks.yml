@@ -30,6 +30,15 @@ bundle:
 # then bump var.dbxcarta_version to the first published version. See
 # dbxcarta/docs/reference/simulate-publish.md.
 
+# The vendored dbxcarta wheels are not built by an `artifacts` block; they reach
+# the cluster as synced workspace files. dbxcarta-dist/ is committed (not
+# gitignored) so the default sync already uploads it, but include it explicitly
+# so the `whl:` libraries below cannot break if .gitignore later changes. See
+# dbxcarta/docs/reference/simulate-publish.md.
+sync:
+  include:
+    - dbxcarta-dist/*.whl
+
 variables:
   cluster_id:
     description: ID of a preprovisioned classic single-user cluster (data_security_mode=SINGLE_USER). Required at deploy and run time. Owns the Spark runtime and node type; needed for the task-level Neo4j Maven connector on the ingest job.
