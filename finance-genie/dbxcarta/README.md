@@ -176,12 +176,15 @@ job as run-time parameters. Because the overlay is the only source, the bundle
 and the config can never diverge.
 
 ```bash
-uv run scripts/run_jobs.py \
-  --cluster-id <cluster-id> --warehouse-id <warehouse-id>
+uv run scripts/run_jobs.py
 ```
 
-Add `--target prod` to run against the prod target, `--no-deploy` to reuse the
-last deployment, or `--no-client` to stop after ingest.
+It reads the cluster id, warehouse id, and Databricks profile from `.env`
+(`DATABRICKS_CLUSTER_ID`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_PROFILE`) — the
+same file the local demo uses — so a configured project needs no flags.
+`--cluster-id` / `--warehouse-id` / `--profile` override those; `--target prod`
+runs against the prod target, `--no-deploy` reuses the last deployment, and
+`--no-client` stops after ingest.
 
 Running `databricks bundle` by hand works, but you must forward the overlay
 yourself, since the bundle holds no config. Deploy needs only the cluster; each
