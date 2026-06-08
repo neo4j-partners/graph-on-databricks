@@ -4,7 +4,7 @@
 # is committed too and a new developer needs only `uv sync`, with no sibling
 # dbxcarta checkout.
 #
-# Refresh ./dbxcarta-dist from a dbxcarta build with scripts/stage_wheelhouse.sh.
+# Refresh ./dbxcarta-dist from a dbxcarta build with scripts/refresh_dbxcarta_dist.sh.
 # Once dbxcarta is published to PyPI, delete this file and ./dbxcarta-dist: the
 # pins in pyproject.toml then resolve from PyPI unchanged. See
 # dbxcarta/docs/reference/simulate-publish.md.

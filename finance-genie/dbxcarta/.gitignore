@@ -5,7 +5,7 @@
 # Virtual environment.
 .venv/
 
-# Consumer wheel built by the databricks bundle (build output, not source).
+# uv build output for this package (build artifact, not source).
 dist/
 
 # Databricks CLI bundle state.

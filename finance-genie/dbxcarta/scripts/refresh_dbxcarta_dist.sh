@@ -11,17 +11,20 @@
 #   cd <dbxcarta> && uv build --package dbxcarta-core \
 #     && uv build --package dbxcarta-client && uv build --package dbxcarta-spark
 #
-# Then run this from finance-genie/dbxcarta/ (override the source dir with
-# DBXCARTA_DIST if the dbxcarta checkout is elsewhere):
-#   DBXCARTA_DIST=/path/to/dbxcarta/dist ./scripts/stage_wheelhouse.sh
+# Then run this script (override the dbxcarta dist location with DBXCARTA_DIST if
+# the dbxcarta checkout is not the default sibling path):
+#   ./scripts/refresh_dbxcarta_dist.sh
+#   DBXCARTA_DIST=/path/to/dbxcarta/dist ./scripts/refresh_dbxcarta_dist.sh
 #
 # Commit the refreshed ./dbxcarta-dist afterward. When dbxcarta is published to
 # PyPI, delete this script and ./dbxcarta-dist and flip databricks.yml from
 # `whl:` to `pypi:`.
 set -euo pipefail
 
-dist="${DBXCARTA_DIST:-../../../dbxcarta/dist}"
+# Resolve paths from the script location, not the caller's working directory, so
+# the script works regardless of where it is invoked from.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+dist="${DBXCARTA_DIST:-${here}/../../../dbxcarta/dist}"
 vendored="${here}/dbxcarta-dist"
 
 if [[ ! -d "${dist}" ]]; then
@@ -34,7 +37,7 @@ fi
 mkdir -p "${vendored}"
 rm -f "${vendored}"/dbxcarta_*.whl "${vendored}"/dbxcarta_*.tar.gz
 
-staged=0
+count=0
 for pkg in dbxcarta_core dbxcarta_spark dbxcarta_client; do
   # Pick the most recent matching wheel so a rebuilt dist with several versions
   # still vendors exactly one wheel per package, and the matching sdist.
@@ -47,8 +50,8 @@ for pkg in dbxcarta_core dbxcarta_spark dbxcarta_client; do
   echo "vendored $(basename "${wheel}") -> dbxcarta-dist/"
   sdist="$(ls -t "${dist}/${pkg}"-*.tar.gz 2>/dev/null | head -n 1 || true)"
   [[ -n "${sdist}" ]] && cp "${sdist}" "${vendored}/"
-  staged=$((staged + 1))
+  count=$((count + 1))
 done
 
-echo "vendored ${staged} dbxcarta wheel(s) into ${vendored}"
+echo "vendored ${count} dbxcarta wheel(s) into ${vendored}"
 echo "commit ./dbxcarta-dist to share the refreshed build with other developers."

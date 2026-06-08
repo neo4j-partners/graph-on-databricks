@@ -28,10 +28,11 @@ build-backend = "uv_build"
 # pinned above. This is the whole point of the published-library approach and
 # the difference from sql-semantics, which pins editable local paths.
 #
-# While PyPI publishing is unavailable, a gitignored uv.toml beside this file
-# supplies a local wheelhouse via find-links so the pinned versions resolve
-# offline. When dbxcarta is published, delete uv.toml and the same pins resolve
-# from PyPI unchanged. See dbxcarta/docs/reference/simulate-publish.md.
+# While PyPI publishing is unavailable, a committed uv.toml beside this file
+# supplies find-links to the vendored ./dbxcarta-dist wheels so the pinned
+# versions resolve with no extra setup. When dbxcarta is published, delete
+# uv.toml and ./dbxcarta-dist and the same pins resolve from PyPI unchanged.
+# See dbxcarta/docs/reference/simulate-publish.md.
 
 [tool.pytest.ini_options]
 addopts = "-m 'not live'"

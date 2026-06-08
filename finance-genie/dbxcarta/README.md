@@ -11,6 +11,33 @@ differs from `graph-on-databricks/sql-semantics`, which pins editable local
 paths to a sibling dbxcarta checkout. Here, `pyproject.toml` pins dbxcarta by
 version with no `[tool.uv.sources]`.
 
+## Setup
+
+The dbxcarta wheels are vendored in `dbxcarta-dist/` and committed, so there is no
+dbxcarta build to run and no sibling checkout to clone. Resolve and configure from
+this project:
+
+```bash
+cd finance-genie/dbxcarta
+
+# Resolve dbxcarta from the vendored wheels (uv.toml find-links ./dbxcarta-dist):
+uv sync
+
+# Copy the local-demo env template and fill in credentials:
+cp .env.sample .env
+```
+
+Check readiness and upload the question set. These use the dbxcarta CLI but run here,
+against this project's overlay and preset, so the work is finance-genie-side:
+
+```bash
+uv run dbxcarta preset finance_genie_dbxcarta:preset --check-ready \
+  --env-file dbxcarta-overlay.env
+
+uv run dbxcarta preset finance_genie_dbxcarta:preset --upload-questions \
+  --env-file dbxcarta-overlay.env
+```
+
 ## Catalog scope
 
 The semantic layer is built over the single Finance Genie catalog
@@ -37,7 +64,7 @@ finance-genie/dbxcarta/
 ├── .env.sample                 # standalone local-demo config (copy to .env)
 ├── questions.json              # 12-question eval fixture (graph-enriched-lakehouse)
 ├── dbxcarta-dist/              # vendored dbxcarta wheels (committed simulate-publish index)
-├── scripts/stage_wheelhouse.sh # maintainer: refresh dbxcarta-dist from a dbxcarta build
+├── scripts/refresh_dbxcarta_dist.sh # maintainer: refresh dbxcarta-dist from a dbxcarta build
 ├── src/finance_genie_dbxcarta/
 │   ├── __init__.py             # re-exports `preset`
 │   ├── preset.py               # StandardPreset(questions_file=...)
@@ -82,7 +109,7 @@ dbxcarta checkout needed.
   uv build --package core ─┐
   uv build --package client├─► dist/
   uv build --package spark ┘     │
-                                 │  scripts/stage_wheelhouse.sh (maintainer only)
+                                 │  scripts/refresh_dbxcarta_dist.sh (maintainer only)
                                  ▼
                           dbxcarta-dist/  (COMMITTED, vendored)
                                  │
@@ -104,7 +131,7 @@ dbxcarta checkout needed.
   still install from PyPI.
 
 Refreshing the vendored wheels is a maintainer step, run only when dbxcarta
-changes: rebuild the dbxcarta wheels, then run `./scripts/stage_wheelhouse.sh`
+changes: rebuild the dbxcarta wheels, then run `./scripts/refresh_dbxcarta_dist.sh`
 and commit `dbxcarta-dist/`.
 
 When dbxcarta is published: delete `uv.toml` and `dbxcarta-dist/`, bump the pins
@@ -120,7 +147,7 @@ dbxcarta. The full flow spans three places:
 
 | Step | Runs in | What it does |
 |------|---------|--------------|
-| (maintainer) Refresh dbxcarta wheels | **dbxcarta** + this project | Rebuild dbxcarta wheels via the [local publishing guide](../../../dbxcarta/docs/reference/simulate-publish.md), then `./scripts/stage_wheelhouse.sh` and commit `dbxcarta-dist/`. New developers skip this. |
+| (maintainer) Refresh dbxcarta wheels | **dbxcarta** + this project | Rebuild dbxcarta wheels via the [local publishing guide](../../../dbxcarta/docs/reference/simulate-publish.md), then `./scripts/refresh_dbxcarta_dist.sh` and commit `dbxcarta-dist/`. New developers skip this. |
 | Populate the catalog | **finance-genie/enrichment-pipeline** | Create the `graph-enriched-lakehouse` data the semantic layer is built over. |
 | Provision the secret scope | **finance-genie** (`setup_secrets.sh`) | Put `NEO4J_*` in `dbxcarta-neo4j-finance-genie`. |
 | Resolve + configure | **finance-genie/dbxcarta** | `uv sync` (resolves from `dbxcarta-dist/`), `.env`, the overlay. |
@@ -128,34 +155,7 @@ dbxcarta. The full flow spans three places:
 | Run jobs | **finance-genie/dbxcarta** | `databricks bundle` ingest then client. |
 | Local demo | **finance-genie/dbxcarta** | Read-only CLI. |
 
-## Setup
-
-The dbxcarta wheels are vendored in `dbxcarta-dist/` and committed, so there is no
-dbxcarta build to run and no sibling checkout to clone. Resolve and configure from
-this project:
-
-```bash
-cd finance-genie/dbxcarta
-
-# Resolve dbxcarta from the vendored wheels (uv.toml find-links ./dbxcarta-dist):
-uv sync
-
-# Copy the local-demo env template and fill in credentials:
-cp .env.sample .env
-```
-
-Check readiness and upload the question set. These use the dbxcarta CLI but run here,
-against this project's overlay and preset, so the work is finance-genie-side:
-
-```bash
-uv run dbxcarta preset finance_genie_dbxcarta:preset --check-ready \
-  --env-file dbxcarta-overlay.env
-
-uv run dbxcarta preset finance_genie_dbxcarta:preset --upload-questions \
-  --env-file dbxcarta-overlay.env
-```
-
-## Run the jobs (ingest then client) — finance-genie/dbxcarta
+## Run the jobs in finance-genie/dbxcarta (ingest then client)
 
 The vendored `dbxcarta-dist/` wheels are shipped as bundle `whl:` libraries, so
 no staging step is needed here.
@@ -171,12 +171,23 @@ databricks bundle run finance_genie_dbxcarta_client \
   --var="cluster_id=<cluster-id>" --var="warehouse_id=<warehouse-id>"
 ```
 
+`scripts/run_jobs.py` automates this whole sequence (deploy, then ingest, then
+client, since `bundle run` blocks until each job finishes):
+
+```bash
+uv run scripts/run_jobs.py \
+  --cluster-id <cluster-id> --warehouse-id <warehouse-id>
+```
+
+Add `--target prod` to run against the prod target, `--no-deploy` to reuse the
+last deployment, or `--no-client` to stop after ingest.
+
 The cluster must allow `SINGLE_USER` classic compute with task-level Maven
 libraries (the Neo4j Spark connector), and the secret scope
 `dbxcarta-neo4j-finance-genie` must hold `NEO4J_URI`, `NEO4J_USERNAME`, and
 `NEO4J_PASSWORD`. The ingest entry point reads those from the scope itself.
 
-## Run the local demo — finance-genie/dbxcarta
+## Run the local demo in finance-genie/dbxcarta
 
 ```bash
 # List the question set
@@ -192,7 +203,8 @@ uv run python -m finance_genie_dbxcarta.local_demo sql \
 
 ## Sequencing
 
-The local demo and the non-live tests run today against the wheelhouse. The
-ingest and client jobs additionally require the upstream Finance Genie catalog
-to be populated, the secret scope provisioned, and a preprovisioned cluster and
-warehouse. They cannot complete end to end until those are in place.
+The local demo and the non-live tests run today against the vendored
+`dbxcarta-dist/` wheels. The ingest and client jobs additionally require the
+upstream Finance Genie catalog to be populated, the secret scope provisioned,
+and a preprovisioned cluster and warehouse. They cannot complete end to end
+until those are in place.
