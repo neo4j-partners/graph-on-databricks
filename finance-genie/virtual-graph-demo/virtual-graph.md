@@ -94,7 +94,16 @@ Build that model with the following steps.
 5. Create the `TRANSACTED_WITH` relationship, as shown below:
 
    - Set the **Relationship type** to `TRANSACTED_WITH`.
-   - Under **Properties**, map from the `transactions` table.
+   - Under **Properties**, map from the `transactions` table:
+
+     | Property | Type | Map from column |
+     |----------|------|-----------------|
+     | `txn_id` | integer | `txn_id` |
+     | `amount` | float | `amount` |
+     | `txn_timestamp` | datetime | `txn_timestamp` |
+     | `txn_hour` | integer | `txn_hour` |
+
+     Set the **id** to `txn_id`.
    - Under **Node ID mapping**, set **From** to `Account`, with ID property `account_id` mapped from ID column `account_id`.
    - Set **To** to `Merchant`, with ID property `merchant_id` mapped from ID column `merchant_id`.
 
@@ -103,7 +112,15 @@ Build that model with the following steps.
 6. Create the `TRANSFERRED_TO` relationship, as shown below. Both ends map to the `Account` node; the source and destination differ only by which column supplies the ID:
 
    - Set the **Relationship type** to `TRANSFERRED_TO`.
-   - Under **Properties**, map from the `account_links` table.
+   - Under **Properties**, map from the `account_links` table:
+
+     | Property | Type | Map from column |
+     |----------|------|-----------------|
+     | `link_id` | integer | `link_id` |
+     | `amount` | float | `amount` |
+     | `transfer_timestamp` | datetime | `transfer_timestamp` |
+
+     Set the **id** to `link_id`.
    - Under **Node ID mapping**, set **From** to `Account`, with ID property `account_id` mapped from ID column `src_account_id`.
    - Set **To** to `Account`, with ID property `account_id` mapped from ID column `dst_account_id`.
 

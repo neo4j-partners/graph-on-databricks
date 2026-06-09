@@ -84,7 +84,7 @@ the data.
 
 Build a Virtual Graph over the Finance Genie Silver tables with node labels `:Account`
 and `:Merchant` (and the `TRANSACTED_WITH` and `TRANSFERRED_TO` relationships between
-them), set up as described in [VIRTUAL_GRAPH.md](VIRTUAL_GRAPH.md). That walkthrough
+them), set up as described in [virtual-graph.md](virtual-graph.md). That walkthrough
 covers connecting Databricks as a data source in Aura, defining the schema, and
 confirming the graph reads from the warehouse.
 
@@ -110,7 +110,7 @@ server timeout (default 120s), `--query N` / `--only N M` pick specific fraud qu
 
 | Document | What it covers |
 |---|---|
-| [`VIRTUAL_GRAPH.md`](VIRTUAL_GRAPH.md) | Step-by-step walkthrough to build the Virtual Graph over the Silver tables in Aura, plus the note on when to model transactions as nodes. |
+| [`virtual-graph.md`](virtual-graph.md) | Step-by-step walkthrough to build the Virtual Graph over the Silver tables in Aura, plus the note on when to model transactions as nodes. |
 | [`basic-graph-examples.md`](basic-graph-examples.md) | Warm-up counts and small relationship traversals that show the graph's value without fraud logic (backs `--demo basic`). |
 | [`finding-fraud.md`](finding-fraud.md) | Plain-English walkthrough of the fraud-signal queries and how to read them (backs `--demo fraud`). |
 | [`best-practices.md`](best-practices.md) | How to write Cypher that pushes down well to Databricks, plus how the warehouse and the connection pool shape performance. |

@@ -129,7 +129,7 @@ Good visual primer before running the algorithms.
 The queries above assume the data was loaded into Neo4j by `02_neo4j_ingest`. You
 can also run exploration queries against the **Virtual Graph**, where Aura
 translates Cypher to SQL and runs it on your Databricks warehouse without copying
-the data. See [VIRTUAL_GRAPH.md](../VIRTUAL_GRAPH.md) for the setup. GDS does not
+the data. See [virtual-graph.md](../virtual-graph-demo/virtual-graph.md) for the setup. GDS does not
 run on the Virtual Graph, so this section covers structural fraud-signal queries
 you can try directly against the Databricks-backed tables.
 
