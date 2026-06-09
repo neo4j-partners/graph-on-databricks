@@ -17,7 +17,7 @@ Findings from running Graph Data Science against a Neo4j Aura **Virtual Graph** 
 | Finding | Status                              |
 |---|-------------------------------------|
 | Resolving a streamed `nodeId` back to a node | Does not resolve consistently today |
-| Larger Cypher projections | Time out during provisioning        |
+| Larger Cypher projections | Session provisioning times out as the edge count grows |
 
 
 ## Open questions
@@ -36,15 +36,27 @@ ways to handle them is welcome.
   prints the raw `nodeId` and score.
 
 
-## Projection size and provisioning timeouts
+## Session provisioning timeouts as the projection grows
+
+The graph is built with the Cypher-projection form of `gds.graph.project(...)`, and the
+`{ memory }` argument on that call provisions a GDS Session. The two are one statement: the
+same call starts the session and projects the subgraph. The failure below is the session
+provisioning timing out, not a projection-memory limit, and the projected edge count is what
+drives how long provisioning stays silent.
+
+Aura sends a 60s Bolt read-timeout hint with no keepalive during provisioning, so once the
+edge count pushes the silent provisioning wait past 60s the driver declares the connection
+dead and the projection dies mid-flight. The demo can raise or remove that client-side
+timeout with `--read-timeout`, but a long provision can still be reset by the server, so this
+is necessary but not sufficient.
 
 The working path provisions a session, registers an in-memory graph, streams PageRank, and
 drops cleanly on a small projection. The "window" below is a time-range filter on the
 transfer rows: each row count is how many transfers fall in the most recent N hours of the
 data, and that row count is the edge count projected into the graph. Filtering to the most
 recent 1.5 hours (233 transfers) ran the full path in about 132 seconds, almost all of it
-session provisioning. Widening the time window, which lets in more transfers, is where
-larger projections begin to time out during provisioning.
+session provisioning. Widening the time window lets in more transfers, raising the edge
+count, and that is where provisioning stays silent long enough to trip the timeout.
 
 A sweep of wider time windows gave the following. Each "time window" row keeps only the
 transfers from that most-recent slice of the data ("last 36h" is the most recent 36 hours
