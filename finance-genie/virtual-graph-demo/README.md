@@ -1,23 +1,36 @@
 # Virtual Graph Demo
 
-A small [uv](https://docs.astral.sh/uv/) Python demo that runs Cypher against the
-Finance Genie Neo4j **Virtual Graph** (Aura translates the Cypher to SQL and runs it on
-a backing Databricks SQL warehouse). One entry point, `vg-demo` (`src/cli.py`), runs
-five demo sets selected with `--demo`:
+This project demonstrates the Neo4j Virtual Graph, which enables zero-copy querying of
+Databricks lakehouses with Cypher. The Virtual Graph compiles Cypher into SQL and pushes
+most of the work down to the backing Databricks SQL warehouse; graph-specific operations
+are handled by Neo4j's graph compute layer, and how much runs where depends on the query.
+The project walks through setting up the Finance Genie sample lakehouse on Databricks,
+creating a Virtual Graph over it in Aura, and querying that graph. It also documents best
+practices, how to use GDS Sessions, and the current limitations of the Virtual Graph.
 
-| `--demo` | What it is | Everything works? |
+Finance Genie is a synthetic dataset of bank accounts, merchants, and the transfers
+between them. Virtual Graph is in preview, and the official docs advise against using
+sensitive or production data with it; this demo uses only that synthetic dataset.
+
+For further information, see:
+
+- [Introducing Neo4j Virtual Graph](https://neo4j.com/blog/graph-database/introducing-neo4j-virtual-graph-graph-reasoning-on-the-data-you-already-have/)
+- [Getting started with Databricks](https://neo4j.com/docs/virtual-graph/aura/getting-started-databricks/)
+
+This [uv](https://docs.astral.sh/uv/) Python demo runs Cypher against the Finance Genie
+Virtual Graph. It includes the following demo sets:
+
+| Demo | What it is | Everything works? |
 |---|---|---|
 | `basic` | warm-up exploration and visualization queries | yes |
-| `fraud` (default) | the fast fraud-signal queries from `finding-fraud.md` | yes; `--all` adds slow / unsupported ones |
+| `fraud` | the fast fraud-signal queries from `finding-fraud.md` | yes |
 | `fast-gds` | the working GDS Session + PageRank path | yes, on a small window |
 | `slow-gds` | the GDS forms that do not work, kept as a demonstration | no, by design |
 | `gds-probe` | sweep projections that add node / relationship properties, to isolate which property types the projection rejects | mixed, by design |
 
-In plain English: the demo treats your Databricks tables as a graph of accounts and
-merchants, without copying any data into Neo4j. You write Cypher; Aura rewrites it as
-SQL and runs it on Databricks. The demos walk from simple counts, through fraud-signal
-queries, to graph algorithms (PageRank), showing both what runs well and where the
-Virtual Graph's current limits are.
+The queries build up gradually, from simple counts, through fraud-signal queries, to
+graph algorithms like PageRank, so you can see both what runs well and where the Virtual
+Graph reaches its current limits.
 
 Getting it running is three steps: create the Silver tables on Databricks, build the
 Virtual Graph over them in Aura, then run the demos.
@@ -42,7 +55,18 @@ Prerequisites:
   At demo runtime only the `NEO4J_*` values are read; the `DATABRICKS_*` values are
   used once, by the table-creation step (Step 1).
 
-## Step 1 — Create the Silver tables
+- The Databricks secret scopes provisioned from that `.env`. After filling it in, run
+  `setup_secrets.sh` once from the `finance-genie` root, the parent of this directory. It
+  reads `.env` and creates the secret scopes used by the enrichment pipeline and the agent
+  surfaces. The demos themselves read `NEO4J_*` from `.env` directly, so this step is for
+  the pipeline rather than for `vg-demo`:
+
+  ```bash
+  cd ..   # the finance-genie root
+  ./setup_secrets.sh
+  ```
+
+## Step 1: Create the Silver tables
 
 The Virtual Graph reads the Finance Genie Silver tables, so they must exist before you
 build it. The committed dataset in `finance-genie/data/` loads into the five base tables
@@ -56,7 +80,7 @@ cd ../enrichment-pipeline
 This uploads the CSVs to a Unity Catalog Volume, applies `sql/schema.sql`, and loads
 the data.
 
-## Step 2 — Build the Virtual Graph
+## Step 2: Build the Virtual Graph
 
 Build a Virtual Graph over the Finance Genie Silver tables with node labels `:Account`
 and `:Merchant` (and the `TRANSACTED_WITH` and `TRANSFERRED_TO` relationships between
@@ -64,7 +88,7 @@ them), set up as described in [VIRTUAL_GRAPH.md](VIRTUAL_GRAPH.md). That walkthr
 covers connecting Databricks as a data source in Aura, defining the schema, and
 confirming the graph reads from the warehouse.
 
-## Step 3 — Run the demos
+## Step 3: Run the demos
 
 Run any demo (`uv run` installs the project and its dependencies on first use):
 
@@ -89,7 +113,7 @@ server timeout (default 120s), `--query N` / `--only N M` pick specific fraud qu
 | [`VIRTUAL_GRAPH.md`](VIRTUAL_GRAPH.md) | Step-by-step walkthrough to build the Virtual Graph over the Silver tables in Aura, plus the note on when to model transactions as nodes. |
 | [`basic-graph-examples.md`](basic-graph-examples.md) | Warm-up counts and small relationship traversals that show the graph's value without fraud logic (backs `--demo basic`). |
 | [`finding-fraud.md`](finding-fraud.md) | Plain-English walkthrough of the fraud-signal queries and how to read them (backs `--demo fraud`). |
-| [`best-practices.md`](best-practices.md) | How to write Cypher that pushes down well to Databricks, and the connection-pool hazard. |
+| [`best-practices.md`](best-practices.md) | How to write Cypher that pushes down well to Databricks, plus how the warehouse and the connection pool shape performance. |
 | [`gds-guide.md`](gds-guide.md) | How to run Graph Data Science via a GDS Session on a Virtual Graph, including the no-write-back constraint. |
 | [`gds-limitations.md`](gds-limitations.md) | Findings and current limitations from running GDS against a Virtual Graph. |
 
@@ -101,7 +125,7 @@ Counts, breakdowns, and small anchored traversals that show the value of the
 relationships without any fraud logic. All run. The `graph` queries return nodes and
 relationships, so the CLI prints only a row count and timing; paste them into the Aura
 Workspace Query tab to see the picture. The demo prints the anchor account and merchant
-ids it picked.
+IDs it picked.
 
 | # | What it does | Kind |
 |---|---|---|
@@ -120,11 +144,12 @@ ids it picked.
 ### `fraud` demo
 
 The seven fast queries (1-7) are the pushdown-friendly forms from
-[`finding-fraud.md`](finding-fraud.md). They group by scalar ids,
-reshape a `count(DISTINCT)` into pair-grouping plus a client-side rollup (fan-in and
-fan-out), and split a cross product into two merged halves (courier). The server
-aggregates and orders; the threshold filters and top-N run in Python; recent windows are
-passed as a precomputed `$since` parameter. Each returns in a few seconds.
+[`finding-fraud.md`](finding-fraud.md). They group by scalar IDs,
+reshape a `count(DISTINCT)` into pair-grouping plus a client-side rollup for the fan-in
+and fan-out queries, and split a cross product into two merged halves for the courier
+query. The server aggregates and orders; the threshold filters and top-N run in Python;
+recent windows are passed as a precomputed `$since` parameter. Each returns in a few
+seconds.
 
 | # | What it does | Status |
 |---|---|---|
@@ -150,8 +175,8 @@ continues.
 
 ### `fast-gds` demo
 
-GDS is not an in-database plugin on the Virtual Graph. The supported path is a **GDS
-Session**: the Cypher-projection form of `gds.graph.project(...)` with a `{ memory }`
+GDS is not an in-database plugin on the Virtual Graph. The path that works in practice is
+a **GDS Session**: the Cypher-projection form of `gds.graph.project(...)` with a `{ memory }`
 config provisions an ephemeral session, then PageRank streams against the named
 in-memory graph. The demo runs its statements one at a time: size the window, drop any
 stale projection, project (this provisions the session), stream PageRank, drop.
@@ -171,13 +196,13 @@ What it looks like on a thin window (the most recent 2 hours of transfers):
 ```
 
 Almost all the time is session cold-start, not the query or the algorithm. Streamed
-`nodeId`s are GDS-internal ids, not `account_id`s; resolving them back is not reliable on
-the Virtual Graph yet, so the demo streams the raw id and score.
+`nodeId`s are GDS-internal IDs, not `account_id`s; resolving them back is not reliable on
+the Virtual Graph yet, so the demo streams the raw ID and score.
 
 **Keep the window small.** `--count-only` counts the rows in a window for free. A thin
 window (`--since-hours 2`, the most recent 2 hours of transfers, a few hundred edges)
 provisions and completes. The default 7-day window is about 23,000 edges, which trips the
-read timeout during provisioning (see Slow GDS). Use `--since-hours` / `--since-days` to scope it, `--limit` to change the top-N,
+read timeout during provisioning (see the `slow-gds` demo below). Use `--since-hours` / `--since-days` to scope it, `--limit` to change the top-N,
 `--memory` to size the session, and `--keep` to leave the projection in place for reuse.
 
 ### `slow-gds` demo
@@ -198,9 +223,9 @@ so run this on a clean instance.
 The fast-gds projection carries only labels and the relationship type; it never projects
 `amount` or `transfer_timestamp` as graph properties. This demo isolates what happens when
 you add properties: a GDS in-memory graph only accepts **numeric** property types, so it
-sweeps a series of projections on a thin window (the timeout stays out of the picture),
-adding one node or relationship property at a time, and reports which project and which the
-server rejects. It first introspects the live schema and prints each property's type, then
+sweeps a series of projections on a thin window where the timeout stays out of the
+picture, adding one node or relationship property at a time, and reports which ones project
+and which the server rejects. It first introspects the live schema and prints each property's type, then
 runs:
 
 | Scenario | Projection adds | Result |
@@ -230,17 +255,3 @@ helper in `src/connection.py` (reads the parent `.env`, or `PROBE_ENV` if set):
   per-query cap and a pool health check between each.
 - `vg-viz` (`src/viz_check.py`): find real flagged accounts and confirm each anchored
   visualization renders small and fast.
-
-### Notes
-
-- **No write-back.** A Virtual Graph has no write-back to the relational source, so
-  PageRank is streamed to the app rather than written to `Account` nodes. See
-  [`gds-guide.md`](gds-guide.md).
-- **Connection pool.** The Virtual Graph holds about 10 JDBC connections to Databricks
-  and does not cancel a server-side query when the client gives up. Run on a clean
-  instance, let each statement finish, and do not abandon a run. The full hazard and the
-  performance rules are in [`best-practices.md`](best-practices.md).
-- **Candidates, not verdicts.** These queries surface candidates, not confirmed fraud.
-  See the interpretation caveats in [`finding-fraud.md`](finding-fraud.md).
-</content>
-</invoke>

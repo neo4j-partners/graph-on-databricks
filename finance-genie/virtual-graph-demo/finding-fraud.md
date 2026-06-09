@@ -252,7 +252,7 @@ account id a query flagged, paste it into one of the queries below, and run it i
 Aura Workspace Query tab to draw the picture. These return node and relationship
 variables, so the Workspace renders them as a graph rather than a table.
 
-One rule makes or breaks this: **always anchor on a specific account id.** Filtering on
+The key recommendation: **anchor on a specific account id.** Filtering on
 one id (`{account_id: 184}`) pushes a selective filter down to the warehouse, so the
 query stays fast and returns few enough nodes to draw. The same pattern without an
 anchor scans the whole table and returns far too much to render. The example ids below

@@ -1,11 +1,11 @@
 # GDS on Virtual Graph: current limitations and findings
 
-Findings from running Graph Data Science against a Neo4j Aura **Virtual Graph** and the limitations I hit.
+Findings from running Graph Data Science against a Neo4j Aura **Virtual Graph** and the current limitations.
 
 ## Test environment
 
-- **Instance:** Aura Virtual Graph `ge224c32`.
-- **Backing warehouse:** Databricks 2X-Small Serverless Starter SQL warehouse.
+- **Instance:** Aura Virtual Graph with 8 gb of Memory.
+- **Backing warehouse:** Databricks 2X-Small Serverless Starter SQL warehouse. Tested with Larger SQL warehouses and did not find any performance improvements. 
 - **Data:** the Finance Genie Silver tables, `:Account` nodes and `TRANSFERRED_TO`
   relationships.
 - **Harness:** the `fast-gds` and `slow-gds` demos (`src/demos/`, run with
@@ -14,16 +14,16 @@ Findings from running Graph Data Science against a Neo4j Aura **Virtual Graph** 
   
 ## Summary
 
-| Finding | Status |
-|---|---|
+| Finding | Status                              |
+|---|-------------------------------------|
 | Resolving a streamed `nodeId` back to a node | Does not resolve consistently today |
-| Larger Cypher projections | May time out during provisioning (not strictly by size) |
+| Larger Cypher projections | Time out during provisioning        |
 
 
 ## Open questions
 
-These are the limitations I have not found a way around. Guidance on how to handle them
-would be welcome.
+These are the current limitations without a known workaround. Feedback on use cases or
+ways to handle them is welcome.
 
 - **GDS stream results can't be attributed to specific accounts.** GDS algorithms return
   rows keyed by a GDS-internal `nodeId`, not by the source `account_id`, and this is the

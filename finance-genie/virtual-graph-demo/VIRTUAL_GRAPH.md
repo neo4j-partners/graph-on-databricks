@@ -2,7 +2,7 @@
 
 Neo4j Virtual Graph lets you query Databricks tables as a property graph in Aura without copying the data into Neo4j first. This walkthrough sets up a Virtual Graph over the Finance Genie Silver tables, so you can explore accounts and transfers with Cypher while the data stays in Unity Catalog.
 
-> Virtual Graph is in private preview. Do not use sensitive or production data with it during the preview.
+> Virtual Graph is in preview. The official docs advise against using sensitive or production data with it during the preview.
 
 ## 1. Complete the Common Setup
 
@@ -113,7 +113,7 @@ Build that model with the following steps.
 
 ## 6. Inspect your graph
 
-Select **Query** from the left-side navigation and run Cypher against the Virtual Graph. Aura translates each query to SQL and runs it on your Databricks warehouse.
+Select **Query** from the left-side navigation and run Cypher against the Virtual Graph. Aura compiles each query into SQL and pushes most of the work to your Databricks warehouse; graph-specific operations run in Neo4j's graph compute layer.
 
 ### Transfers between accounts
 

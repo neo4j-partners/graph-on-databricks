@@ -161,13 +161,14 @@ LIMIT 25
 
 ## Why anchoring matters
 
-The Virtual Graph translates Cypher to SQL on the backing Databricks warehouse.
-A query anchored on a single node id becomes a selective SQL filter that the
+The Virtual Graph compiles Cypher into SQL and pushes most of it down to the backing
+Databricks warehouse. A query anchored on a single node id becomes a selective SQL filter that the
 warehouse runs quickly and that returns a handful of rows. The same two-hop
 pattern with no anchor becomes a full join across the relationship table, which
 is slow and returns far too many rows to draw. For demos and visualizations,
 always start from a specific account or merchant.
 
-For the operational hazards of the Virtual Graph, the small JDBC connection pool,
-slow queries that cannot be canceled, and the read-only constraint, see the
-"Operational hazards" section of [`best-practices.md`](best-practices.md).
+For how the warehouse and the small JDBC connection pool shape performance, plus the
+behavior of queries that keep running after the client gives up and the read-only
+constraint, see the "Performance and the connection pool" section of
+[`best-practices.md`](best-practices.md).

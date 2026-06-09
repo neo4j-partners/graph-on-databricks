@@ -1,7 +1,7 @@
 # Virtual Graph Best Practices
 
 How to write Cypher that runs well on the Finance Genie Virtual Graph. Aura
-translates each Cypher query to SQL and runs it on the backing Databricks SQL
+compiles Cypher into SQL and pushes most of the work down to the backing Databricks SQL
 warehouse, so the rules here are about helping that translation push work down to
 Databricks instead of dragging rows back to the graph engine.
 
@@ -13,7 +13,8 @@ Cypher query will not run.
 
 ## How the Virtual Graph works
 
-- **Translation.** Cypher becomes SQL over Databricks. Only a subset of Cypher is
+- **Translation.** Most of a Cypher query becomes SQL over Databricks, with
+  graph-specific work handled by the engine. Only a subset of Cypher is
   supported, so a query written for a loaded Aura graph rarely runs verbatim. The
   reference forms in the appendix show the gap.
 - **The shared query shape.** Aggregate and order on the server, then apply the
@@ -28,8 +29,10 @@ Cypher query will not run.
   - `TRANSFERRED_TO` (`:Account` → `:Account`): `amount`, `transfer_timestamp`, `link_id`.
   - `TRANSACTED_WITH` (`:Account` → `:Merchant`): `amount`, `txn_timestamp`, `txn_hour`, `txn_id`.
 
-Timings in this guide are dominated by the backing warehouse and the connection-pool
-behavior, not by the query text. Treat them as rough and directional.
+The patterns in this guide change timings by orders of magnitude, so query shape is the
+first thing to get right. The absolute seconds for any given query also depend on the
+warehouse size and the connection pool, so treat the numbers here as rough and
+directional.
 
 ## What governs performance
 
@@ -49,8 +52,9 @@ terms used throughout:
 **Cost center 2, how much data moves.** Every result row travels back over the wire.
 This bites even when cost center 1 is perfect.
 
-**The machine underneath.** Real wall-clock time is usually set by the warehouse size
-and the connection pool, covered under [Operational hazards](#operational-hazards).
+**The machine underneath.** Once the query shape is right, the absolute wall-clock time
+also depends on the warehouse size and the connection pool, covered under
+[Performance and the connection pool](#performance-and-the-connection-pool).
 
 The next sections are the patterns. Each one is stated once, with the worked example
 that measured it.
@@ -265,10 +269,16 @@ follow from the patterns above.
 | Counting two labels in one statement | `MATCH (a:Account) WITH count(a) ... MATCH (m:Merchant) ...` fails with `42NG0`. Run each label count as its own statement. |
 | `CYPHER 25` version prefix | Does not enable any of the above. |
 
-## Operational hazards
+## Performance and the connection pool
 
-Every query becomes SQL on the backing Databricks SQL warehouse, and the connection pool
-to that warehouse is the main operational hazard.
+Three things set how fast a query comes back: its shape, the warehouse size, and the
+connection pool. The patterns above cover shape, the largest lever. This section covers
+the other two. Every query becomes SQL on the backing Databricks SQL warehouse and runs
+through a small JDBC connection pool to it, so both the warehouse and the pool shape what
+you observe.
+
+The timing table shows shape doing the heavy lifting: the same relationship table is a
+few seconds with the right group key and tens of seconds without it.
 
 | Query shape | Observed timing |
 |---|---|
@@ -279,21 +289,26 @@ to that warehouse is the main operational hazard.
 | `count(DISTINCT ...)` grouped by a node over the full transfer table | did not finish within 100s |
 | Two-hop pattern joins (pass-through, rapid-turnover) | very expensive; unbounded ones did not finish within 100s |
 
-- **Small pool.** The Virtual Graph holds a small JDBC connection pool to Databricks,
-  observed maximum 10 connections.
-- **Abandoning does not cancel.** Killing a slow query on the client does not cancel the
-  underlying Databricks query. It keeps running and holds a pool connection.
-- **Saturation.** A few abandoned slow queries saturate the pool, after which every new
-  query fails with `HikariPool-1 - Connection is not available, request timed out after
-  30000ms (total=10, active=10, idle=0)`. Recovery needs those queries to finish on
-  Databricks or the instance to be restarted.
+How the pool behaves:
+
+- **Pool size.** The Virtual Graph holds a small JDBC connection pool to Databricks, with
+  an observed maximum of 10 connections.
+- **A client-side cancel does not cancel the query.** Killing a slow query on the client
+  leaves the underlying Databricks query running, and it holds its pool connection until
+  it finishes.
+- **Saturation.** Once enough long-running queries hold connections, the pool is full and
+  new queries return `HikariPool-1 - Connection is not available, request timed out after
+  30000ms (total=10, active=10, idle=0)`. The pool recovers when those queries finish on
+  Databricks, or after the instance is restarted.
 - **No server-side timeout.** The Bolt transaction timeout `begin_transaction(timeout=...)`
-  is not honored, so you cannot bound a query that way.
+  is not honored, so the pool, not a timeout, is what bounds a long query.
 
-Practical guidance:
+Recommendations:
 
-- **Run one query at a time.** Let each finish rather than abandoning it.
-- **Keep result sets small.** Prefer the lighter aggregations and add time windows.
+- **Run one query at a time.** Letting each finish before starting the next keeps
+  connections free.
+- **Keep result sets small.** Prefer the lighter aggregations and add time windows; see
+  [Pattern 6](#pattern-6-keep-result-sets-small).
 - **Size the warehouse.** A bigger Databricks SQL warehouse sets a faster floor for every
   scan and aggregation.
 

@@ -168,15 +168,16 @@ recent 1.5 hours (233 transfers, so 233 edges) ran the full path successfully:
 The dominant cost is Aura Graph Analytics session provisioning, the cold start of the
 ephemeral compute, not the Databricks query or the algorithm itself.
 
-**Keep projections small.** The reliable path today is a small projection: the 233-edge
+**Keep projections small.** A small projection is the reliable path today: the 233-edge
 projection from the 1.5-hour window completed cleanly, and small projections provision
-faster. Larger projections, from a wider time window with more transfers, fail
-nondeterministically on a 60 second Bolt read timeout or a server reset. Use `--count-only`
-to count the rows in a window for free and `--keep` to reuse a provisioned session.
+faster. A wider time window with more transfers can exceed the 60 second Bolt read timeout
+during provisioning or hit a server reset, so scope the window until the projection
+provisions reliably. Use `--count-only` to count the rows in a window for free and
+`--keep` to reuse a provisioned session.
 
-## What does not work
+## Limitations and workarounds
 
-These are the known working patterns. For what does not work with GDS on the Virtual
+The patterns above are the known working ones. For the GDS limitations on the Virtual
 Graph, the streamed-`nodeId` resolution gap, and the full analysis of the 60 second Bolt
-read timeout and server reset that make large projections fail, along with workarounds,
+read timeout and server reset that affect large projections, along with workarounds,
 see [`gds-limitations.md`](gds-limitations.md).
