@@ -6,7 +6,7 @@ Neo4j Virtual Graph lets you query Databricks tables as a property graph in Aura
 
 ## 1. Complete the Common Setup
 
-Before setting up the Virtual Graph, run the **Common Setup** in [README.md](./README.md). That step creates the shared `.env`, provisions the Databricks secrets, uploads the synthetic dataset, and applies `sql/schema.sql` to create the base tables. The Virtual Graph reads those tables, so they must exist first.
+Before setting up the Virtual Graph, run the **Common Setup** in the [finance-genie README](../README.md). That step creates the shared `.env`, provisions the Databricks secrets, uploads the synthetic dataset, and applies `sql/schema.sql` to create the base tables. The Virtual Graph reads those tables, so they must exist first. The [virtual-graph-demo README](./README.md) lists the minimum subset of those steps the demo needs.
 
 The tables you will model are the Finance Genie Silver tables: `accounts`, `merchants`, `transactions`, and `account_links`. The `account_labels` table stays out of the graph. It holds the fraud ground truth used for evaluation, not graph structure.
 

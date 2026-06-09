@@ -1,14 +1,6 @@
 # GDS on Virtual Graph: current limitations and findings
 
-Findings from running Graph Data Science against a Neo4j Aura **Virtual Graph** during the
-private preview. This is the companion to [`gds-guide.md`](gds-guide.md), which documents
-the working GDS Session path. This document collects the limitations we hit, to share with
-the Neo4j team as preview feedback. As an early-access preview, some rough edges are
-expected, and several of these may already be in progress.
-
-Scope is GDS only. The Virtual Graph Cypher coverage gaps (HAVING-style filters, temporal
-arithmetic in `WHERE`, variable-length paths) are a separate topic and are documented in
-[`best-practices.md`](best-practices.md).
+Findings from running Graph Data Science against a Neo4j Aura **Virtual Graph** and the limitations I hit.
 
 ## Test environment
 
@@ -18,12 +10,8 @@ arithmetic in `WHERE`, variable-length paths) are a separate topic and are docum
   relationships.
 - **Harness:** the `fast-gds` and `slow-gds` demos (`src/demos/`, run with
   `uv run vg-demo --demo fast-gds` / `--demo slow-gds`).
-- **Dates:** live runs on 2026-06-04, compiled from internal #team-graph-engine
-  discussion in June 2026.
 
-Behavior is actively changing during the preview, so verify each finding against the
-current Aura Graph Analytics / GDS Sessions documentation.
-
+  
 ## Summary
 
 | Finding | Status |
@@ -31,19 +19,21 @@ current Aura Graph Analytics / GDS Sessions documentation.
 | Resolving a streamed `nodeId` back to a node | Does not resolve consistently today |
 | Larger Cypher projections | May time out during provisioning (not strictly by size) |
 
-The second finding is the more significant one and is the focus of this document.
 
-## Other known gaps
+## Open questions
 
-- **A streamed `nodeId` cannot be mapped back to an account.** GDS algorithms run over the
-  in-memory projection, where every node carries a GDS-internal integer id assigned at
-  projection time. `gds.pageRank.stream` returns each row keyed by that `nodeId` and a
-  `score`, not by the source `account_id`. The usual way to make the result actionable is
-  to resolve each `nodeId` back to its node, for example
-  `... YIELD nodeId, score WITH gds.util.asNode(nodeId) AS n, score RETURN n.account_id, score`,
-  or by chaining the `CALL` into a follow-up `MATCH`. On the Virtual Graph that resolution
-  is not consistent today, so PageRank produces a ranking that cannot yet be attributed to
-  specific accounts. The demo prints the raw internal id and score.
+These are the limitations I have not found a way around. Guidance on how to handle them
+would be welcome.
+
+- **GDS stream results can't be attributed to specific accounts.** GDS algorithms return
+  rows keyed by a GDS-internal `nodeId`, not by the source `account_id`, and this is the
+  same across centrality scores, community ids, embeddings, and pathfinding output.
+  PageRank is the worked example here: `gds.pageRank.stream` yields `nodeId` + `score`, and
+  mapping that `nodeId` back to its node (`gds.util.asNode(nodeId)` or a follow-up `MATCH`)
+  does not work consistently on the Virtual Graph today, so the output is a ranking of
+  anonymous internal ids rather than accounts. The usual fallback, writing results back
+  with `.write` mode, is also unavailable because the Virtual Graph is read-only. The demo
+  prints the raw `nodeId` and score.
 
 
 ## Projection size and provisioning timeouts
