@@ -128,6 +128,61 @@ Build that model with the following steps.
 
 7. Select **Create Virtual Graph** to save the model.
 
+## Indexes for the model
+
+The model editor exposes an **Indexes** tab on both nodes and relationships, alongside the
+**Properties** and **Constraints** tabs. Add an index with `+` and pick a property; the
+index type is Neo4j's default `range` index.
+
+The model already carries four indexes after the steps above, all created for you:
+
+- `Account.account_id` and `Merchant.merchant_id`, the range indexes that back each node's
+  ID uniqueness constraint.
+- `TRANSACTED_WITH.txn_id` and `TRANSFERRED_TO.link_id`, from the optional relationship
+  **ID** property set on each relationship.
+
+None of those sit on the columns the demo queries filter by. The fraud queries and the GDS
+session window all filter on timestamps, amounts, and account dates, not on the ID
+columns. The Aura Import guidance is to add a range index to any property you regularly
+filter by range. The five additions below map to the queries in
+[`finding-fraud.md`](finding-fraud.md) and the GDS path in [`gds-guide.md`](gds-guide.md),
+ordered by how many queries each one serves:
+
+| Index | Type | Backs |
+|-------|------|-------|
+| `TRANSFERRED_TO.transfer_timestamp` | range | The GDS session window (`WHERE t.transfer_timestamp >= $since`), fan-in (query 5), fan-out (query 6), and the collection / spray finder queries. Highest coverage. |
+| `TRANSFERRED_TO.amount` | range | Structuring (query 1), the selective `>= 9000 AND < 10000` filter. |
+| `Account.opened_date` | range | Busy brand-new accounts (query 2). |
+| `Account.balance` | range | Velocity ratio (query 4). |
+| `TRANSACTED_WITH.txn_timestamp` | range | Shared-merchant burst and any merchant time-window query. |
+
+For the GDS session specifically, the projection query is
+`MATCH (src:Account)-[t:TRANSFERRED_TO]->(dst:Account) WHERE t.transfer_timestamp >= $since`.
+The index that maps to it is `TRANSFERRED_TO.transfer_timestamp`, the same index that
+serves the fan-in and fan-out fraud queries, so it is the single highest-value addition.
+
+Skip these, with the reason:
+
+- `Account.account_id` and `Merchant.merchant_id` are already indexed by their uniqueness
+  constraints, so the anchored visualization lookups such as `{account_id: 184}` are
+  already covered.
+- `account_type`, `region`, and merchant `category` are `GROUP BY` keys, not selective
+  range filters, and a range index does not help a grouping scan.
+- `txn_hour` and `holder_age` are not filtered selectively by any demo query.
+- `TRANSACTED_WITH.amount` has no range filter in the current fast query set; add it later
+  only if a merchant-amount threshold query joins the set.
+
+One honest caveat: whether a model range index changes a Virtual Graph's execution is
+unverified. Every performance lever in [`best-practices.md`](best-practices.md) is query
+shape, warehouse size, and the connection pool, never model indexes, and the backing Delta
+tables have no B-tree index for a range index to translate into. Treat these additions as
+aligning the model with Neo4j and Aura Import best practice at near-zero cost, not as a
+guaranteed speed-up. The proven levers stay the ones in
+[`best-practices.md`](best-practices.md): scalar group keys, time windows to keep result
+sets small, warehouse size, and one query at a time. To check the effect of an index,
+prefix a query with `EXPLAIN` and compare the generated SQL and timing before and after
+adding it.
+
 ## 6. Inspect your graph
 
 Select **Query** from the left-side navigation and run Cypher against the Virtual Graph. Aura compiles each query into SQL and pushes most of the work to your Databricks warehouse; graph-specific operations run in Neo4j's graph compute layer.

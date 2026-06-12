@@ -69,3 +69,11 @@ of transfers), and the transfer count is the number of edges projected into the 
 | last 72h    | 9,846             | connection read timeout, then a later attempt survived 6+ minutes |
 | last 109h   | 14,991            | connection read timeout |
 | last 145h   | 20,019            | survived 263s, then stopped manually |
+
+This sweep was single attempts; several rows are inconclusive ("survived" means it had not
+timed out when stopped, not that it completed). A later systematic sweep, three runs per
+window, put the 233-edge projection at an ~88 s median, so the 128.8 s above was a colder
+single sample, and pinned the growth curve below the timeout: about 3.8 minutes at 986 edges
+and 6.2 minutes at 1,987, with a ~5,000-edge projection that did not finish within 33
+minutes. Warehouse size made no difference at any window. See
+[`perf-tests-results.md`](perf-tests-results.md), Test set B.

@@ -175,6 +175,13 @@ during provisioning or hit a server reset, so scope the window until the project
 provisions reliably. Use `--count-only` to count the rows in a window for free and
 `--keep` to reuse a provisioned session.
 
+A later systematic sweep on the backing warehouse ran three projections per window. It put
+the 233-edge projection at an ~88 s median, so the 128.8 s measured above was a colder
+single sample, and it confirmed the projection step dominates and scales super-linearly:
+about 1.5 minutes at 233 edges, 3.8 minutes at 986, and 6.2 minutes at 1,987, while a
+~5,000-edge projection did not finish within 33 minutes and was stopped. Warehouse size made
+no difference at any window. See [`perf-tests-results.md`](perf-tests-results.md), Test set B.
+
 ## Limitations and workarounds
 
 The patterns above are the known working ones. For the GDS limitations on the Virtual
