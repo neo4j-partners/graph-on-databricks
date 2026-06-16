@@ -114,8 +114,8 @@ to make the structural patterns visible so analysts can investigate.
 
 <!--
 Best proxy available without graph columns: biggest spenders,
-their top merchants. Genie segments accounts into deciles by
-transaction volume, counts transactions in the top decile.
+their top merchants. Genie ranks accounts by transaction volume
+and counts transactions for the top 10%.
 
 Five merchants tied at 26 to 30. All look like ordinary commercial
 activity. From this list there's no basis to pick one merchant
@@ -128,7 +128,7 @@ over another for investigation. The volume proxy consumed the answer.
 
 *"Which merchants are most commonly transacted with by accounts in ring-candidate communities?"*
 
-| Merchant | Top-decile (before) | Ring members (after) |
+| Merchant | Top 10% (before) | Ring members (after) |
 |---|---|---|
 | MarketPlus | 30 | **111** |
 | QuickCash | 26 | **104** |

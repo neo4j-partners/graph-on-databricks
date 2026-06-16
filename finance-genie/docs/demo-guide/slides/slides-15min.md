@@ -26,9 +26,9 @@ ol > li {
 }
 </style>
 
-# Graph-Enriched Lakehouse
+# Teaching Genie to See Connections
 
-Combining Databricks Genie with Neo4j Graph Data Science
+Graph Intelligence for the Databricks Lakehouse
 
 <!--
 One-line argument: financial crime is a network problem, the row
@@ -110,7 +110,7 @@ over another for investigation. The volume proxy consumed the answer.
 
 *"Which merchants are most commonly transacted with by accounts in ring-candidate communities?"*
 
-| Merchant | Top-decile (before) | Ring members (after) |
+| Merchant | Top 10% (volume) | Ring members (after) |
 |---|---|---|
 | MarketPlus | 30 | **111** |
 | QuickCash | 26 | **104** |
