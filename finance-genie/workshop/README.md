@@ -72,7 +72,7 @@ first notebook:
 
 **`00_setup_data.ipynb`** *(dedicated or serverless)*: Creates and loads the five
 Silver base tables (`accounts`, `merchants`, `transactions`, `account_links`,
-`account_labels`) in `graph-enriched-lakehouse.graph-enriched-schema`. Fetches
+`account_labels`) in `graph-on-databricks.graph-enriched-schema`. Fetches
 the committed CSVs and `ground_truth.json` from the public GitHub repo, writes
 them to a Unity Catalog Volume, creates the tables with column comments, and
 loads the data. The notebook equivalent of
