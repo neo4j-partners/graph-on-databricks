@@ -199,6 +199,7 @@ WITH a, txn_count_30d, distinct_merchant_count_30d, inbound_transfer_events,
      count(DISTINCT cp) AS distinct_counterparty_count
 RETURN a.account_id              AS account_id,
        a.account_hash            AS account_hash,
+       a.account_name            AS account_name,
        a.account_type            AS account_type,
        a.region                  AS region,
        a.balance                 AS balance,
@@ -286,6 +287,7 @@ RETURN collect(DISTINCT a.community_id) AS community_ids
 _ACCOUNTS_SCHEMA: list[tuple[str, str]] = [
     ("account_id", "BIGINT"),
     ("account_hash", "STRING"),
+    ("account_name", "STRING"),
     ("account_type", "STRING"),
     ("region", "STRING"),
     ("balance", "DOUBLE"),
@@ -437,6 +439,7 @@ def _decorate_accounts(
             {
                 "account_id": int(a.get("account_id") or 0),
                 "account_hash": a.get("account_hash"),
+                "account_name": a.get("account_name"),
                 "account_type": a.get("account_type"),
                 "region": a.get("region"),
                 "balance": (

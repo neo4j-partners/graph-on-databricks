@@ -223,6 +223,7 @@ run_sql "INSERT INTO accounts" \
    SELECT
      CAST(account_id   AS BIGINT)  AS account_id,
      account_hash,
+     account_name,
      account_type,
      region,
      CAST(balance      AS DOUBLE)  AS balance,
@@ -233,7 +234,7 @@ run_sql "INSERT INTO accounts" \
      format      => 'csv',
      header      => 'true',
      inferSchema => 'false',
-     schema      => 'account_id STRING, account_hash STRING, account_type STRING, region STRING, balance STRING, opened_date STRING, holder_age STRING'
+     schema      => 'account_id STRING, account_hash STRING, account_name STRING, account_type STRING, region STRING, balance STRING, opened_date STRING, holder_age STRING'
    )"
 
 run_sql "INSERT INTO merchants" \

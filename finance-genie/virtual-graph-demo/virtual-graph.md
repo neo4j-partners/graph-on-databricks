@@ -66,7 +66,7 @@ The panel shows the data source set to Databricks with the server hostname, HTTP
 
 - `account_labels` with `account_id` and `is_fraud`
 - `account_links` with `link_id`, `src_account_id`, `dst_account_id`, `amount`, and `transfer_timestamp`
-- `accounts` with `account_id`, `account_hash`, `account_type`, `region`, `balance`, `opened_date`, and `holder_age`
+- `accounts` with `account_id`, `account_hash`, `account_name`, `account_type`, `region`, `balance`, `opened_date`, and `holder_age`
 
 Scroll down to see the remaining two tables, `merchants` and `transactions`. All five Silver tables are discovered. Seeing these tables and columns confirms that Aura can reach the warehouse and read the Finance Genie schema.
 
