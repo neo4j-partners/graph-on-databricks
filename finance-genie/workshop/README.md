@@ -62,11 +62,6 @@ first notebook:
 - **Run GDS in the Aura Query tab** instead of the Python-client notebook
   (`04_gds_enrichment.ipynb`). See `aura_gds_guide.md` for the step-by-step
   algorithm guide.
-- **`07_train_model.ipynb`** is off the 15-minute demo path. It trains a baseline
-  gradient-boosting classifier on tabular features and a graph-augmented
-  classifier on tabular plus `risk_score` / `community_id` / `similarity_score`,
-  logs both to MLflow, and translates the lift into estimated dollar impact.
-  Useful for ML-focused Q&A; skip for the analyst-workflow demo.
 
 ## Notebook Reference
 

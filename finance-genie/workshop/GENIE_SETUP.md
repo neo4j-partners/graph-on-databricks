@@ -20,7 +20,7 @@ comes from and what to expect when you run the live before/after reveal.
 | Table list attached to each space | `enrichment-pipeline/setup/provision_genie_spaces.py` — `BEFORE_TABLES`, `AFTER_TABLES` |
 | Sample questions surfaced in the UI | same file — `BEFORE_QUESTIONS`, `AFTER_QUESTIONS` |
 | Text instructions block | `enrichment-pipeline/genie_instructions.md` (lean — only table relationships and schema context) |
-| Column-level documentation | Unity Catalog column comments, applied from the inline DDL in `05_pull_gold_tables.ipynb` sections 6–8 (mirrors `enrichment-pipeline/sql/gold_schema.sql`). Genie reads column descriptions directly from UC. |
+| Column-level documentation | Unity Catalog column comments, applied from the inline DDL in `05_pull_gold_tables.ipynb` sections 2–4 (mirrors `enrichment-pipeline/sql/gold_schema.sql`). Genie reads column descriptions directly from UC. |
 | `fraud_risk_tier` / ring-size thresholds | `enrichment-pipeline/jobs/_gold_constants.py` — `RING_SIZE_LOW=50`, `RING_SIZE_HIGH=200`, `COMMUNITY_AVG_RISK_MIN=1.0` |
 
 To change a column description, edit the DDL (either the workshop notebook
