@@ -273,16 +273,9 @@ mapped TIMESTAMP properties are `transfer_timestamp` and `txn_timestamp`; the ma
 property `opened_date` is free. Carrying a `DATE` grouping key such as `opened_date` costs
 nothing, which is why a key-grouped aggregation that keeps `opened_date` stays fast.
 
-### When plain Cypher is not enough: GDS
+### Coming Soon
 
-The patterns above keep rules-based fraud signals such as degree, fan-in/out, reciprocity,
-cycles, and co-occurrence in pushed-down Cypher. A global, transitive score such as PageRank
-or community detection cannot be expressed that way and needs a GDS Session, a separate
-ephemeral compute path that projects the data into an in-memory graph. Its cost is dominated
-by that projection step, which scales super-linearly with edge count and is insensitive to
-warehouse size, so keep the projected window small: about 1.5 minutes at 233 edges, rising
-past 33 minutes at roughly 5,000. See [`gds-guide.md`](gds-guide.md) for the working
-projection pattern and the plain-Cypher-versus-GDS trade-off.
+GDS is coming soon.
 
 ## Adaptation recipes
 

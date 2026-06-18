@@ -20,14 +20,16 @@ in order on the right compute:
 
 | Order | Notebook | Compute | Stage |
 |---|---|---|---|
-| 1 | `00_required_setup.ipynb` | dedicated cluster | Store Neo4j credentials and Genie Space IDs, verify the Aura connection |
-| 2 | `01_genie_silver_questions.ipynb` | serverless | Anchor: run the before/after reveal against both Genie Spaces |
-| 3 | `02_neo4j_ingest.ipynb` | dedicated cluster | Load Silver tables into Neo4j |
-| 4 | `03_gds_enrichment.ipynb` | dedicated cluster | Run GDS; patterns become columns |
-| 5 | `04_pull_gold_tables.ipynb` | dedicated cluster | Enrich; results land in Gold |
+| 1 | `00_setup_data.ipynb` | dedicated or serverless | Load the five Silver base tables from the committed CSVs |
+| 2 | `01_required_setup.ipynb` | dedicated cluster | Store Neo4j credentials and Genie Space IDs, verify the Aura connection |
+| 3 | `02_genie_silver_questions.ipynb` | serverless | Anchor: run the before/after reveal against both Genie Spaces |
+| 4 | `03_neo4j_ingest.ipynb` | dedicated cluster | Load Silver tables into Neo4j |
+| 5 | `04_gds_enrichment.ipynb` | dedicated cluster | Run GDS; patterns become columns |
+| 6 | `05_pull_gold_tables.ipynb` | dedicated cluster | Enrich; results land in Gold |
 
-`00_required_setup.ipynb` is only needed if the admin has not already populated
-the `neo4j-graph-engineering` secret scope.
+`00_setup_data.ipynb` is only needed if the admin has not already loaded the
+base tables. `01_required_setup.ipynb` is only needed if the admin has not
+already populated the `neo4j-graph-engineering` secret scope.
 
 ## Prerequisites
 
@@ -43,22 +45,24 @@ first notebook:
    `password`, `genie_space_id_before`, and `genie_space_id_after`. The demo
    owner populates these through the root
    [Common Setup](../README.md#common-setup) (`./setup_secrets.sh`). Participants
-   can also store them interactively by running `00_required_setup.ipynb`.
+   can also store them interactively by running `01_required_setup.ipynb`.
 3. **The base tables** (`accounts`, `merchants`, `transactions`,
    `account_links`, `account_labels`) exist in
    `graph-on-databricks.graph-enriched-schema`. The demo owner loads them with
-   `enrichment-pipeline/upload_and_create_tables.sh`.
+   `enrichment-pipeline/upload_and_create_tables.sh`. Participants can also
+   create and load them interactively by running `00_setup_data.ipynb`, which
+   fetches the committed CSVs from GitHub and writes the same tables.
 
 ## Alternative Options
 
-- **Skip 02–04** if the demo owner already ran the full `enrichment-pipeline/`
+- **Skip 03–05** if the demo owner already ran the full `enrichment-pipeline/`
   pipeline. The Gold tables and enriched graph already exist, so you can run
-  `01_genie_silver_questions.ipynb` for the before/after reveal and go straight
+  `02_genie_silver_questions.ipynb` for the before/after reveal and go straight
   to analysis.
 - **Run GDS in the Aura Query tab** instead of the Python-client notebook
-  (`03_gds_enrichment.ipynb`). See `aura_gds_guide.md` for the step-by-step
+  (`04_gds_enrichment.ipynb`). See `aura_gds_guide.md` for the step-by-step
   algorithm guide.
-- **`06_train_model.ipynb`** is off the 15-minute demo path. It trains a baseline
+- **`07_train_model.ipynb`** is off the 15-minute demo path. It trains a baseline
   gradient-boosting classifier on tabular features and a graph-augmented
   classifier on tabular plus `risk_score` / `community_id` / `similarity_score`,
   logs both to MLflow, and translates the lift into estimated dollar impact.
@@ -66,11 +70,20 @@ first notebook:
 
 ## Notebook Reference
 
-**`00_required_setup.ipynb`**: Stores Neo4j credentials and both Genie Space IDs
+**`00_setup_data.ipynb`** *(dedicated or serverless)*: Creates and loads the five
+Silver base tables (`accounts`, `merchants`, `transactions`, `account_links`,
+`account_labels`) in `graph-enriched-lakehouse.graph-enriched-schema`. Fetches
+the committed CSVs and `ground_truth.json` from the public GitHub repo, writes
+them to a Unity Catalog Volume, creates the tables with column comments, and
+loads the data. The notebook equivalent of
+`enrichment-pipeline/upload_and_create_tables.sh`. Run once if the admin has not
+already loaded the base tables.
+
+**`01_required_setup.ipynb`**: Stores Neo4j credentials and both Genie Space IDs
 in the `neo4j-graph-engineering` scope, then verifies the Aura connection. Run
 once on the dedicated cluster if the admin has not already populated the scope.
 
-**`01_genie_silver_questions.ipynb`** *(serverless)*: Runs the before/after
+**`02_genie_silver_questions.ipynb`** *(serverless)*: Runs the before/after
 reveal live against both Genie Spaces. A tabular warm-up confirms Genie is
 working. An analytics challenge shows it handling joins and conditional
 aggregates. Then three anchor before/after pairs run side by side (merchant
@@ -78,19 +91,19 @@ favorites, book share, investigator review queue), followed by two validation
 pairs (merchant ring-candidate share; high-volume account community membership).
 The gap between each before and after answer is the argument for the pipeline.
 
-**`02_neo4j_ingest.ipynb`** *(dedicated cluster)*: Load Silver into Neo4j. Reads
+**`03_neo4j_ingest.ipynb`** *(dedicated cluster)*: Load Silver into Neo4j. Reads
 the five Delta tables and writes them as a property graph: `:Account` and
 `:Merchant` nodes, `TRANSACTED_WITH` (Account → Merchant) and `TRANSFERRED_TO`
 (Account → Account) relationships.
 
-**`03_gds_enrichment.ipynb`** *(dedicated cluster)*: Run GDS, patterns become
+**`04_gds_enrichment.ipynb`** *(dedicated cluster)*: Run GDS, patterns become
 columns. Runs three GDS algorithms via the `graphdatascience` Python client and
 writes the results back to each Account node:
 - **PageRank** → `risk_score` (centrality in the transfer network)
 - **Louvain** → `community_id` (each fraud ring becomes one community)
 - **Node Similarity** → `similarity_score` (Jaccard overlap of shared-merchant sets)
 
-**`04_pull_gold_tables.ipynb`** *(dedicated cluster)*: Enrich, results land in
+**`05_pull_gold_tables.ipynb`** *(dedicated cluster)*: Enrich, results land in
 Gold. Reads the enriched Account nodes and similarity relationships back from
 Neo4j and writes three Gold tables that the AFTER Genie space queries:
 - **`gold_accounts`**: account metadata plus `risk_score`, `community_id`,

@@ -2,11 +2,11 @@
 
 **This is a reference guide.** Run these commands in the **Neo4j Aura Workspace**
 Query tab rather than Databricks. It is a standalone alternative to
-`03_gds_enrichment.ipynb` for readers who prefer to follow along outside a
+`04_gds_enrichment.ipynb` for readers who prefer to follow along outside a
 Databricks notebook.
 
-After running `02_neo4j_ingest`, switch to Aura and execute the steps below.
-When finished, return to Databricks and run `04_pull_gold_tables`.
+After running `03_neo4j_ingest`, switch to Aura and execute the steps below.
+When finished, return to Databricks and run `05_pull_gold_tables`.
 
 ## What We're Computing
 
@@ -121,159 +121,6 @@ RETURN a, t, m, p, b
 **What to look for:** the account connects to merchants across various
 categories and has at least one `TRANSFERRED_TO` edge to another account.
 Good visual primer before running the algorithms.
-
----
-
-## Step 1.5: Virtual Graph
-
-The queries above assume the data was loaded into Neo4j by `02_neo4j_ingest`. You
-can also run exploration queries against the **Virtual Graph**, where Aura
-translates Cypher to SQL and runs it on your Databricks warehouse without copying
-the data. See [virtual-graph.md](../virtual-graph-demo/virtual-graph.md) for the setup. GDS does not
-run on the Virtual Graph, so this section covers structural fraud-signal queries
-you can try directly against the Databricks-backed tables.
-
-### What translates and what does not
-
-Cypher coverage on the Virtual Graph is still narrowing. Two patterns from the
-loaded-graph queries fail when translated to SQL:
-
-- **A `WHERE` after an aggregating `WITH`.** This is a HAVING-style filter on an
-  aggregate, such as `WITH dst, count(*) AS senders WHERE senders >= 5`. Rank
-  with `ORDER BY` and cap with `LIMIT` instead of filtering on the aggregate.
-- **Temporal arithmetic.** Expressions like `datetime() - duration({days: 7})`
-  or `date() - duration({days: 30})` do not translate. Filter on raw scalar
-  properties instead, such as the integer `txn_hour` or a literal timestamp, and
-  apply that filter before the aggregating `WITH`.
-
-`WITH ... aggregation ... RETURN` itself works. A `WHERE` placed before the
-aggregating `WITH`, filtering raw node or relationship properties, also works.
-The queries below stay inside those rules.
-
-> Labels follow your Virtual Graph model. If you kept the generated table names,
-> use `:accounts` and `:merchants`; the examples below use `:Account` and
-> `:Merchant`. Adjust to match your model.
-
-### A. Fan-in: collection mules
-
-Many distinct senders pushing into one account is the classic collection-mule
-shape. Rank accounts by distinct senders rather than filtering on a threshold.
-
-! SLOW
-
-```cypher
-MATCH (src:Account)-[t:TRANSFERRED_TO]->(dst:Account)
-WITH dst,
-     count(DISTINCT src)     AS senders,
-     count(t)                AS transfers,
-     round(sum(t.amount), 2) AS inflow
-RETURN dst.account_id AS account_id, senders, transfers, inflow
-ORDER BY senders DESC, inflow DESC
-LIMIT 50
-```
-
-### B. Fan-out: distribution and smurfing
-
-The mirror of fan-in. One account spraying funds to many recipients.
-
-```cypher
-MATCH (src:Account)-[t:TRANSFERRED_TO]->(dst:Account)
-WITH src,
-     count(DISTINCT dst)     AS recipients,
-     round(sum(t.amount), 2) AS outflow
-RETURN src.account_id AS account_id, recipients, outflow
-ORDER BY recipients DESC
-LIMIT 50
-```
-
-### C. Structuring: just-under-threshold transfers
-
-Repeated transfers sized to stay below a reporting line. The amount filter is on
-a raw relationship property, so it runs before the aggregating `WITH` and
-translates cleanly.
-
-VG PASSES! 
-
-```cypher
-MATCH (src:Account)-[t:TRANSFERRED_TO]->(:Account)
-WHERE t.amount >= 9000 AND t.amount < 10000
-WITH src,
-     count(t)                AS near_threshold,
-     round(sum(t.amount), 2) AS total
-RETURN src.account_id AS account_id, near_threshold, total
-ORDER BY near_threshold DESC
-LIMIT 50
-```
-
-### D. Off-hours merchant activity
-
-Activity between midnight and 6am. `txn_hour` is a stored integer, so the
-time-of-day filter needs no duration arithmetic.
-
-```cypher
-MATCH (a:Account)-[t:TRANSACTED_WITH]->(m:Merchant)
-WHERE t.txn_hour >= 0 AND t.txn_hour < 6
-WITH a,
-     count(t)                AS off_hours_txns,
-     round(sum(t.amount), 2) AS off_hours_amount,
-     count(DISTINCT m)       AS distinct_merchants
-RETURN a.account_id AS account_id,
-       off_hours_txns, off_hours_amount, distinct_merchants
-ORDER BY off_hours_txns DESC
-LIMIT 25
-```
-
-### E. Velocity ratio: volume versus balance
-
-Total outbound volume relative to current balance. Filtering `a.balance > 0`
-before the aggregating `WITH` keeps the filter on a raw property and guards the
-division.
-
-```cypher
-MATCH (a:Account)-[t:TRANSFERRED_TO]->(:Account)
-WHERE a.balance > 0
-WITH a, round(sum(t.amount), 2) AS outflow
-RETURN a.account_id AS account_id,
-       round(a.balance, 2)           AS balance,
-       outflow                       AS outflow_volume,
-       round(outflow / a.balance, 1) AS velocity_ratio
-ORDER BY velocity_ratio DESC
-LIMIT 25
-```
-
-Add `EXPLAIN` to the front of any of these to see the generated SQL instead of
-running the query.
-
-### Confirmed: GDS does not run on the Virtual Graph
-
-Running the GDS pipeline from Steps 2 through 9 directly against the Virtual
-Graph endpoint confirms that the algorithms are unavailable. Every projection
-and algorithm call is rejected at parse time. The catalog endpoint is **Aura
-Graph Analytics**, which is a different surface from the classic GDS library the
-rest of this guide assumes.
-
-| GDS call | Result against the Virtual Graph |
-|----------|----------------------------------|
-| `gds.version()` | Fails: `Aura Graph Analytics is versionless.` |
-| `gds.graph.project('account_transfers', ...)` | Fails: `Neo.ClientError.Statement.SyntaxError` `42NG0: Unsupported syntax` |
-| `gds.graph.list()` | Succeeds, returns zero rows |
-| `gds.pageRank.write(...)` | Fails: `42NG0: Unsupported syntax` |
-| `gds.louvain.write(...)` | Fails: `42NG0: Unsupported syntax` |
-| `gds.graph.project('account_merchants', ...)` | Fails: `42NG0: Unsupported syntax` |
-| `gds.nodeSimilarity.write(...)` | Fails: `42NG0: Unsupported syntax` |
-| `gds.graph.drop(...)` | Succeeds |
-
-A few catalog procedures such as `gds.graph.list` and `gds.graph.drop` are
-recognized and return cleanly, but graph projection and every algorithm write
-fail with `42NG0: Unsupported syntax` pointing at the `CALL gds...` line itself.
-Because projection fails, no algorithm has a graph to run against.
-
-The practical consequence is that `risk_score`, `community_id`, and
-`similarity_score` cannot be computed on the Virtual Graph. To produce those
-properties, load the data into Neo4j with `02_neo4j_ingest` and run Steps 2
-through 10 on the loaded Aura graph. On the Virtual Graph, use the structural
-fraud-signal queries A through E above, which surface the same patterns directly
-from the Databricks-backed tables.
 
 ---
 
@@ -727,6 +574,6 @@ The graph now has three GDS-computed properties on every Account node:
 - `community_id`: Louvain cluster assignment
 - `similarity_score`: highest Jaccard similarity to any other account
 
-**Next →** Return to Databricks and run `04_pull_gold_tables` to read these
+**Next →** Return to Databricks and run `05_pull_gold_tables` to read these
 features back into Unity Catalog as the three Gold tables the AFTER Genie
 space queries.
