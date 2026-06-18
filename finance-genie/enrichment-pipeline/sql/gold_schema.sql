@@ -15,6 +15,7 @@
 CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.gold_accounts (
     account_id               BIGINT   NOT NULL COMMENT 'Account identifier (joins to accounts.account_id)',
     account_hash             STRING   COMMENT 'Anonymized account identifier',
+    account_name             STRING   COMMENT 'Account holder name: a person name for checking/savings accounts, a company name for business accounts',
     account_type             STRING   COMMENT 'Account category: checking, savings, or business',
     region                   STRING   COMMENT 'Geographic region where the account was opened',
     balance                  DOUBLE   COMMENT 'Current account balance in USD',

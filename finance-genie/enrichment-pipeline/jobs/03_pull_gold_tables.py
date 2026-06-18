@@ -229,6 +229,7 @@ def main() -> None:
         .select(
             "account_id",
             "account_hash",
+            "account_name",
             "account_type",
             "region",
             "balance",

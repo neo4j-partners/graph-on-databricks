@@ -151,10 +151,19 @@ def generate_accounts() -> pd.DataFrame:
     rows = []
     for i in range(1, NUM_ACCOUNTS + 1):
         open_date = base_date + timedelta(days=random.randint(0, 1800))
+        account_type = random.choice(account_types)
+        # Business accounts get a company name; personal accounts (checking,
+        # savings) get a person name. Faker draws from its own seeded RNG
+        # (fake.seed_instance), so this does not perturb the global `random`
+        # stream that builds the ring / fraud / whale ground truth.
+        account_name = (
+            fake.company() if account_type == "business" else fake.name()
+        )
         rows.append({
             "account_id":   i,
             "account_hash": hashlib.md5(f"acct-{i}".encode()).hexdigest()[:12],
-            "account_type": random.choice(account_types),
+            "account_name": account_name,
+            "account_type": account_type,
             "region":       random.choice(regions),
             "balance":      round(random.uniform(100, 500_000), 2),
             "opened_date":  open_date.strftime("%Y-%m-%d"),

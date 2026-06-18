@@ -40,6 +40,41 @@ recovery.
 
 ---
 
+![bg contain](./graph_use_cases.png)
+
+<!--
+Graph databases model the data in a wide variety of industries as
+digital twins. Employees, suppliers, products, customers,
+transactions, processes, security: anywhere entities connect, a
+graph captures the structure directly. This talk takes one of these,
+financial crime in transactions, as a worked example.
+-->
+
+---
+
+![bg contain](./what_is_graph.png)
+
+<!--
+The graph makes it easy to find hidden patterns. Three kinds of
+question: what's important (centrality), what's unusual (community
+and shared identifiers), and what's next (similarity). Hold these
+three; they come back later as the GDS columns that enrich Genie.
+-->
+
+---
+
+# Worked Example: Finding Fraud with Genie + Graph
+
+<!--
+To show how graph improves Genie's responses with better context,
+let's look at a motivating example. We'll start with the kind of
+fraud question an analyst asks today, see where Genie lands without
+graph columns, then bring in graph enrichment and ask the same
+question again. The gap between the two answers is the whole point.
+-->
+
+---
+
 ## Financial Crime Hides Between the Rows
 
 - **Coordinated fraud** spreads activity across dozens of accounts on purpose
@@ -58,9 +93,8 @@ This sets up the anchor reveal on the next slide.
 
 ## Demo Data Set: Synthetic Banking Network
 
-- **Two financial networks:** a spending graph and a peer-to-peer transfer graph
-- **Spending graph:** accounts transact with merchants
-- **Transfer graph:** accounts send money directly to other accounts
+- **Purchases:** accounts spend at merchants
+- **Transfers:** accounts send money directly to other accounts
 - **Fraud rings** leave structural footprints in both
 - The goal: surface those patterns, not score individual transactions
 
@@ -73,10 +107,6 @@ tight clusters of accounts trading with each other and routing
 through the same merchants. The goal is not to label fraud; it is
 to make the structural patterns visible so analysts can investigate.
 -->
-
----
-
-![bg contain](./silver-data-model.png)
 
 ---
 
@@ -134,7 +164,7 @@ in the before ranking. The volume proxy couldn't surface them;
 community membership can.
 
 Hold on this slide until someone asks "how did you get that?"
-That question is the invitation into the Architecture section.
+That question is the invitation into the next section.
 If nobody asks, offer it.
 -->
 
@@ -144,51 +174,9 @@ If nobody asks, offer it.
 
 ---
 
-![bg contain](./what_is_graph.png)
-
----
-
-## Graph Databases Find Every Instance of a Pattern
-
-- **Describe a pattern:** cluster of accounts, shared counterparties, any network shape
-- **Get every instance back:** no starting account, no ID to look up
-- **Pattern-matching is the graph's native operation**
-
-<!--
-One slide on why a graph database is the right tool to produce
-those three kinds of answers. Lead with capability, not contrast.
-Describe the pattern, get every instance back. The audience does
-not need a SQL-vs-graph mechanics lesson; they need to know the
-graph is built for the questions we just listed.
-
-If asked in Q&A, the point comparison is: SQL needs a starting
-account ID; a graph database needs only the shape.
--->
-
----
-
-## Graph Columns Change What Genie Finds
-
-- **Graph results enrich the Gold tables:** `risk_score`, `community_id`, `similarity_score`, `fraud_risk_tier`
-- **Genie treats them like any other dimension:** `GROUP BY fraud_risk_tier`, `WHERE is_ring_candidate = true`
-- **New questions available:** candidate-population sizing, regional review workload, merchant concentration by community
-- **Change the columns. Change what Genie finds.**
-
-<!--
-The pivot that ties the graph discussion back to Genie. Same Genie,
-same SQL, new dimensions. The analyst works the way they always
-have; the toolkit is strictly larger.
-
-This is the slide that completes the answer to "how did you get
-that?" Graph analysis produces the answers, those answers become
-Delta columns, Genie queries them like any other column.
--->
-
----
-
 ## What Graph Analysis Adds to Genie
 
-Examples of enrichment:
+One of the core values of a graph database is **graph analysis** (GDS):
 
 - **Centrality:** how central an account is in the flow of money. A network position.
 - **Community:** which accounts cluster tightly together. A density across many edges.
@@ -197,12 +185,16 @@ Examples of enrichment:
 **Each becomes a column Genie can group by, filter on, and compare across.**
 
 <!--
-Positive-framed opening for Architecture. Lead with the unlock:
-graph analysis produces three kinds of answers that don't exist
-as row-level properties. Each of the three maps to a GDS algorithm
-we'll see later on the Sample GDS Algorithms slide: PageRank,
-Louvain, Node Similarity. Every one of them lands as a Delta column
-alongside region, product, and balance.
+Positive-framed opening for the section. Lead with the unlock: graph
+analysis is a core capability of the graph database, and it produces
+three kinds of answers that don't exist as row-level properties.
+Each of the three maps to a GDS algorithm named on the next pipeline
+slide: PageRank, Louvain, Node Similarity. Every one of them lands as
+a Delta column alongside region, product, and balance.
+
+These three are the callback to the opening "what is graph" image:
+what's important (centrality), what's unusual (community), what's
+next (similarity).
 
 Do not frame this as "SQL can't do X." Frame it as "graph analysis
 unlocks these answers for Genie." Expansion, not limitation recovery.
@@ -210,7 +202,39 @@ unlocks these answers for Genie." Expansion, not limitation recovery.
 
 ---
 
-# The Enrichment Pipeline
+## The Graph Finds Candidates. The Analyst Finds Fraud.
+
+- **GDS produces structural signals that indicate ring-like behavior:** community membership, centrality, similarity
+- **A high-risk community is a candidate, not a verdict**
+- **The analyst runs ordinary Genie queries against the enriched Gold tables** to decide which accounts and merchants warrant investigator time
+
+<!--
+The signals from the previous slide indicate ring-like behavior;
+they do not declare it. The pipeline makes no judgment call. It
+surfaces shapes that resemble rings and lets analysts do the fraud
+work with the tools they already use. The "after" questions in this
+demo cover merchant concentration, regional review workload, and
+book share by community. That is the workflow.
+-->
+
+---
+
+## The Enrichment Pipeline
+
+Four steps convert a network of account relationships into plain columns that Genie queries like any other dimension.
+
+- **Load:** Silver tables into Neo4j Aura as a property graph
+- **Run GDS:** PageRank, Louvain, Node Similarity against the graph
+- **Enrich:** pull scores via Neo4j Spark Connector, join with Silver, write to Gold
+- **Query:** enriched columns sit alongside all base data in the Gold table
+
+<!--
+This is how the structural signals become columns. Four steps.
+Structural analysis runs once per pipeline cycle; every downstream
+consumer reads the results as columns. The graph analysis is
+invisible to the query layer. The architecture diagram on the next
+slide shows the pull direction.
+-->
 
 ---
 
@@ -230,51 +254,21 @@ gold_account_similarity_pairs holds similarity edge pairs.
 
 ---
 
-## The Enrichment Pipeline
+## Graph Columns Change What Genie Finds
 
-Four steps convert a network of account relationships into plain columns that Genie queries like any other dimension.
-
-- **Load:** Silver tables into Neo4j Aura as a property graph
-- **Run GDS:** PageRank, Louvain, Node Similarity against the graph
-- **Enrich:** pull scores via Neo4j Spark Connector, join with Silver, write to Gold
-- **Query:** enriched columns sit alongside all base data in the Gold table
-
-<!--
-Four steps. Structural analysis runs once per pipeline cycle;
-every downstream consumer reads the results as columns. The
-graph analysis is invisible to the query layer.
--->
-
----
-
-## The Graph Finds Candidates. The Analyst Finds Fraud.
-
-- **GDS produces structural signals that indicate ring-like behavior:** community membership, centrality, similarity
-- **A high-risk community is a candidate, not a verdict**
-- **The analyst runs ordinary Genie queries against the enriched Gold tables** to decide which accounts and merchants warrant investigator time
-
-<!--
-The pipeline makes no judgment call. It surfaces shapes that
-resemble rings and lets analysts do the fraud work with the
-tools they already use. The "after" questions in this demo cover
-merchant concentration, regional review workload, and book share
-by community. That is the workflow.
--->
-
----
-
-## The Analyst's Toolkit, Expanded
-
-- **`community_id` and `fraud_risk_tier`** sit alongside region, product, and balance as ordinary dimensions
+- **Graph results enrich the Gold tables:** `risk_score`, `community_id`, `similarity_score`, `fraud_risk_tier`
+- **Genie treats them like any other dimension:** `GROUP BY fraud_risk_tier`, `WHERE is_ring_candidate = true`
 - **New questions available:** candidate-population sizing, regional review workload, merchant concentration by community
-- **`GROUP BY fraud_risk_tier`,** not "find the ring"
-
-**Same Genie. More answers.**
+- **Change the columns. Change what Genie finds.**
 
 <!--
-Expansion, not limitation recovery. The analyst works in Genie
-the same way they always have; the difference is that graph-
-derived columns are now available as ordinary dimensions.
+The pivot that ties the graph discussion back to Genie. Same Genie,
+same SQL, new dimensions. The analyst works the way they always
+have; the toolkit is strictly larger.
+
+This is the slide that completes the answer to "how did you get
+that?" Graph analysis produces the answers, the pipeline writes them
+as Delta columns, Genie queries them like any other column.
 -->
 
 ---
@@ -308,9 +302,64 @@ architecture, the payoff. Close on expansion framing.
 
 ---
 
+![bg contain](./graph_ai.png)
+
+<!--
+This is just one of many examples of how Neo4j works with GenAI.
+GraphRAG, multi-hop reasoning, a semantic knowledge layer, decision
+traces, and agent memory: the enrichment pattern we just walked
+through is one entry point into a broader set of graph-plus-AI
+capabilities.
+-->
+
+---
+
 ## Fill-in / Q&A
 
 The following slides apply when running the demo live or fielding detailed questions about how Genie behaves under the hood.
+
+---
+
+![bg contain](./silver-data-model.png)
+
+<!--
+Backup: the Silver data model. Show if the audience wants to see
+the underlying tables before enrichment. Two overlapping networks,
+accounts-to-merchants and account-to-account transfers.
+-->
+
+---
+
+## Graph Databases Find Every Instance of a Pattern
+
+- **Describe a pattern:** cluster of accounts, shared counterparties, any network shape
+- **Get every instance back:** no starting account, no ID to look up
+- **Pattern-matching is the graph's native operation**
+
+<!--
+Backup: one slide on why a graph database is the right tool to
+produce those three kinds of answers. Lead with capability, not
+contrast. Describe the pattern, get every instance back.
+
+If asked in Q&A, the point comparison is: SQL needs a starting
+account ID; a graph database needs only the shape.
+-->
+
+---
+
+## The Analyst's Toolkit, Expanded
+
+- **`community_id` and `fraud_risk_tier`** sit alongside region, product, and balance as ordinary dimensions
+- **New questions available:** candidate-population sizing, regional review workload, merchant concentration by community
+- **`GROUP BY fraud_risk_tier`,** not "find the ring"
+
+**Same Genie. More answers.**
+
+<!--
+Backup: expansion, not limitation recovery. The analyst works in
+Genie the same way they always have; the difference is that graph-
+derived columns are now available as ordinary dimensions.
+-->
 
 ---
 
