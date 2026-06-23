@@ -93,6 +93,24 @@ def load_text(
     return _read_bytes(base, filename, source).decode("utf-8").strip()
 
 
+def download_to_volume(
+    filenames: List[str],
+    volume_path: str,
+    *,
+    github_base: str = GITHUB_DATA_BASE,
+) -> None:
+    """Download data files from GitHub into a Unity Catalog volume.
+
+    Notebook 01 stages the committed CSVs into the volume once, then reads them
+    back from the volume so the rest of the run does no network I/O. Writing to a
+    ``/Volumes/...`` path uses ordinary file I/O on a Databricks cluster.
+    """
+    dest = Path(volume_path)
+    for filename in filenames:
+        (dest / filename).write_bytes(_read_bytes(github_base, filename, "github"))
+    print(f"Staged {len(filenames)} files into {volume_path}")
+
+
 # =============================================================================
 # Neo4j Connection
 # =============================================================================
