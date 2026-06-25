@@ -5,11 +5,11 @@ description = "Synthetic fraud dataset generator, verifier, and Databricks job r
 requires-python = ">=3.12"
 dependencies = [
     "databricks-job-runner>=0.6.2",
-    "databricks-sdk>=0.112.0",
+    "databricks-sdk>=0.119.0",
     "databricks-tools-core",
     "neo4j",
-    "faker>=40.19.1",
-    "graphdatascience>=1.12",
+    "faker>=40.23.0",
+    "graphdatascience>=1.22",
     "pandas",
     "python-dotenv",
     "rich",
