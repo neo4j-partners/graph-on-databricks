@@ -278,16 +278,17 @@ wheels = [
 
 [[package]]
 name = "databricks-sdk"
-version = "0.112.0"
+version = "0.119.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "google-auth" },
     { name = "protobuf" },
     { name = "requests" },
+    { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/49/b7/8b5579a3abce4c8b3b677bcab757d712df7bf4fff732c85dfa1d800180f1/databricks_sdk-0.112.0.tar.gz", hash = "sha256:39ed2fc6a0a1110e64ad8903a471daea0570ca544811ba88163bbb199a67dea7", size = 954943, upload-time = "2026-05-27T09:16:24.816Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/12/f9f912d8be2786c9aa2dbfa2a2da0af97c5548432a94b65a2c2af807da71/databricks_sdk-0.119.0.tar.gz", hash = "sha256:40e56ad56a8afb8150d4152c9fc7bf474ba1d44b6315ac4d9a5b18d57fd29900", size = 1001754, upload-time = "2026-06-24T15:37:01.829Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/c4/d7f2bc1125a0e68a3554cb96e656b117980633656921cbc03830d8839cc1/databricks_sdk-0.112.0-py3-none-any.whl", hash = "sha256:2121c0852eef39c20d6381e6a2ac52f580610b268891722e39a3b53d92da78b7", size = 901369, upload-time = "2026-05-27T09:16:22.893Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/aa/65c33c372960c4c786def1b01346767e880a4d85fdf310aecf817789fa82/databricks_sdk-0.119.0-py3-none-any.whl", hash = "sha256:17d9fe9add06668da57250454e4e91a18f7a288ba5fe80cd73be3e66cded48ef", size = 948381, upload-time = "2026-06-24T15:36:59.986Z" },
 ]
 
 [[package]]
@@ -321,14 +322,14 @@ wheels = [
 
 [[package]]
 name = "faker"
-version = "40.19.1"
+version = "40.23.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/01/28c8ddae8caaf82c929655000963d83e3f01265a9af34e823c2ef2eee8ac/faker-40.19.1.tar.gz", hash = "sha256:76fa71fd3bf320db25e5504eb356f9a76b8a95cd6098524d006f446035b6b89d", size = 1969318, upload-time = "2026-05-22T15:57:37.433Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/d6/fc071e5754815d9058e12ab549cc88e90f8f4ecf4dc33b6b750cdf4b622d/faker-40.23.0.tar.gz", hash = "sha256:f135e563f1f95f19346bb680bc2e43570bc43b7893e566023746f51f32c69dfc", size = 1972975, upload-time = "2026-06-10T20:53:21.611Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/49/b4/40a1ec12ec834604f3848143343baf1c67bc9a1096e401907eaa0d25876a/faker-40.19.1-py3-none-any.whl", hash = "sha256:265259b37c013838baaae34940207288170df385d6c5281413fce56a3504d580", size = 2007643, upload-time = "2026-05-22T15:57:35.867Z" },
+    { url = "https://files.pythonhosted.org/packages/64/5f/824e6fb3e9d63408151dc9173994fa65bde620a67dde3a59354f5aecd497/faker-40.23.0-py3-none-any.whl", hash = "sha256:775922453e54afa42eaf60eac478fa3a969357f224d09a8022b93e3ad88f18ae", size = 2013046, upload-time = "2026-06-10T20:53:19.226Z" },
 ]
 
 [[package]]
@@ -350,10 +351,10 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "databricks-job-runner", specifier = ">=0.6.2" },
-    { name = "databricks-sdk", specifier = ">=0.112.0" },
+    { name = "databricks-sdk", specifier = ">=0.119.0" },
     { name = "databricks-tools-core", git = "https://github.com/databricks-solutions/ai-dev-kit?subdirectory=databricks-tools-core" },
-    { name = "faker", specifier = ">=40.19.1" },
-    { name = "graphdatascience", specifier = ">=1.12" },
+    { name = "faker", specifier = ">=40.23.0" },
+    { name = "graphdatascience", specifier = ">=1.22" },
     { name = "neo4j" },
     { name = "pandas" },
     { name = "python-dotenv" },
@@ -375,7 +376,7 @@ wheels = [
 
 [[package]]
 name = "graphdatascience"
-version = "1.21"
+version = "1.22"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "multimethod" },
@@ -390,9 +391,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/e9/a49127cc728c7ea2acaa2aad44f06f291aabe0a5a700f980ffdf88f853da/graphdatascience-1.21.tar.gz", hash = "sha256:5a9f16be010eee69d027c5b1ea76bba7029fad8426646c603f137cc9841e3934", size = 1746004, upload-time = "2026-04-16T11:49:01.974Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/9f/290f299f770ef9aad73b0c49e5683a6f7455cbc16b1b0a5546109a6f0fd9/graphdatascience-1.22.tar.gz", hash = "sha256:00bfad65dcaccd3d40f1f4e23661125dc7400ecffdb5a04c34512fc9a287f5a9", size = 1781480, upload-time = "2026-06-04T11:57:24.877Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/67/a2a944d6d6c0baea1b30017435d2b04ce0b766328c277fd90b7ee36b7bbc/graphdatascience-1.21-py3-none-any.whl", hash = "sha256:4813c3fa6eef5d469a7d344ac37b8992461ed067ee30b6b11bd17c3d5c471592", size = 2016416, upload-time = "2026-04-16T11:48:59.86Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/4c/a55ff1ad641414456be2b2bc3d57a4d2bb86c5dadca378c0c83503bddbb4/graphdatascience-1.22-py3-none-any.whl", hash = "sha256:e2dfbd206daa61c39d00653d420edc63f409674d1449d6d0253794e1807b7604", size = 2101782, upload-time = "2026-06-04T11:57:23.036Z" },
 ]
 
 [[package]]
