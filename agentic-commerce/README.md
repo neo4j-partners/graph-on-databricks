@@ -4,6 +4,36 @@ Agentic Commerce is a Databricks-hosted shopping assistant backed by Neo4j. It c
 
 The deployment path builds a local `retail_agent` wheel, uploads it to a Unity Catalog volume, and submits Databricks Python wheel entry points with `databricks-job-runner`. For design background, see [Agentic Commerce: GraphRAG Meets Agent Memory on Neo4j](docs/agentic-commerce.md). For lower-level GraphRAG notes, see [Developer's Guide: GraphRAG on Databricks](docs/DevelopersGuideGraphRAG-Databricks.md).
 
+## Why Graph + Databricks for Retail AI
+
+Retail recommendation and support systems built on flat data models hit a ceiling quickly. Vector search finds semantically similar products, but it cannot answer "which products in the customer's preferred brand also have the performance attributes they care about, and what issues have other customers reported with those specific models?" That question requires traversing relationships, not ranking embeddings.
+
+This demo builds a shopping assistant that treats product data as a graph:
+
+- **Product relationships**: Products connect to categories, brands, and attributes as first-class graph nodes.
+- **Source knowledge**: Support tickets, reviews, and knowledge articles link directly to the products they describe.
+- **Agent memory**: Customer preferences accumulate as a persistent subgraph, retrievable by semantic similarity across sessions.
+- **Query pattern**: Agent responses combine graph traversal with semantic retrieval, grounding answers in both structured product relationships and unstructured knowledge content.
+
+### Neo4j
+
+Neo4j stores and traverses the relationship graph natively:
+
+- **Cypher traversal**: Multi-hop product relationship queries are single Cypher statements. The SQL equivalent is a chain of joins that grows with each hop.
+- **GraphRAG layer**: Source knowledge documents are chunked, entities and symptoms extracted, and nodes linked back to the product graph. Retrieval uses both vector similarity and graph proximity, improving answer specificity compared to a flat vector index on the same content.
+- **Agent memory**: Facts and preferences store as graph nodes and accumulate across sessions without fine-tuning the model.
+
+### Databricks
+
+Databricks provides the execution environment, the LLM, and the embedding service:
+
+- **Model Serving**: The agent runs as an MLflow ChatAgent, registered in Unity Catalog and deployed to a REST endpoint.
+- **LLM inference**: `databricks-claude-sonnet-4-6` handles reasoning and generation.
+- **Embeddings**: `databricks-bge-large-en` generates embeddings for both the GraphRAG index and the memory layer.
+- **Unity Catalog**: Holds registered model versions and the wheel artifacts that Databricks Jobs use to load and build the graph.
+
+Neo4j owns the relationship and retrieval layer. Databricks owns inference, deployment, and model lifecycle.
+
 ## What This Repo Contains
 
 - An MLflow `ChatAgent` model implemented in `retail_agent/agent/serving.py`.
@@ -68,9 +98,7 @@ Run the full pipeline:
 uv run python -m cli pipeline --all
 ```
 
-For operator runs or debugging, prefer running the same path one step at a
-time so each Databricks run ID is visible and easy to inspect. See
-[Step-by-step runbook](#step-by-step-runbook).
+For step-by-step deployment, pipeline modes, focused testing, and individual commands, see [docs/runbook.md](docs/runbook.md).
 
 Run the demo client locally after the serving endpoint is deployed:
 
@@ -81,231 +109,6 @@ apx dev start
 ```
 
 Open `http://localhost:9000`. Use `apx dev status`, `apx dev logs`, and `apx dev stop` to manage the local app. See [demo-client/README.md](demo-client/README.md) for full local checks, runtime settings, backend smoke tests, and deployment commands.
-
-## Pipeline
-
-`pipeline` is a local orchestrator over the existing Databricks wheel jobs. It builds and uploads the current wheel, submits each Databricks job in order, waits for each job to finish, and stops on the first failure.
-
-Pipeline modes:
-
-Run the full end-to-end path: upload the wheel, load Neo4j data, build GraphRAG, deploy the endpoint, and run all verification jobs.
-
-```bash
-uv run python -m cli pipeline --all
-```
-
-Run only the data path: upload the wheel, load products/source knowledge into Neo4j, and build the GraphRAG layer.
-
-```bash
-uv run python -m cli pipeline --data
-```
-
-Run only deployment: upload the wheel and deploy the agent endpoint. Use this after code changes that do not require reloading Neo4j data.
-
-```bash
-uv run python -m cli pipeline --deploy
-```
-
-Run only verification against an existing deployed endpoint.
-
-```bash
-uv run python -m cli pipeline --verify
-```
-
-Pipeline steps:
-
-| Step | What it does | Individual command |
-|------|--------------|--------------------|
-| Upload wheel | Builds `retail_agent` and uploads it to `DATABRICKS_VOLUME_PATH/wheels` | `uv run python -m cli upload --wheel` |
-| Load products | Creates the retail product graph, source knowledge nodes, product embeddings, and memory indexes in Neo4j | `uv run python -m cli submit retail-agent-load-products` |
-| Build GraphRAG | Reads source knowledge from Neo4j, runs `SimpleKGPipeline`, creates chunks/entities, links them to products, and creates retrieval indexes | `uv run python -m cli submit retail-agent-load-graphrag` |
-| Deploy agent | Logs the agent to MLflow, registers `retail_assistant.retail.retail_agent_v3`, deploys with `databricks-agents`, and waits for active traffic | `uv run python -m cli submit retail-agent-deploy` |
-| Verify endpoint | Checks endpoint readiness, diagnostics, product tools, short-term memory, and long-term preferences | `uv run python -m cli submit retail-agent-demo` |
-| Verify retrievers | Demonstrates vector, vector-plus-Cypher, hybrid, and Text2Cypher GraphRAG retrievers | `uv run python -m cli submit retail-agent-demo-retrievers` |
-| Verify knowledge | Sends live troubleshooting, hybrid search, issue diagnosis, and comparison queries through the endpoint | `uv run python -m cli submit retail-agent-check-knowledge` |
-
-Useful options:
-
-```bash
-uv run python -m cli pipeline --all --dry-run
-uv run python -m cli pipeline --data --skip-upload
-uv run python -m cli pipeline --verify --compute serverless
-```
-
-Use `uv run python -m cli logs <run-id>` after a submitted step to inspect Databricks task output.
-
-### Step-by-step runbook
-
-Use this path when validating a deployment, debugging a failure, or keeping a
-clear record of each Databricks run ID. It is the same sequence as
-`pipeline --all`, but each step can be checked before continuing.
-
-Run local checks first:
-
-```bash
-uv run python -m pytest tests
-uv run python -m compileall -q retail_agent demo-client/src
-uv run python -m cli validate
-```
-
-Build and upload the wheel:
-
-```bash
-uv run python -m cli upload --wheel
-```
-
-Submit each Databricks job in order:
-
-```bash
-uv run python -m cli submit retail-agent-load-products
-uv run python -m cli submit retail-agent-load-graphrag
-uv run python -m cli submit retail-agent-deploy
-uv run python -m cli submit retail-agent-demo
-uv run python -m cli submit retail-agent-demo-retrievers
-uv run python -m cli submit retail-agent-check-knowledge
-```
-
-After each submitted job, inspect the logs before moving to the next step:
-
-```bash
-uv run python -m cli logs <run-id>
-```
-
-Expected success signals:
-
-| Step | Success signal |
-|------|----------------|
-| Load products | `Sample data loaded successfully`, 21 products, 84 knowledge articles, 84 support tickets, 84 reviews, and 21 product embeddings |
-| Build GraphRAG | `Pipeline complete. 252 processed, 0 failed` |
-| Deploy agent | A new Unity Catalog model version is created and the endpoint reports target version traffic |
-| Verify endpoint | `Overall: 9 passed, 0 failed` |
-| Verify retrievers | `Demo complete` with vector, vector-plus-Cypher, hybrid, and Text2Cypher sections |
-| Verify knowledge | `Knowledge exercise: 4 passed, 0 failed` |
-
-### Long-running jobs
-
-Databricks jobs can outlive the local SDK waiter. A local `TimeoutError` means
-the CLI stopped waiting; it does not prove that the Databricks run failed.
-Check the run state and logs with:
-
-```bash
-databricks jobs get-run <run-id> --profile <profile>
-uv run python -m cli logs <run-id>
-```
-
-For this project, `retail-agent-load-graphrag` can run long enough to hit the
-local waiter timeout while still finishing successfully in Databricks. Treat the
-Databricks run state and final log counts as the source of truth.
-
-Some GraphRAG logs can include nonfatal warnings from Neo4j APOC relationship
-merges or from a malformed LLM extraction response. Inspect the final result
-state and summary counts before treating these warnings as failures.
-
-## Focused Testing
-
-Test only the deployed agent endpoint on Databricks:
-
-```bash
-uv run python -m cli submit retail-agent-demo
-uv run python -m cli submit retail-agent-check-knowledge
-uv run python -m cli logs <run-id>
-```
-
-`retail-agent-demo` verifies endpoint readiness, diagnostics, product search,
-product lookup, graph traversal, short-term memory, long-term preferences,
-profile retrieval, and preference-based recommendations.
-
-`retail-agent-check-knowledge` verifies the GraphRAG path with knowledge search,
-hybrid search, product diagnosis, and cross-product knowledge comparison.
-
-Test only the local `retail_agent` package before submitting Databricks jobs:
-
-```bash
-uv run python -m pytest tests
-uv run python -m compileall retail_agent
-uv run python -m cli validate retail-agent-demo
-```
-
-## Individual Commands
-
-Use these commands for debugging, rerunning one step, or checking a submitted run.
-
-```bash
-# Show project CLI help
-uv run python -m cli --help
-
-# Validate cluster access and available wheel entry points
-uv run python -m cli validate
-
-# Build and upload the package wheel
-uv run python -m cli upload --wheel
-
-# Run one wheel entry point
-uv run python -m cli submit retail-agent-demo
-
-# View Databricks job logs
-uv run python -m cli logs <run-id>
-```
-
-Available wheel entry points:
-
-| Entry point | Purpose |
-|-------------|---------|
-| `retail-agent-load-products` | Load product catalog, source knowledge, relationships, product embeddings, and memory indexes |
-| `retail-agent-load-graphrag` | Build the GraphRAG chunk/entity layer and retrieval indexes |
-| `retail-agent-deploy` | Log, register, deploy, and wait for the serving endpoint |
-| `retail-agent-demo` | Verify endpoint, product tools, and memory |
-| `retail-agent-demo-retrievers` | Demonstrate GraphRAG retriever patterns |
-| `retail-agent-check-knowledge` | Verify knowledge tools through the live endpoint |
-| `retail-agent-deploy-supervisor` | Stub supervisor deployment entry point |
-
-## Local Validation
-
-Run local checks before submitting Databricks jobs:
-
-```bash
-uv run python -m pytest
-uv run python -m compileall -q retail_agent demo-client/src
-uv run python -m cli validate
-```
-
-The latest verified Databricks pipeline completed product loading, GraphRAG loading, endpoint deployment, endpoint and memory checks, retriever demos, and knowledge checks successfully. The verified endpoint was `agents_retail_assistant-retail-retail_agent_v3`.
-
-## Optional Lakehouse Data
-
-The main agent runtime uses Neo4j. The repo also contains scripts for generating synthetic retail lakehouse data for Databricks SQL and Genie-style analytics demos.
-
-This step is optional for the current Agentic Commerce pipeline. If you do not generate or upload the lakehouse data, the Neo4j-backed product search, GraphRAG tools, memory, recommendations, model deployment, and endpoint checks still work. What you do not get is the separate Delta table dataset used for SQL analytics or future Genie/supervisor demos.
-
-Generate expanded catalog data:
-
-```bash
-uv run python -m retail_agent.scripts.generate_transactions --expanded --verify
-```
-
-This writes CSVs to `data/lakehouse/`:
-
-| File | Rows | Description |
-|------|------|-------------|
-| `transactions.csv` | ~1.15M | Line items across 500K orders |
-| `customers.csv` | 5,000 | Customer dimension with segments |
-| `reviews.csv` | ~115K | Product reviews linked to transactions |
-| `inventory_snapshots.csv` | ~417K | Daily stock levels per product |
-| `stores.csv` | 20 | Physical store locations |
-| `knowledge_articles.csv` | Product knowledge articles | Product manuals, FAQs, and troubleshooting content |
-
-Upload CSVs and create Delta tables:
-
-```bash
-uv run python -m retail_agent.scripts.lakehouse_tables
-```
-
-Options:
-
-```bash
-uv run python -m retail_agent.scripts.lakehouse_tables --skip-upload
-uv run python -m retail_agent.scripts.lakehouse_tables --skip-tables
-```
 
 ## Architecture
 
@@ -378,17 +181,6 @@ Optional analytics path:
 
 Databricks provides the job execution environment, MLflow model registry, Model Serving endpoint, LLM endpoint, embedding endpoint, Unity Catalog volume for wheels, and optional Delta Lake tables for analytics demos.
 
-## Supervisor Stub
-
-The repository is structured for a future Mosaic AI multi-agent supervisor that routes analytics questions to a Genie space and product/KG questions to the deployed retail KG agent endpoint. The implementation is currently a stub:
-
-- `retail_agent/agent/supervisor.py` contains sub-agent specs, `build_supervisor_chat_agent()` that raises `NotImplementedError`, and the TODO list in the module docstring.
-- `retail_agent/deployment/deploy_supervisor.py` prints a `STUB` banner and exits nonzero.
-- `retail-agent-deploy-supervisor` is the wheel entry point for the current supervisor stub.
-- `retail_agent/agent/config.py` includes `supervisor_model_name` and `genie_space_id`; `genie_space_id` is empty by default and must be set before any real deployment.
-
-To make this real, provision the Genie space, replace the supervisor skeleton with a `databricks_ai_bridge.GenieAgent` plus multi-agent supervisor implementation, mirror `deploy_agent.py` in `deploy_supervisor.py`, and add a check script.
-
 ## Project Structure
 
 ```text
@@ -408,3 +200,13 @@ demo-client/                          # optional frontend/backend demo client
 docs/                                 # architecture and implementation notes
 tests/                                # local tests
 ```
+
+## Docs
+
+| Document | Description |
+|----------|-------------|
+| [Deployment Runbook](docs/runbook.md) | Pipeline modes, step-by-step deployment, focused testing, individual commands, and local validation |
+| [Lakehouse Data](docs/lakehouse.md) | Optional SQL analytics data generation for Genie-style demos |
+| [Supervisor Stub](docs/supervisor.md) | Future multi-agent supervisor design and implementation notes |
+| [Agentic Commerce: GraphRAG Meets Agent Memory on Neo4j](docs/agentic-commerce.md) | Design background and architecture narrative |
+| [Developer's Guide: GraphRAG on Databricks](docs/DevelopersGuideGraphRAG-Databricks.md) | Lower-level GraphRAG implementation notes |
