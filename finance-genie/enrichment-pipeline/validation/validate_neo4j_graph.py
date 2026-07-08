@@ -57,7 +57,7 @@ ANCHOR_VISIT_RATIO_MIN = 2.0
 
 
 def load_ground_truth(script_dir: Path) -> dict:
-    gt_path = script_dir.parent / "data" / "ground_truth.json"
+    gt_path = script_dir.parent.parent / "data" / "ground_truth.json"
     if not gt_path.is_file():
         fail(f"ground_truth.json not found at {gt_path}")
     return json.loads(gt_path.read_text())

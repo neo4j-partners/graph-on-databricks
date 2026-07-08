@@ -1,0 +1,9 @@
+[project]
+name = "supplier-risk-graph"
+version = "0.1.0"
+description = "Synthetic dataset generator and Neo4j loader for the supplier-risk-graph demo: an EDM knowledge layer plus instance data spanning Neo4j and the lakehouse."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false

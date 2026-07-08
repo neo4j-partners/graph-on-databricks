@@ -1,0 +1,6 @@
+id,name,definition
+TERM-01,Platinum Customer,"A customer in the platinum segment, the top commercial tier."
+TERM-02,Strategic Account,A platinum customer flagged strategic by account management.
+TERM-03,High-Risk Supplier,A supplier whose procurement risk score meets or exceeds the supplier risk threshold.
+TERM-04,Risky Customer,A customer more than 60 days late on payments for each of their last 3 invoices.
+TERM-05,Unreconciled Revenue,Recognized revenue not yet reconciled; material when it exceeds the materiality threshold per business unit.

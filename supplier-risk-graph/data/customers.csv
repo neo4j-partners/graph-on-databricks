@@ -1,0 +1,101 @@
+id,name,segment,profitabilityTrend,churnRisk,upsellScore,avgDaysLate,overdueShare
+CUST-001,Quartz Trading,platinum,stable,medium,8,9.0,0.2
+CUST-002,Cedar Group,silver,declining,high,97,26.8,0.38
+CUST-003,Alder Foods,platinum,improving,high,68,0.0,0.0
+CUST-004,Summit Wholesale,silver,declining,high,16,25.0,0.0
+CUST-005,Harbor Beverages,silver,declining,high,44,4.1,0.0
+CUST-006,Granite Distribution,gold,stable,low,84,4.3,0.0
+CUST-007,Fjord Drinks Co,gold,declining,high,60,45.4,0.43
+CUST-008,Delta Markets,silver,improving,low,70,1.6,0.0
+CUST-009,Summit Group,silver,declining,high,21,0.0,0.0
+CUST-010,Cedar Foods,platinum,declining,low,33,5.0,0.25
+CUST-011,Ridgeline Trading,platinum,declining,medium,67,14.8,0.0
+CUST-012,Atlas Foods,gold,improving,low,77,7.2,0.0
+CUST-013,Willow Group,gold,declining,medium,54,14.4,0.0
+CUST-014,Northwind Wholesale,silver,declining,high,27,4.8,0.0
+CUST-015,Cedar Distribution,gold,improving,low,69,11.4,0.0
+CUST-016,Pinnacle Retail,silver,declining,low,25,7.8,0.0
+CUST-017,Kestrel Group,gold,improving,low,39,11.0,0.0
+CUST-018,Alder Group,silver,declining,low,51,8.4,0.0
+CUST-019,Alder Drinks Co,platinum,declining,low,47,9.7,0.0
+CUST-020,Cedar Trading,silver,stable,low,56,5.5,0.0
+CUST-021,Fjord Markets,silver,declining,low,66,6.8,0.0
+CUST-022,Fjord Wholesale,silver,declining,high,57,7.3,0.17
+CUST-023,Meridian Wholesale,silver,improving,high,15,16.5,0.0
+CUST-024,Pinnacle Hospitality,gold,improving,medium,31,21.3,0.0
+CUST-025,Atlas Drinks Co,gold,declining,high,28,74.0,0.75
+CUST-026,Orchid Trading,platinum,improving,high,93,8.4,0.0
+CUST-027,Fjord Beverages,gold,stable,medium,43,0.7,0.0
+CUST-028,Summit Trading,gold,improving,high,2,0.0,0.0
+CUST-029,Quartz Foods,platinum,declining,high,100,15.4,0.2
+CUST-030,Ridgeline Wholesale,silver,improving,medium,29,4.1,0.0
+CUST-031,Zephyr Foods,silver,stable,low,76,18.3,0.0
+CUST-032,Kestrel Drinks Co,silver,declining,high,0,3.4,0.0
+CUST-033,Fjord Foods,gold,stable,medium,9,0.0,0.0
+CUST-034,Lumen Hospitality,silver,stable,low,7,9.7,0.0
+CUST-035,Pinnacle Beverages,silver,improving,medium,71,1.8,0.0
+CUST-036,Harbor Retail,silver,declining,high,75,10.0,0.0
+CUST-037,Umber Drinks Co,silver,improving,low,4,17.5,0.17
+CUST-038,Alder Retail,silver,declining,high,42,42.3,0.5
+CUST-039,Tidal Hospitality,silver,declining,medium,64,8.5,0.0
+CUST-040,Umber Foods,silver,improving,medium,32,10.2,0.0
+CUST-041,Ember Beverages,gold,improving,low,78,0.0,0.0
+CUST-042,Ridgeline Group,silver,stable,medium,17,7.5,0.0
+CUST-043,Zephyr Trading,silver,improving,medium,63,7.5,0.0
+CUST-044,Iris Drinks Co,silver,declining,high,89,3.0,0.0
+CUST-045,Vector Hospitality,silver,stable,high,13,11.0,0.0
+CUST-046,Delta Wholesale,silver,declining,high,34,0.0,0.0
+CUST-047,Willow Wholesale,silver,improving,high,65,17.6,0.0
+CUST-048,Tidal Markets,silver,declining,medium,46,0.2,0.0
+CUST-049,Iris Foods,platinum,declining,low,36,0.8,0.0
+CUST-050,Atlas Beverages,gold,improving,medium,52,11.4,0.0
+CUST-051,Zephyr Beverages,gold,improving,low,30,15.0,0.0
+CUST-052,Juniper Drinks Co,silver,declining,high,94,2.0,0.0
+CUST-053,Cedar Hospitality,silver,improving,medium,50,11.2,0.0
+CUST-054,Juniper Retail,silver,stable,high,26,9.2,0.0
+CUST-055,Iris Group,silver,improving,high,12,11.4,0.0
+CUST-056,Willow Foods,gold,stable,low,6,8.3,0.0
+CUST-057,Granite Drinks Co,silver,declining,high,45,0.0,0.0
+CUST-058,Birch Retail,gold,stable,high,58,5.4,0.0
+CUST-059,Summit Foods,silver,stable,medium,87,16.7,0.0
+CUST-060,Lumen Drinks Co,silver,improving,low,22,8.6,0.0
+CUST-061,Northwind Drinks Co,silver,declining,medium,74,10.9,0.0
+CUST-062,Delta Retail,platinum,declining,high,98,9.4,0.12
+CUST-063,Juniper Foods,silver,improving,medium,80,18.4,0.0
+CUST-064,Cedar Beverages,gold,improving,high,3,13.6,0.0
+CUST-065,Orchid Retail,platinum,stable,low,99,3.6,0.0
+CUST-066,Harbor Markets,platinum,declining,high,37,47.3,0.43
+CUST-067,Quartz Beverages,platinum,declining,high,85,8.8,0.25
+CUST-068,Pinnacle Group,silver,stable,high,92,2.5,0.0
+CUST-069,Juniper Distribution,silver,declining,high,83,27.8,0.38
+CUST-070,Orchid Drinks Co,silver,improving,high,49,6.6,0.0
+CUST-071,Ember Wholesale,gold,improving,high,61,41.5,0.0
+CUST-072,Birch Drinks Co,silver,improving,medium,48,2.0,0.0
+CUST-073,Tidal Distribution,silver,declining,high,59,12.3,0.0
+CUST-074,Quartz Wholesale,silver,improving,medium,14,4.0,0.0
+CUST-075,Fjord Group,silver,improving,low,62,3.1,0.0
+CUST-076,Harbor Hospitality,silver,stable,medium,81,0.0,0.0
+CUST-077,Tidal Retail,silver,improving,medium,5,14.5,0.0
+CUST-078,Zephyr Drinks Co,silver,improving,high,88,30.6,0.0
+CUST-079,Cedar Markets,gold,improving,high,40,4.2,0.0
+CUST-080,Tidal Group,gold,declining,high,90,24.4,0.38
+CUST-081,Umber Markets,gold,declining,high,73,38.6,0.38
+CUST-082,Lumen Foods,gold,declining,high,41,14.6,0.0
+CUST-083,Quartz Distribution,silver,declining,high,72,32.4,0.6
+CUST-084,Juniper Trading,silver,improving,low,35,9.4,0.14
+CUST-085,Ember Retail,silver,stable,low,1,0.3,0.17
+CUST-086,Juniper Hospitality,silver,improving,high,86,0.0,0.0
+CUST-087,Juniper Beverages,silver,stable,medium,96,2.2,0.0
+CUST-088,Fjord Trading,silver,declining,high,53,7.6,0.0
+CUST-089,Granite Group,silver,improving,medium,18,0.2,0.0
+CUST-090,Birch Group,silver,improving,high,20,16.8,0.0
+CUST-091,Pinnacle Markets,gold,improving,medium,38,11.9,0.0
+CUST-092,Ember Trading,platinum,improving,medium,91,13.5,0.0
+CUST-093,Northwind Foods,gold,improving,low,82,8.6,0.0
+CUST-094,Atlas Hospitality,silver,stable,medium,55,0.0,0.0
+CUST-095,Quartz Markets,silver,stable,low,10,0.0,0.0
+CUST-096,Lumen Group,platinum,stable,low,23,0.0,0.0
+CUST-097,Ridgeline Beverages,gold,declining,low,79,13.6,0.0
+CUST-098,Granite Wholesale,platinum,improving,medium,19,16.0,0.2
+CUST-099,Orchid Distribution,silver,stable,low,24,9.2,0.0
+CUST-100,Vector Drinks Co,silver,stable,medium,95,5.6,0.0

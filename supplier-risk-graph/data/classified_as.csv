@@ -1,0 +1,24 @@
+entity_id,term_id,reason,evaluatedAt,ruleVersion
+CUST-001,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-003,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-010,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-011,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-019,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-026,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-029,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-049,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-062,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-065,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-066,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-067,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-092,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-096,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-098,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
+CUST-066,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-062,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-029,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-098,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-096,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-026,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-001,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-003,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0

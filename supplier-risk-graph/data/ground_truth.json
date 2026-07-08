@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "seed": 42,
+  "as_of_date": "2026-07-01",
+  "summary": {
+    "customers": 100,
+    "suppliers": 30,
+    "business_units": 5,
+    "invoices": 599,
+    "payments": 554,
+    "revenue_entries": 70,
+    "compliance_findings": 23,
+    "answers": {
+      "q1": 2,
+      "q2": 6,
+      "q3": 15,
+      "q4": 5,
+      "q5": 5,
+      "q6": 3
+    }
+  },
+  "q1_unreconciled_business_units": [
+    {
+      "business_unit_id": "BU-04",
+      "name": "Asia Pacific",
+      "unreconciled_total": 194803.91,
+      "threshold": 100000
+    },
+    {
+      "business_unit_id": "BU-02",
+      "name": "Southern Europe",
+      "unreconciled_total": 155679.76,
+      "threshold": 100000
+    }
+  ],
+  "q2_kyc_violators": [
+    {
+      "customer_id": "CUST-017",
+      "name": "Kestrel Group",
+      "open_kyc_findings": [
+        "CF-003"
+      ]
+    },
+    {
+      "customer_id": "CUST-048",
+      "name": "Tidal Markets",
+      "open_kyc_findings": [
+        "CF-009"
+      ]
+    },
+    {
+      "customer_id": "CUST-052",
+      "name": "Juniper Drinks Co",
+      "open_kyc_findings": [
+        "CF-007",
+        "CF-008"
+      ]
+    },
+    {
+      "customer_id": "CUST-064",
+      "name": "Cedar Beverages",
+      "open_kyc_findings": [
+        "CF-005",
+        "CF-006"
+      ]
+    },
+    {
+      "customer_id": "CUST-066",
+      "name": "Harbor Markets",
+      "open_kyc_findings": [
+        "CF-001",
+        "CF-002"
+      ]
+    },
+    {
+      "customer_id": "CUST-087",
+      "name": "Juniper Beverages",
+      "open_kyc_findings": [
+        "CF-004"
+      ]
+    }
+  ],
+  "q3_platinum_by_upsell": [
+    {
+      "customer_id": "CUST-029",
+      "name": "Quartz Foods",
+      "upsellScore": 100
+    },
+    {
+      "customer_id": "CUST-065",
+      "name": "Orchid Retail",
+      "upsellScore": 99
+    },
+    {
+      "customer_id": "CUST-062",
+      "name": "Delta Retail",
+      "upsellScore": 98
+    },
+    {
+      "customer_id": "CUST-026",
+      "name": "Orchid Trading",
+      "upsellScore": 93
+    },
+    {
+      "customer_id": "CUST-092",
+      "name": "Ember Trading",
+      "upsellScore": 91
+    },
+    {
+      "customer_id": "CUST-067",
+      "name": "Quartz Beverages",
+      "upsellScore": 85
+    },
+    {
+      "customer_id": "CUST-003",
+      "name": "Alder Foods",
+      "upsellScore": 68
+    },
+    {
+      "customer_id": "CUST-011",
+      "name": "Ridgeline Trading",
+      "upsellScore": 67
+    },
+    {
+      "customer_id": "CUST-019",
+      "name": "Alder Drinks Co",
+      "upsellScore": 47
+    },
+    {
+      "customer_id": "CUST-066",
+      "name": "Harbor Markets",
+      "upsellScore": 37
+    },
+    {
+      "customer_id": "CUST-049",
+      "name": "Iris Foods",
+      "upsellScore": 36
+    },
+    {
+      "customer_id": "CUST-010",
+      "name": "Cedar Foods",
+      "upsellScore": 33
+    },
+    {
+      "customer_id": "CUST-096",
+      "name": "Lumen Group",
+      "upsellScore": 23
+    },
+    {
+      "customer_id": "CUST-098",
+      "name": "Granite Wholesale",
+      "upsellScore": 19
+    },
+    {
+      "customer_id": "CUST-001",
+      "name": "Quartz Trading",
+      "upsellScore": 8
+    }
+  ],
+  "q4_high_risk_suppliers": [
+    {
+      "supplier_id": "SUP-010",
+      "name": "Birch Transport",
+      "riskScore": 91,
+      "threshold": 70
+    },
+    {
+      "supplier_id": "SUP-019",
+      "name": "Atlas Hops Co",
+      "riskScore": 83,
+      "threshold": 70
+    },
+    {
+      "supplier_id": "SUP-024",
+      "name": "Zephyr Cooling Systems",
+      "riskScore": 82,
+      "threshold": 70
+    },
+    {
+      "supplier_id": "SUP-022",
+      "name": "Meridian Cooling Systems",
+      "riskScore": 76,
+      "threshold": 70
+    },
+    {
+      "supplier_id": "SUP-023",
+      "name": "Harbor Cooling Systems",
+      "riskScore": 74,
+      "threshold": 70
+    }
+  ],
+  "q5_risky_customers": [
+    {
+      "customer_id": "CUST-007",
+      "name": "Fjord Drinks Co",
+      "last_three": [
+        {
+          "invoice_id": "INV-0043",
+          "daysLate": 82
+        },
+        {
+          "invoice_id": "INV-0042",
+          "daysLate": 86
+        },
+        {
+          "invoice_id": "INV-0041",
+          "daysLate": 103
+        }
+      ]
+    },
+    {
+      "customer_id": "CUST-025",
+      "name": "Atlas Drinks Co",
+      "last_three": [
+        {
+          "invoice_id": "INV-0143",
+          "daysLate": 85
+        },
+        {
+          "invoice_id": "INV-0142",
+          "daysLate": 100
+        },
+        {
+          "invoice_id": "INV-0141",
+          "daysLate": 104
+        }
+      ]
+    },
+    {
+      "customer_id": "CUST-038",
+      "name": "Alder Retail",
+      "last_three": [
+        {
+          "invoice_id": "INV-0224",
+          "daysLate": 67
+        },
+        {
+          "invoice_id": "INV-0223",
+          "daysLate": 76
+        },
+        {
+          "invoice_id": "INV-0222",
+          "daysLate": 80
+        }
+      ]
+    },
+    {
+      "customer_id": "CUST-066",
+      "name": "Harbor Markets",
+      "last_three": [
+        {
+          "invoice_id": "INV-0403",
+          "daysLate": 90
+        },
+        {
+          "invoice_id": "INV-0402",
+          "daysLate": 98
+        },
+        {
+          "invoice_id": "INV-0401",
+          "daysLate": 99
+        }
+      ]
+    },
+    {
+      "customer_id": "CUST-081",
+      "name": "Umber Markets",
+      "last_three": [
+        {
+          "invoice_id": "INV-0493",
+          "daysLate": 73
+        },
+        {
+          "invoice_id": "INV-0492",
+          "daysLate": 84
+        },
+        {
+          "invoice_id": "INV-0491",
+          "daysLate": 85
+        }
+      ]
+    }
+  ],
+  "q6_strategic_at_risk": [
+    {
+      "customer_id": "CUST-029",
+      "name": "Quartz Foods",
+      "conditions": {
+        "profitabilityTrend": "declining",
+        "churnRisk": "high",
+        "overdue_invoice": true,
+        "open_compliance_finding": true
+      }
+    },
+    {
+      "customer_id": "CUST-062",
+      "name": "Delta Retail",
+      "conditions": {
+        "profitabilityTrend": "declining",
+        "churnRisk": "high",
+        "overdue_invoice": true,
+        "open_compliance_finding": true
+      }
+    },
+    {
+      "customer_id": "CUST-066",
+      "name": "Harbor Markets",
+      "conditions": {
+        "profitabilityTrend": "declining",
+        "churnRisk": "high",
+        "overdue_invoice": true,
+        "open_compliance_finding": true
+      }
+    }
+  ],
+  "gds_q4_exposed_business_unit": "BU-03",
+  "gds_q4_supplier_exposure_by_business_unit": [
+    {
+      "business_unit_id": "BU-03",
+      "name": "Americas",
+      "supplier_count": 4,
+      "avg_supplier_risk": 65.0,
+      "max_supplier_risk": 68
+    },
+    {
+      "business_unit_id": "BU-02",
+      "name": "Southern Europe",
+      "supplier_count": 22,
+      "avg_supplier_risk": 45.1,
+      "max_supplier_risk": 91
+    },
+    {
+      "business_unit_id": "BU-04",
+      "name": "Asia Pacific",
+      "supplier_count": 22,
+      "avg_supplier_risk": 39.7,
+      "max_supplier_risk": 83
+    },
+    {
+      "business_unit_id": "BU-01",
+      "name": "Northern Europe",
+      "supplier_count": 18,
+      "avg_supplier_risk": 39.1,
+      "max_supplier_risk": 91
+    },
+    {
+      "business_unit_id": "BU-05",
+      "name": "Africa & Middle East",
+      "supplier_count": 18,
+      "avg_supplier_risk": 35.7,
+      "max_supplier_risk": 74
+    }
+  ],
+  "gds_q5_similarity_candidates": [
+    {
+      "customer_id": "CUST-083",
+      "name": "Quartz Distribution",
+      "avgDaysLate": 32.4,
+      "overdueShare": 0.6,
+      "churnRisk": "high",
+      "profitabilityTrend": "declining",
+      "distance_to_risky_centroid": 0.199
+    },
+    {
+      "customer_id": "CUST-069",
+      "name": "Juniper Distribution",
+      "avgDaysLate": 27.8,
+      "overdueShare": 0.38,
+      "churnRisk": "high",
+      "profitabilityTrend": "declining",
+      "distance_to_risky_centroid": 0.247
+    },
+    {
+      "customer_id": "CUST-002",
+      "name": "Cedar Group",
+      "avgDaysLate": 26.8,
+      "overdueShare": 0.38,
+      "churnRisk": "high",
+      "profitabilityTrend": "declining",
+      "distance_to_risky_centroid": 0.256
+    },
+    {
+      "customer_id": "CUST-080",
+      "name": "Tidal Group",
+      "avgDaysLate": 24.4,
+      "overdueShare": 0.38,
+      "churnRisk": "high",
+      "profitabilityTrend": "declining",
+      "distance_to_risky_centroid": 0.278
+    }
+  ]
+}

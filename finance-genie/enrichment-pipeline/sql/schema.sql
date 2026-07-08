@@ -29,7 +29,7 @@ COMMENT 'Account dimension — one row per account holder';
 CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.customers (
     customer_id   BIGINT  NOT NULL COMMENT 'Unique customer identifier (primary key)',
     account_id    BIGINT           COMMENT 'Account owned by this customer (foreign key to accounts.account_id)',
-    customer_name STRING           COMMENT 'Customer full name; matches the holder name on the linked account',
+    customer_name STRING           COMMENT 'Customer full name, matching the holder name on the linked account',
     phone         STRING           COMMENT 'Customer contact phone number in NANP format (e.g. 312-555-0142)',
     email         STRING           COMMENT 'Customer contact email address',
     address       STRING           COMMENT 'Customer mailing address as a single string: street, city, state and zip',
