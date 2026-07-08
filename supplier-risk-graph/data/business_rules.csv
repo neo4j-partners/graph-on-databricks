@@ -1,0 +1,6 @@
+id,name,expression,description,threshold
+RULE-01,Platinum Customer Rule,customer.segment = 'platinum',Membership of the platinum commercial segment.,
+RULE-02,Strategic Account Rule,customer.segment = 'platinum' AND flagged strategic by account management,Platinum customers designated strategic.,
+RULE-03,High-Risk Supplier Rule,supplier.riskScore >= 70,Procurement risk score at or above the supplier risk threshold.,70
+RULE-04,Risky Customer Rule,all(last 3 invoices WHERE invoice.daysLate > 60),More than 60 days late on each of the last three invoices.,60
+RULE-05,Unreconciled Revenue Rule,sum(revenueEntry.amount WHERE reconciled = false) > materiality threshold,Unreconciled revenue per business unit above the materiality threshold.,100000

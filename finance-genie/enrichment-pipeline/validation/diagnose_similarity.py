@@ -163,7 +163,7 @@ def diagnose_fraud_vs_normal(gds: GraphDataScience) -> None:
     import json
     from pathlib import Path
 
-    gt_path = Path(__file__).parent.parent / "data" / "ground_truth.json"
+    gt_path = Path(__file__).parent.parent.parent / "data" / "ground_truth.json"
     if not gt_path.is_file():
         print(f"  (skipping — ground_truth.json not found at {gt_path})")
         return

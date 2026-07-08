@@ -6,7 +6,8 @@ match in phase 11e.
 
 Writes three tables into `graph-on-databricks.graph-enriched-schema`:
   gold_accounts                   account metadata + GDS features + community
-                                  aggregates + fraud_risk_tier (20 cols)
+                                  aggregates + graph-derived KYC identity
+                                  columns + fraud_risk_tier (25 cols)
   gold_account_similarity_pairs   pair-level similarity + same_community flag
   gold_fraud_ring_communities     per-community summary for ring-level queries
 
@@ -96,6 +97,13 @@ def main() -> None:
     SCHEMA = os.environ["SCHEMA"]
     SECRET_SCOPE = os.environ["NEO4J_SECRET_SCOPE"]
 
+    # Neo4j is remote Aura, so each connector read pays full network latency for
+    # the entire result set. Splitting the read into `partitions` concurrent
+    # tasks (label/relationship mode partitions internally by id range, so the
+    # output is unchanged) parallelizes the transfer. Applied per-read below
+    # rather than via NEO4J_OPTS because that dict is shared with the writer job.
+    NEO4J_READ_PARTITIONS = os.environ.get("NEO4J_READ_PARTITIONS", "8")
+
     NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, NEO4J_OPTS = load_neo4j_opts(SECRET_SCOPE)
 
     # ----------------------------------------------------------------------- #
@@ -115,6 +123,7 @@ def main() -> None:
         .format("org.neo4j.spark.DataSource")
         .options(**NEO4J_OPTS)
         .option("labels", "Account")
+        .option("partitions", NEO4J_READ_PARTITIONS)
         .load()
         .select(
             F.col("account_id").cast("long"),
@@ -122,6 +131,10 @@ def main() -> None:
             F.col("betweenness_centrality").cast("double"),
             F.col("community_id").cast("long"),
             F.col("similarity_score").cast("double"),
+            F.col("shared_phone_count").cast("long"),
+            F.col("shared_address_count").cast("long"),
+            F.col("identity_cluster_id").cast("long"),
+            F.col("identity_cluster_size").cast("long"),
         )
         .cache()
     )
@@ -130,10 +143,11 @@ def main() -> None:
     # ----------------------------------------------------------------------- #
     # Build gold_accounts with community aggregates + fraud_risk_tier          #
     #                                                                           #
-    # Targeted fillna on inbound_transfer_events only — leaving community_id,  #
-    # risk_score, and similarity_score null for unscored accounts is            #
-    # intentional: a blanket fillna(0) would bucket every unscored account     #
-    # into a synthetic community_id=0 and poison the window aggregates.        #
+    # Targeted fillna on the count columns only — leaving community_id,        #
+    # risk_score, similarity_score, identity_cluster_id, and                   #
+    # identity_cluster_size null for unscored accounts is intentional: a       #
+    # blanket fillna(0) would bucket every unscored account into a synthetic   #
+    # community_id=0 (or identity cluster 0) and poison the window aggregates. #
     #                                                                           #
     # gold_df is cached and reused in later sections; no write-then-read cycle. #
     # ----------------------------------------------------------------------- #
@@ -212,6 +226,8 @@ def main() -> None:
                 "txn_count_30d": 0,
                 "distinct_merchant_count_30d": 0,
                 "distinct_counterparty_count": 0,
+                "shared_phone_count": 0,
+                "shared_address_count": 0,
             }
         )
         .withColumn("community_size", F.count("*").over(w_community))
@@ -246,6 +262,10 @@ def main() -> None:
             "txn_count_30d",
             "distinct_merchant_count_30d",
             "distinct_counterparty_count",
+            "shared_phone_count",
+            "shared_address_count",
+            "identity_cluster_id",
+            "identity_cluster_size",
             "is_ring_community",
             "fraud_risk_tier",
         )
@@ -260,7 +280,7 @@ def main() -> None:
         .option("overwriteSchema", "false")
         .saveAsTable(GOLD_ACCOUNTS_TABLE)
     )
-    print(f"Written {GOLD_ACCOUNTS_TABLE} ({n_gold:,} rows, 20 columns)")
+    print(f"Written {GOLD_ACCOUNTS_TABLE} ({n_gold:,} rows, 25 columns)")
 
     # ----------------------------------------------------------------------- #
     # Build gold_account_similarity_pairs with same_community flag             #
@@ -279,6 +299,7 @@ def main() -> None:
         .option("relationship", "SIMILAR_TO")
         .option("relationship.source.labels", ":Account")
         .option("relationship.target.labels", ":Account")
+        .option("partitions", NEO4J_READ_PARTITIONS)
         .load()
         .select(
             F.least(

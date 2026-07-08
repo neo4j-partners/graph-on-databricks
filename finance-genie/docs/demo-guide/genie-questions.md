@@ -85,3 +85,27 @@ For James-Conway, Cardenas and Sons, Johnson, Williams and May, and Meyer Ltd, w
 ```
 
 > Three sit at the ~4% book baseline (utilities, grocery, retail). James-Conway (crypto) is at 76% — ~19× above baseline. The before could not distinguish James-Conway from the noise; the after can.
+
+---
+
+## KYC: Shared-Identity Detection (Gold Space)
+
+Run in the Gold space after `06_kyc_walkthrough` has landed the four KYC columns on `gold_accounts` (`shared_phone_count`, `shared_address_count`, `identity_cluster_id`, `identity_cluster_size`). These resolve against graph features computed by Weakly Connected Components over the shared phone and address graph, so they have no Silver equivalent. Finding who shares an identifier is a recursive self-join in the warehouse and a single column here.
+
+### 1. Accounts Sharing a Phone
+
+```
+Which accounts share a phone number with another customer?
+```
+
+> Resolves to `gold_accounts.shared_phone_count > 0`. Returns the eight story-ring accounts (368, 927, 1033, 1696, 2184, 2216, 2612, 3003) and nothing else, because every background customer holds a unique number. The value is a graph feature: the count of other customers reached through the same `:Phone` node.
+
+### 2. Accounts in a Shared-Identity Cluster
+
+```
+Show me accounts in a shared-identity cluster
+```
+
+> Resolves to `gold_accounts.identity_cluster_size > 1`. Returns the same eight accounts, all carrying one `identity_cluster_id` with `identity_cluster_size` = 8. No single phone connects all eight; the shared address is the bridge that collapses the two phone groups into one Weakly Connected Component. That traversal is what a warehouse cannot express in one hop.
+
+> Both questions read from graph-derived columns. Money movement flagged the ring; identity resolution proves the eight accounts are one person wearing eight masks. See `KYC_DEMO.md` for the full walkthrough, including the knowledge-layer provenance query that names the policy, definition, and source columns behind the classification.

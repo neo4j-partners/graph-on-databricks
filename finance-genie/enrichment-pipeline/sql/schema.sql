@@ -1,6 +1,6 @@
 -- Base (silver) table schema for the graph-enriched finance pipeline.
 --
--- Defines all five base tables with Unity Catalog column-level comments.
+-- Defines all six base tables with Unity Catalog column-level comments.
 -- Column descriptions are the primary signal Genie uses to understand data.
 --
 -- Executed by upload_and_create_tables.sh before CSV data is loaded.
@@ -25,6 +25,18 @@ CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.accounts (
 )
 USING DELTA
 COMMENT 'Account dimension — one row per account holder';
+
+CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.customers (
+    customer_id   BIGINT  NOT NULL COMMENT 'Unique customer identifier (primary key)',
+    account_id    BIGINT           COMMENT 'Account owned by this customer (foreign key to accounts.account_id)',
+    customer_name STRING           COMMENT 'Customer full name, matching the holder name on the linked account',
+    phone         STRING           COMMENT 'Customer contact phone number in NANP format (e.g. 312-555-0142)',
+    email         STRING           COMMENT 'Customer contact email address',
+    address       STRING           COMMENT 'Customer mailing address as a single string: street, city, state and zip',
+    CONSTRAINT customers_pk PRIMARY KEY (customer_id) RELY
+)
+USING DELTA
+COMMENT 'Customer KYC identity dimension — one row per customer. Customers that share a phone number or address are a synthetic-identity risk signal';
 
 CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.merchants (
     merchant_id   BIGINT  NOT NULL COMMENT 'Unique merchant identifier (primary key)',
@@ -71,6 +83,10 @@ COMMENT 'Ground-truth fraud labels — one row per account';
 -- so the CREATE OR REPLACE statements above stay free of cross-table
 -- reference ordering. Unity Catalog does not enforce these; they are the
 -- declared-relationship signal consumed by downstream tooling.
+ALTER TABLE `${catalog}`.`${schema}`.customers
+    ADD CONSTRAINT customers_account_fk FOREIGN KEY (account_id)
+    REFERENCES `${catalog}`.`${schema}`.accounts (account_id) RELY;
+
 ALTER TABLE `${catalog}`.`${schema}`.transactions
     ADD CONSTRAINT transactions_account_fk FOREIGN KEY (account_id)
     REFERENCES `${catalog}`.`${schema}`.accounts (account_id) RELY;

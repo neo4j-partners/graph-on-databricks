@@ -27,6 +27,8 @@ from checks_genie_csv import check_gds_output, check_genie_output, run_genie_csv
 from checks_structural import (  # noqa: E402
     check_anchor_jaccard,
     check_column_signals,
+    check_kyc_background_uniqueness,
+    check_kyc_story_ring,
     check_ring_density,
     check_whale_pagerank,
     load_data,
@@ -106,6 +108,15 @@ def main():
         file=sys.stderr,
     )
 
+    gt_path = input_dir / "ground_truth.json"
+    ground_truth = json.loads(gt_path.read_text()) if gt_path.exists() else {}
+    kyc_gt = ground_truth.get("kyc_story_ring")
+    if kyc_gt is None:
+        raise SystemExit(
+            f"{gt_path} is missing or has no kyc_story_ring entry. "
+            "Re-run setup/generate_data.py before verifying."
+        )
+
     checks = [
         check_whale_pagerank(data["account_links"], fraud_ids, whale_ids),
         check_ring_density(data["account_links"], rings),
@@ -113,6 +124,8 @@ def main():
         check_column_signals(
             data["accounts"], data["transactions"], fraud_ids
         ),
+        check_kyc_story_ring(data["customers"], kyc_gt),
+        check_kyc_background_uniqueness(data["customers"], kyc_gt),
     ]
 
     render_report_rich(checks)

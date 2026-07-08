@@ -11,8 +11,13 @@
 
 Mirrors the algorithm steps in workshop/02_aura_gds_guide.ipynb — writes
 risk_score, betweenness_centrality, community_id, and similarity_score to every
-:Account node, and creates :SIMILAR_TO relationships. Exits 0 on success, 1 on
-failure.
+:Account node, and creates :SIMILAR_TO relationships. Then runs WCC identity
+resolution over the Customer/Phone/Address graph and writes identity_cluster_id,
+identity_cluster_size, shared_phone_count, and shared_address_count to every
+:Customer node and its owned :Account node. Finally it builds a thin KYC
+knowledge layer (:Policy/:BusinessTerm/:BusinessRule/:DataSource) and links
+every shared-identity customer to it with a :CLASSIFIED_AS edge, so a KYC
+violation can be explained by graph traversal. Exits 0 on success, 1 on failure.
 
 Run from enrichment-pipeline/:
 
@@ -46,6 +51,10 @@ NODESIM_DEGREE_CUTOFF = 5
 BETWEENNESS_SAMPLING_SIZE = 1_000
 BETWEENNESS_SAMPLING_SEED = 42
 
+# BusinessTerm the KYC knowledge layer classifies shared-identity customers as.
+# Duplicated in verify_gds.py — keep the two in sync.
+KYC_BUSINESS_TERM = "Shared Identity Ring"
+
 
 def connect(uri: str, user: str, password: str) -> GraphDataScience:
     try:
@@ -66,21 +75,30 @@ def drop_if_exists(gds: GraphDataScience, name: str) -> None:
 
 def run_pipeline(gds: GraphDataScience) -> None:
     header("Step 1: graph sanity")
+    # COUNT {} subqueries instead of chained MATCH: a chained MATCH on a label
+    # with zero nodes returns an empty result set, which would crash .iloc[0]
+    # instead of reaching the clear fail() below.
     counts = gds.run_cypher(
         """
-        MATCH (a:Account) WITH count(a) AS accounts
-        MATCH (m:Merchant) WITH accounts, count(m) AS merchants
-        MATCH ()-[t:TRANSACTED_WITH]->() WITH accounts, merchants, count(t) AS txns
-        MATCH ()-[p:TRANSFERRED_TO]->() WITH accounts, merchants, txns, count(p) AS p2p
-        RETURN accounts, merchants, txns, p2p
+        RETURN count { (a:Account) } AS accounts,
+               count { (m:Merchant) } AS merchants,
+               count { (c:Customer) } AS customers,
+               count { ()-[:TRANSACTED_WITH]->() } AS txns,
+               count { ()-[:TRANSFERRED_TO]->() } AS p2p
         """
     ).iloc[0]
     print(
         f"      accounts={counts['accounts']:,}  merchants={counts['merchants']:,}  "
-        f"txns={counts['txns']:,}  p2p={counts['p2p']:,}"
+        f"customers={counts['customers']:,}  txns={counts['txns']:,}  "
+        f"p2p={counts['p2p']:,}"
     )
     if counts["accounts"] != EXPECTED_ACCOUNTS:
         fail(f"account count {counts['accounts']} != {EXPECTED_ACCOUNTS}")
+    if counts["customers"] != EXPECTED_ACCOUNTS:
+        fail(
+            f"customer count {counts['customers']} != {EXPECTED_ACCOUNTS} — "
+            "re-run jobs/02_neo4j_ingest.py to load the identity layer"
+        )
 
     header("Step 2: project account_transfers (UNDIRECTED)")
     drop_if_exists(gds, "account_transfers")
@@ -201,6 +219,145 @@ def run_pipeline(gds: GraphDataScience) -> None:
         """
     )
     print("      indexes ready: account_community_id, account_risk_score")
+
+    header("Step 10: project customer_identity (UNDIRECTED)")
+    drop_if_exists(gds, "customer_identity")
+    G3, stats3 = gds.graph.project(
+        "customer_identity",
+        ["Customer", "Phone", "Address"],
+        {
+            "HAS_PHONE": {"orientation": "UNDIRECTED"},
+            "HAS_ADDRESS": {"orientation": "UNDIRECTED"},
+        },
+    )
+    print(
+        f"      projected '{G3.name()}': {stats3['nodeCount']:,} nodes, "
+        f"{stats3['relationshipCount']:,} relationships"
+    )
+
+    header("Step 11: WCC.write → identity_cluster_id")
+    wcc = gds.wcc.write(G3, writeProperty="identity_cluster_id")
+    print(
+        f"      componentCount={int(wcc['componentCount']):,}  "
+        f"propertiesWritten={int(wcc['nodePropertiesWritten']):,}"
+    )
+    gds.graph.drop(G3)
+
+    header("Step 12: identity_cluster_size per customer")
+    # Cluster size counts customers only — WCC also labels the :Phone and
+    # :Address nodes in each component, but those are identifiers, not members.
+    sized = gds.run_cypher(
+        """
+        MATCH (c:Customer)
+        WITH c.identity_cluster_id AS cid, collect(c) AS members
+        UNWIND members AS c
+        SET c.identity_cluster_size = size(members)
+        WITH cid, size(members) AS cluster_size
+        RETURN count(DISTINCT cid) AS clusters,
+               sum(CASE WHEN cluster_size > 1 THEN 1 ELSE 0 END) AS shared_customers
+        """
+    ).iloc[0]
+    print(
+        f"      clusters={int(sized['clusters']):,}  "
+        f"customers_in_shared_clusters={int(sized['shared_customers']):,}"
+    )
+
+    header("Step 13: shared_phone_count / shared_address_count per customer")
+    for rel, prop in (
+        ("HAS_PHONE", "shared_phone_count"),
+        ("HAS_ADDRESS", "shared_address_count"),
+    ):
+        row = gds.run_cypher(
+            f"""
+            MATCH (c:Customer)
+            OPTIONAL MATCH (c)-[:{rel}]->()<-[:{rel}]-(other:Customer)
+            WITH c, count(DISTINCT other) AS n
+            SET c.{prop} = n
+            RETURN sum(CASE WHEN n > 0 THEN 1 ELSE 0 END) AS sharing
+            """
+        ).iloc[0]
+        print(f"      {prop}: {int(row['sharing']):,} customers share")
+
+    header("Step 14: propagate identity properties to :Account via OWNS")
+    propagated = gds.run_cypher(
+        """
+        MATCH (c:Customer)-[:OWNS]->(a:Account)
+        SET a.identity_cluster_id = c.identity_cluster_id,
+            a.identity_cluster_size = c.identity_cluster_size,
+            a.shared_phone_count = c.shared_phone_count,
+            a.shared_address_count = c.shared_address_count
+        RETURN count(a) AS accounts_updated
+        """
+    ).iloc[0]
+    print(f"      accounts_updated={int(propagated['accounts_updated']):,}")
+
+    header("Step 15: knowledge layer — Policy / BusinessTerm / BusinessRule / DataSource")
+    # Thin semantic/provenance layer so "which policy, definition, and data
+    # sources flagged this customer" is a traversal, not tribal knowledge. Built
+    # here, next to the WCC classification, so detection and its explanation are
+    # written together. All MERGE — safe to re-run.
+    gds.run_cypher(
+        """
+        MERGE (p:Policy {policy_id: 'KYC-CIP-001'})
+          SET p.name = 'Customer Identification Program (KYC)',
+              p.authority = 'FinCEN 31 CFR 1020.220',
+              p.description = 'Requires verifying customer identity and detecting customers operating under shared or synthetic identities.'
+        MERGE (term:BusinessTerm {name: $term})
+          SET term.description = 'A group of customers linked into one identity cluster by shared phone numbers or addresses, indicating possible synthetic-identity or structuring activity.'
+        MERGE (rule:BusinessRule {rule_id: 'KYC-WCC-001'})
+          SET rule.name = 'Shared-identity WCC cluster',
+              rule.logic = 'Weakly Connected Components over (:Customer)-[:HAS_PHONE|HAS_ADDRESS]->() ; flag every customer whose identity_cluster_size > 1.',
+              rule.threshold = 1
+        MERGE (phone:DataSource {name: 'silver.customers.phone'})
+          SET phone.description = 'Customer phone column; feeds the :Phone identity nodes via HAS_PHONE.'
+        MERGE (addr:DataSource {name: 'silver.customers.address'})
+          SET addr.description = 'Customer address column; feeds the :Address identity nodes via HAS_ADDRESS.'
+        MERGE (term)-[:GOVERNED_BY]->(p)
+        MERGE (term)-[:DEFINED_BY]->(rule)
+        MERGE (rule)-[:DERIVED_FROM]->(phone)
+        MERGE (rule)-[:DERIVED_FROM]->(addr)
+        """,
+        params={"term": KYC_BUSINESS_TERM},
+    )
+    print(
+        "      knowledge layer ready: Policy, BusinessTerm, BusinessRule, "
+        "2 DataSource + provenance edges"
+    )
+
+    header("Step 16: delete stale :CLASSIFIED_AS relationships")
+    cleared = gds.run_cypher(
+        """
+        MATCH (:Customer)-[r:CLASSIFIED_AS]->(:BusinessTerm)
+        DELETE r RETURN count(r) AS deleted
+        """
+    )
+    print(f"      deleted={int(cleared['deleted'].iloc[0]):,} stale relationships")
+
+    header("Step 17: classify shared-identity customers → :CLASSIFIED_AS provenance")
+    # Every customer whose WCC cluster holds more than one customer is a member
+    # of a shared-identity ring. The edge carries a human-readable reason and
+    # the cluster it was derived from, so the classification explains itself.
+    classified = gds.run_cypher(
+        """
+        MATCH (term:BusinessTerm {name: $term})
+        MATCH (c:Customer) WHERE c.identity_cluster_size > 1
+        MERGE (c)-[r:CLASSIFIED_AS]->(term)
+        SET r.reason = 'shares ' + toString(c.shared_phone_count) +
+                       ' phone(s) and ' + toString(c.shared_address_count) +
+                       ' address with ' + toString(c.identity_cluster_size - 1) +
+                       ' other customer(s) in identity cluster ' +
+                       toString(c.identity_cluster_id),
+            r.evaluatedAt = datetime(),
+            r.cluster_id = c.identity_cluster_id,
+            r.cluster_size = c.identity_cluster_size
+        RETURN count(r) AS classified
+        """,
+        params={"term": KYC_BUSINESS_TERM},
+    ).iloc[0]
+    print(
+        f"      customers classified as '{KYC_BUSINESS_TERM}': "
+        f"{int(classified['classified']):,}"
+    )
 
 
 def main() -> None:
