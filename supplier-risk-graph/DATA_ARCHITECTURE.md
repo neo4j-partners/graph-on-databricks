@@ -25,6 +25,18 @@ Instance-table columns are camelCase, since the CSV headers load verbatim into b
 | `classifications` | Write-back | Business-term labels assigned to customers and suppliers, with the reason and the source that produced them | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. Join `entity_id` to `customers.id` or `suppliers.id`. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
 | `business_unit_exposure` | Write-back | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | The Q4 supplier-risk propagation result, one row per business unit |
 
+The seven instance tables are mirrored into Neo4j as nodes; the two write-back tables surface as `CLASSIFIED_AS` edges and a `BusinessUnit` property. Sample a few of each mirrored instance label:
+
+```cypher
+UNWIND ['Customer', 'Supplier', 'BusinessUnit', 'Invoice', 'Payment', 'RevenueEntry', 'ComplianceFinding'] AS label
+CALL {
+  WITH label
+  MATCH (n) WHERE label IN labels(n)
+  RETURN n LIMIT 3
+}
+RETURN label, n;
+```
+
 ## Neo4j Nodes
 
 ### Data / instance layer (mirror of the lakehouse)
@@ -41,6 +53,15 @@ Because the instance CSVs are the single source for both sides, the mirror nodes
 | `RevenueEntry` | `period, amount, currency, reconciled` | Revenue booked to a division for a period | `reconciled = false` drives Q1 |
 | `ComplianceFinding` | `id, type, status, openedDate` | A compliance issue raised against a customer | `status = 'open'` drives Q2 and Q6 |
 
+Sample one customer's instance subgraph, its unit, invoices, payments, and findings:
+
+```cypher
+MATCH (c:Customer)-[:BELONGS_TO]->(bu:BusinessUnit)
+OPTIONAL MATCH (c)-[:HAS_INVOICE]->(i:Invoice)-[:SETTLED_BY]->(p:Payment)
+OPTIONAL MATCH (c)-[:HAS_FINDING]->(f:ComplianceFinding)
+RETURN c, bu, i, p, f LIMIT 25;
+```
+
 ### Knowledge / semantic layer (graph only)
 
 | Label | Key properties | Business description | Notes |
@@ -51,6 +72,18 @@ Because the instance CSVs are the single source for both sides, the mirror nodes
 | `Policy` | `name, type` | A governance policy that scopes entities and rules | For example KYC Policy, Procurement Policy |
 | `Threshold` | `name, value, currency` | A parameter value a business term depends on | For example Materiality Threshold |
 | `DataSource` | `name, system, table` | The physical table a logical entity is stored in | Lineage target; `table` holds the real Unity Catalog table name |
+
+Sample a few of each knowledge-layer label:
+
+```cypher
+UNWIND ['EDMEntity', 'BusinessTerm', 'BusinessRule', 'Policy', 'Threshold', 'DataSource'] AS label
+CALL {
+  WITH label
+  MATCH (n) WHERE label IN labels(n)
+  RETURN n LIMIT 3
+}
+RETURN label, n;
+```
 
 ## Relationships
 
@@ -65,6 +98,18 @@ Because the instance CSVs are the single source for both sides, the mirror nodes
 | `SUPPLIES` | `(:Supplier)-[:SUPPLIES]->(:BusinessUnit)` | A supplier feeds this internal division | Supply relationships |
 | `HAS_FINDING` | `(:Customer)-[:HAS_FINDING]->(:ComplianceFinding)` | A customer has this compliance issue | Compliance exposure |
 
+Sample a few of each instance-layer relationship:
+
+```cypher
+UNWIND ['HAS_INVOICE', 'SETTLED_BY', 'BELONGS_TO', 'RECOGNIZES', 'SUPPLIES', 'HAS_FINDING'] AS relType
+CALL {
+  WITH relType
+  MATCH (a)-[r]->(b) WHERE type(r) = relType
+  RETURN a, r, b LIMIT 3
+}
+RETURN a, r, b;
+```
+
 ### Knowledge layer
 
 | Relationship | Pattern | Business description | Notes |
@@ -76,12 +121,36 @@ Because the instance CSVs are the single source for both sides, the mirror nodes
 | `APPLIES_TO` | `(:Threshold)-[:APPLIES_TO]->(:BusinessTerm)` | A threshold parameterizes this term | Threshold that parameterizes a term |
 | `MAPS_TO` | `(:EDMEntity)-[:MAPS_TO]->(:DataSource)` | A logical entity is stored in this physical source | Lineage from logical entity to physical source; `DataSource.table` points at the real UC table |
 
+Sample a few of each knowledge-layer relationship:
+
+```cypher
+UNWIND ['DEFINED_BY', 'EVALUATES', 'CONSTRAINS', 'GOVERNS', 'APPLIES_TO', 'MAPS_TO'] AS relType
+CALL {
+  WITH relType
+  MATCH (a)-[r]->(b) WHERE type(r) = relType
+  RETURN a, r, b LIMIT 3
+}
+RETURN a, r, b;
+```
+
 ### Cross-layer
 
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
 | `REALIZED_AS` | `(:EDMEntity)-[:REALIZED_AS]->(:Customer\|:Invoice)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The demo realizes only the Customer and Invoice entities, the ones the six questions traverse: 100 Customer edges and 612 Invoice edges. |
 | `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with this business term | Materialized classification with provenance; written back to the `classifications` Delta table |
+
+Sample the cross-layer edges that tie the knowledge layer to instances:
+
+```cypher
+UNWIND ['REALIZED_AS', 'CLASSIFIED_AS'] AS relType
+CALL {
+  WITH relType
+  MATCH (a)-[r]->(b) WHERE type(r) = relType
+  RETURN a, r, b LIMIT 5
+}
+RETURN a, r, b;
+```
 
 The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be traced instance to business term to rule to EDM entity to data source, so Q6 can report which business definitions and data sources were used.
 
