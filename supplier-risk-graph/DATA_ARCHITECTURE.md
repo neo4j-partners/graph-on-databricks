@@ -191,3 +191,55 @@ The demo uses two graph analytics passes to extend the rule-based answers: a pla
 - Both passes write new `CLASSIFIED_AS` edges carrying `source: 'gds'`, the algorithm name, the score, and `evaluatedAt`.
 - The edges have the same shape as the rule-planted ones, so the Q6 explanation query returns them without modification.
 - Results are deterministic given the fixed-seed data. Q4 exposure matches the `gds_q4_*` entries in `ground_truth.json`; the Q5/Q6 kNN candidates emerge from the run and are checked only for shape (four non-flagged customers, each near the risky cohort).
+
+## Lineage
+
+The `MAPS_TO` edge is data lineage: it connects a logical business entity in the Enterprise Data Model to the physical table where that data actually lives. In this demo every EDM entity points at a real Databricks Unity Catalog table:
+
+```
+(:EDMEntity {name:'Customer'})-[:MAPS_TO]->(:DataSource {table:'supplier_risk.customers'})
+```
+
+So "Customer" as a concept in the EDM is realized in `supplier_risk.customers` on the lakehouse. The `DataSource.table` values are the actual UC table names (`supplier_risk.customers`, `.suppliers`, `.invoices`, and so on), which is why lineage points at real Databricks assets rather than placeholders. All seven instance entities have a 1:1 mapping.
+
+Lineage is one link in a longer chain that answers "where did this answer come from". A business term traces down through its rule, to the logical entity, and finally to the exact UC table backing it, which is what Q6 reports:
+
+```
+BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> EDMEntity -MAPS_TO-> DataSource (physical table)
+                                                      EDMEntity -REALIZED_AS-> Customer/Invoice (instances)
+```
+
+### Seeing lineage in Neo4j
+
+The lineage edges as a table, each logical entity and its physical source:
+
+```cypher
+MATCH (e:EDMEntity)-[:MAPS_TO]->(ds:DataSource)
+RETURN e.name AS entity, ds.system AS system, ds.table AS unityCatalogTable
+ORDER BY entity;
+```
+
+The lineage layer as a graph, for the Browser visual:
+
+```cypher
+MATCH p = (:EDMEntity)-[:MAPS_TO]->(:DataSource)
+RETURN p;
+```
+
+Full end-to-end lineage, a business term down to its physical table:
+
+```cypher
+MATCH (t:BusinessTerm)-[:DEFINED_BY]->(r:BusinessRule)-[:EVALUATES]->(e:EDMEntity)-[:MAPS_TO]->(ds:DataSource)
+RETURN t.name AS term, r.name AS rule, e.name AS entity, ds.table AS sourceTable;
+```
+
+One entity's complete picture, its physical source and its realized instances together:
+
+```cypher
+MATCH (e:EDMEntity {name: 'Customer'})
+OPTIONAL MATCH (e)-[:MAPS_TO]->(ds:DataSource)
+OPTIONAL MATCH (e)-[:REALIZED_AS]->(inst)
+RETURN e, ds, inst LIMIT 25;
+```
+
+Only `Customer` and `Invoice` have `REALIZED_AS` edges to instances in this demo; the other five entities have lineage (`MAPS_TO`) but no realized instances.
