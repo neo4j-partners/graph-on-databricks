@@ -8,7 +8,8 @@ Features it implements:
 - **GDS identity resolution**: Weakly Connected Components over the identity graph to find shared-identity clusters
 - **Shared-identifier metrics**: each customer gets counts of how many other customers share a phone or address with them; the counts are copied onto the customer's accounts for the gold pull, and the graph holds the detail of who and which identifier
 - **Gold write-back**: graph-derived KYC columns land in `gold_accounts` alongside the existing `risk_score` and `community_id`
-- **Ground-truth verification**: automated checks that the planted KYC story ring is detected exactly and background data stays clean
+- **Knowledge-layer provenance**: a `Policy` / `BusinessTerm` / `BusinessRule` / `DataSource` layer plus `CLASSIFIED_AS` edges make each violation explainable as a traversal, returning the rule, definition, policy, and data-source lineage that flagged the customer
+- **Ground-truth verification**: automated checks that the planted KYC story ring is detected exactly, that only its customers are classified, and that background data stays clean
 
 ## Features
 
@@ -35,6 +36,15 @@ Features it implements:
 - **Money movement detects**: Louvain on the transfer graph finds the fraud ring
 - **Identity explains**: WCC on the identity graph shows the ring's 8 accounts are really one identity sharing 2 phones and 1 address
 - **The point**: neither layer alone catches it, and the SQL equivalent is recursive self-joins across identifier types
+
+### Knowledge-layer provenance
+
+**ELI5**: Detection tells you a customer broke the rule. It does not tell you which rule, what the rule means, or where the data came from. The knowledge layer adds those as their own nodes: one `Policy` node, one `BusinessTerm` that names the pattern, one `BusinessRule` that states the logic, and `DataSource` nodes for the columns the rule reads. When GDS flags a customer, it draws a `CLASSIFIED_AS` line from that customer to the business term. Now the whole explanation, the violation, the definition, the policy it enforces, and the source columns, is one path you can walk instead of a story you have to tell.
+
+- **Model**: `(:Customer)-[:CLASSIFIED_AS]->(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)-[:DERIVED_FROM]->(:DataSource)`, with `(:BusinessTerm)-[:GOVERNED_BY]->(:Policy)`
+- **Classification**: the GDS run writes a `CLASSIFIED_AS` edge for every customer whose `identity_cluster_size` is above 1, carrying a plain-language `reason`, the `cluster_id`, and `cluster_size`
+- **Self-explaining answer**: one traversal returns each violator plus the business term, the rule and its logic, the governing policy and its regulatory authority, and the data-source columns the rule was derived from
+- **Graph-only**: this layer lives entirely in Neo4j and is not written back to Delta; it powers the live explain query, not a gold column
 
 ### Gold write-back and Genie
 
@@ -70,6 +80,18 @@ RETURN c.identity_cluster_id, count(DISTINCT c) AS customers,
        collect(DISTINCT a.account_id) AS accounts
 ```
 
+The explain beat, each violator with the rule, definition, policy, and data-source lineage that classified it:
+
+```cypher
+MATCH (c:Customer)-[cl:CLASSIFIED_AS]->(term:BusinessTerm)-[:DEFINED_BY]->(rule:BusinessRule)
+MATCH (term)-[:GOVERNED_BY]->(policy:Policy)
+MATCH (rule)-[:DERIVED_FROM]->(src:DataSource)
+RETURN c.customer_id AS customer, cl.reason AS why, term.name AS business_term,
+       rule.rule_id AS rule, policy.policy_id AS policy,
+       collect(DISTINCT src.name) AS data_sources
+ORDER BY c.customer_id
+```
+
 - **Bloom**: the story ring appears as one connected blob around 2 `Phone` nodes and 1 `Address` node
 - **Genie**: natural-language questions about shared identifiers resolve against the graph-derived gold columns
 
@@ -92,8 +114,8 @@ PIPELINE_START_STEP=16 ./run_existing_data_pipeline.py
 ```
 
 - **Step 8**: uploads job scripts, including `sql/gold_schema.sql` that `03_pull_gold_tables.py` reads at runtime; skipping it leaves a stale copy on the cluster
-- **Step 10**: `jobs/02_neo4j_ingest.py` ingests customers, phones, and addresses with uniqueness constraints
-- **Step 11**: `validation/run_gds.py` runs WCC and writes the identity properties
-- **Step 12**: `validation/verify_gds.py` checks the story ring against `ground_truth.json`
+- **Step 10**: `jobs/02_neo4j_ingest.py` ingests customers, phones, and addresses with uniqueness constraints, including the knowledge-layer node constraints
+- **Step 11**: `validation/run_gds.py` runs WCC and writes the identity properties, then builds the knowledge layer and classifies every shared-identity customer with a `CLASSIFIED_AS` edge
+- **Step 12**: `validation/verify_gds.py` checks the story ring against `ground_truth.json`, covering both identity resolution `[8/9]` and knowledge-layer provenance `[9/9]`
 - **Step 13**: `jobs/03_pull_gold_tables.py` reads the KYC columns from Neo4j and writes `gold_accounts`
 - **Step 14**: gold validation; the new columns do not affect the existing checks

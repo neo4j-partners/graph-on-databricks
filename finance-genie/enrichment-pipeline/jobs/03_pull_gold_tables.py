@@ -97,6 +97,13 @@ def main() -> None:
     SCHEMA = os.environ["SCHEMA"]
     SECRET_SCOPE = os.environ["NEO4J_SECRET_SCOPE"]
 
+    # Neo4j is remote Aura, so each connector read pays full network latency for
+    # the entire result set. Splitting the read into `partitions` concurrent
+    # tasks (label/relationship mode partitions internally by id range, so the
+    # output is unchanged) parallelizes the transfer. Applied per-read below
+    # rather than via NEO4J_OPTS because that dict is shared with the writer job.
+    NEO4J_READ_PARTITIONS = os.environ.get("NEO4J_READ_PARTITIONS", "8")
+
     NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, NEO4J_OPTS = load_neo4j_opts(SECRET_SCOPE)
 
     # ----------------------------------------------------------------------- #
@@ -116,6 +123,7 @@ def main() -> None:
         .format("org.neo4j.spark.DataSource")
         .options(**NEO4J_OPTS)
         .option("labels", "Account")
+        .option("partitions", NEO4J_READ_PARTITIONS)
         .load()
         .select(
             F.col("account_id").cast("long"),
@@ -291,6 +299,7 @@ def main() -> None:
         .option("relationship", "SIMILAR_TO")
         .option("relationship.source.labels", ":Account")
         .option("relationship.target.labels", ":Account")
+        .option("partitions", NEO4J_READ_PARTITIONS)
         .load()
         .select(
             F.least(
