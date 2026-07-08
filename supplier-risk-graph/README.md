@@ -334,6 +334,44 @@ Without the graph, Genie has to infer what "risky" or "material" or "high-risk" 
 
 The difference is visible in a side-by-side comparison. A "risky customers" question asked against the raw instance tables alone forces Genie to guess a definition. The same question asked against a space that includes `classifications` returns the governed reason and matches the Cypher exactly.
 
+## A multi-agent supervisor over Genie and the graph
+
+Expose the Neo4j instance as an MCP server and a supervisor agent can pair it with the Genie space to answer questions and explain their provenance from the EDM. The two agents have complementary jobs, and the split matches the two layers this demo already builds.
+
+- **Genie agent (facts):** scans, aggregations, and joins over the gold tables. It answers how much, how many, and which rows over `customers`, `invoices`, `business_unit_exposure`, and `classifications`.
+- **Neo4j MCP agent (meaning):** holds what Genie cannot infer from column names. Business term definitions, rule expressions, threshold values, policy scope, and the `MAPS_TO`, `REALIZED_AS`, and `CLASSIFIED_AS` lineage.
+- **Supervisor:** routes and stitches. It resolves the definition in the graph first, hands Genie a precise parameterized query, then asks the graph for the provenance chain behind the answer Genie produced.
+
+An off-the-shelf Neo4j Cypher MCP server exposes read-only, parameterized Cypher as tools, so the MCP layer does not have to be built from scratch. Keep it read-only so the agent cannot mutate the graph.
+
+### Provenance the supervisor can explain
+
+For any answer it can walk the same chain the Q6 explanation query uses and cite each hop:
+
+- **Instance to term:** a `Customer` or `Supplier` is `CLASSIFIED_AS` a `BusinessTerm`, with the `reason` recorded on the edge.
+- **Term to rule:** `BusinessTerm` `DEFINED_BY` `BusinessRule`, the actual expression.
+- **Rule to entity:** `BusinessRule` `EVALUATES` `EDMEntity`.
+- **Entity to source:** `EDMEntity` `MAPS_TO` `DataSource.table`, the real Unity Catalog table the number came from.
+
+So the answer to Q2 is not just "6 customers". It is 6 customers because the KYC Policy POL-01 constrains the Customer entity EDM-01, which maps to `supplier_risk.compliance_findings`, filtered to `type = KYC` and `status = open`.
+
+### What else it can combine from the EDM
+
+- **Definition resolution before querying:** the supervisor asks the graph what "material", "high-risk", or "risky" means, reads the `Threshold` off the rule, and only then queries Genie. Meaning is resolved once, not re-guessed per prompt.
+- **Impact analysis:** because `Threshold` `APPLIES_TO` `BusinessTerm` `DEFINED_BY` `BusinessRule` `EVALUATES` `EDMEntity` `MAPS_TO` `DataSource`, the agent can answer "if I raise the Late Payment Threshold THR-03, which terms, rules, tables, and prior answers change". That traversal has no clean SQL equivalent.
+- **Policy and governance reasoning:** `CONSTRAINS` ties each `Policy` to an `EDMEntity`, so the agent can answer which policies govern customer data or which answers touch a compliance-constrained entity.
+- **Queryable glossary:** the knowledge layer is the catalog. List every governed term and its definition, which thresholds parameterize which terms, or who owns a given number.
+- **Rule versus model provenance:** `CLASSIFIED_AS` carries `source`, `algorithm`, `score`, and `reason`, so the agent can separate policy-flagged accounts from kNN-similar ones and explain each, including the GDS candidates no rule caught.
+- **Multi-hop the fact side finds awkward:** supplier to business unit to customer exposure paths and similarity neighborhoods, the Q4 exposure and Q5/Q6 kNN stories.
+- **Consistency check:** both layers derive from one source, so the supervisor can cross-check Genie's Delta counts against the graph's classification counts and flag drift as a self-verification step.
+
+### The dependency that keeps it honest
+
+The provenance is only as trustworthy as the maintained edges.
+
+- **Keep write-back running:** the `classifications` and `business_unit_exposure` tables are what stop Genie and the graph from becoming two sources of truth.
+- **Change rules in both places:** if a rule changes in code, the `BusinessRule.expression` and `Threshold.value` in the graph must change with it, or the explanation will confidently cite the wrong definition.
+
 ## Appendix: mapping to the Databricks integration modes
 
 The demo runs one mode, Multi-Hop Native with write-back, because it is offline and self-contained. In production each question would use whichever mode fits its data gravity and hop count. The table below maps each question to the mode it would use.
