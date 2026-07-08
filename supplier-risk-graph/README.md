@@ -1,14 +1,27 @@
 # supplier-risk-graph
 
-A small demo of a dual data architecture for supplier and customer risk. The Databricks lakehouse owns the data / instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge / semantic layer and holds a mirror of the instance data, so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides, so the demo runs offline and the two sides always match.
+A small demo of a dual data architecture for supplier and customer risk.
 
-The graph answers all six of the validation questions and, for each one, explains which business definition, threshold, policy, and data source backed the answer. The questions build in graph value: Q1 to Q3 are definition lookups, Q4 to Q6 add multi-hop provenance, and two graph analytics passes find what the flat rules cannot. The two passes are a supplier-risk exposure aggregation for Q4, and one Graph Data Science algorithm, kNN customer similarity, for Q5 and Q6.
+- **Instance layer (Databricks):** the lakehouse owns the data as Unity Catalog Delta tables.
+- **Knowledge layer (Neo4j):** owns the semantic layer and holds a mirror of the instance data, so multi-hop and provenance queries run in one graph.
+- **Single source:** one set of CSVs in `data/` feeds both sides, so the demo runs offline and the two sides always match.
+
+The graph answers all six validation questions and, for each one, explains which business definition, threshold, policy, and data source backed the answer. The questions build in graph value:
+
+- **Q1 to Q3:** definition lookups.
+- **Q4 to Q6:** add multi-hop provenance.
+- **Two analytics passes:** find what the flat rules cannot. One is a supplier-risk exposure aggregation for Q4; the other is a Graph Data Science algorithm, kNN customer similarity, for Q5 and Q6.
 
 This README reads on its own as a walkthrough. It covers the model, the one-time setup, every query with a plain-English explanation, how Genie consumes the result, and an appendix mapping each question to a Databricks integration mode.
 
 ## The two-layer model
 
-The instance layer is a mirror of the lakehouse tables. The knowledge layer holds the Enterprise Data Model, business terms, rules, policies, thresholds, and lineage to the real Unity Catalog tables. Two cross-layer edges tie them together: `REALIZED_AS` links a logical EDM entity to its physical instances, and `CLASSIFIED_AS` records a classification with provenance.
+Two layers, tied together by two cross-layer edges:
+
+- **Instance layer:** a mirror of the lakehouse tables.
+- **Knowledge layer:** the Enterprise Data Model, business terms, rules, policies, thresholds, and lineage to the real Unity Catalog tables.
+- **`REALIZED_AS`:** links a logical EDM entity to its physical instances.
+- **`CLASSIFIED_AS`:** records a classification with provenance.
 
 See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the data diagram and the full label, relationship, and property model. All property names are camelCase in both Neo4j and Unity Catalog, so the Cypher below runs unchanged.
 
@@ -51,7 +64,14 @@ Run these in order from this folder. Steps 1 and 2 need no live service; steps 3
    uv run upload.py
    ```
 
-Quick check that the load worked, before you walk through anything live: open Neo4j Browser on the demo database with the results pane set to Table view. `uv run load.py --check` should report 1433 nodes and 2219 relationships. Q1 returns 2 business units, Q2 returns 6 customers, and Q6 returns 3 customers. If those three match, everything upstream loaded correctly.
+Quick check that the load worked, before you walk through anything live. Open Neo4j Browser on the demo database with the results pane set to Table view, then confirm:
+
+- **Counts:** `uv run load.py --check` reports 1433 nodes and 2219 relationships.
+- **Q1:** 2 business units.
+- **Q2:** 6 customers.
+- **Q6:** 3 customers.
+
+If those three match, everything upstream loaded correctly.
 
 ## Note on Cypher Functions: a quick primer
 
@@ -65,7 +85,11 @@ A few functions appear repeatedly:
 
 ## The six questions
 
-Each query resolves its definition in the knowledge layer and pulls its facts from the mirrored instance data. Thresholds are read from the graph, never hardcoded. The queries are grouped by how much graph they use: the first three look up a governed definition, the next three traverse across both layers for provenance, and the extensions at the end find what the rules alone miss.
+Each query resolves its definition in the knowledge layer and pulls its facts from the mirrored instance data. Thresholds are read from the graph, never hardcoded. The queries are grouped by how much graph they use:
+
+- **First three:** look up a governed definition.
+- **Next three:** traverse across both layers for provenance.
+- **Extensions at the end:** find what the rules alone miss.
 
 ### Definitions live in the graph (Q1 to Q3)
 
@@ -93,7 +117,10 @@ Expected: 2 units, BU-04 Asia Pacific (189924.86) and BU-02 Southern Europe (175
 
 #### Q2 — Customers with open KYC compliance findings
 
-The KYC Policy constrains the Customer EDM entity; that entity realizes as the mirrored `Customer` instances, which are then checked for open KYC findings. Backed by policy "KYC Policy" (POL-01), which CONSTRAINS the Customer entity (EDM-01). Facts come from `customers` and `compliance_findings`.
+- **What it does:** starts at the KYC Policy, walks to the Customer entity it constrains, follows that entity to the mirrored `Customer` instances, and keeps the ones with an open KYC finding.
+- **Backed by:** policy "KYC Policy" (POL-01), which CONSTRAINS the Customer entity (EDM-01).
+- **Facts from:** `customers` and `compliance_findings`.
+- **Where the findings come from:** the compliance findings are synthetic demo data, not real regulatory filings. `generate_data.py` deterministically selects a 6-customer KYC cohort from a fixed seed, which includes the first at-risk strategic account, and gives each customer one or two findings of `type: KYC, status: open`. Those rows land in the `compliance_findings` table (DS-07), and the loader mirrors them into Neo4j as `ComplianceFinding` nodes linked to each customer by `HAS_FINDING`. The cohort is sized so Q2 returns exactly 6 customers.
 
 > Direction note: the requirements doc traverses `REALIZED_AS` the wrong way. The model uses the entity-to-instance direction `(:EDMEntity)-[:REALIZED_AS]->(:Customer)`, so this query traverses entity to instance. This is the query the requirements doc had backwards.
 
@@ -271,7 +298,12 @@ The GDS Q5/Q6 similarity candidates are not listed here: they emerge from the kN
 
 ## How Genie consumes the graph semantics
 
-Genie is the consumer of what the graph produces, not a competing answer path. The graph supplies the governed definitions that make Genie answers accurate, cheaper, and explainable, and writes its classifications back into Delta, so Genie answers over gold tables that already carry the graph's meaning. When a user asks Genie "which business units have material unreconciled revenue" or "who are our high-risk suppliers", the meaning of "material" and "high-risk" lives in the knowledge layer as thresholds and rules, not in an ad hoc SQL guess. The graph resolves the definition once, points at the real Unity Catalog tables through `MAPS_TO` lineage, and both rule-based and GDS-scored classifications flow back into Delta so Databricks users see the graph value in their own tables.
+Genie is the consumer of what the graph produces, not a competing answer path.
+
+- **Governed definitions:** the graph supplies the definitions that make Genie answers accurate, cheaper, and explainable.
+- **Write-back:** classifications land in Delta, so Genie answers over gold tables that already carry the graph's meaning.
+- **Meaning, not guesswork:** when a user asks "which business units have material unreconciled revenue" or "who are our high-risk suppliers", the meaning of "material" and "high-risk" lives in the knowledge layer as thresholds and rules, not an ad hoc SQL guess.
+- **Resolved once:** the graph resolves the definition once, points at the real Unity Catalog tables through `MAPS_TO` lineage, and both rule-based and GDS-scored classifications flow back into Delta so Databricks users see the graph value in their own tables.
 
 ### Setup (one-time, before the call)
 
