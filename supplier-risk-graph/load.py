@@ -123,6 +123,7 @@ REL_SPECS = [
     RelSpec("defined_by.csv", "DEFINED_BY", "term_id", "BusinessTerm", "rule_id", "BusinessRule"),
     RelSpec("evaluates.csv", "EVALUATES", "rule_id", "BusinessRule", "edm_entity_id", "EDMEntity"),
     RelSpec("constrains.csv", "CONSTRAINS", "policy_id", "Policy", "edm_entity_id", "EDMEntity"),
+    RelSpec("governs.csv", "GOVERNS", "policy_id", "Policy", "rule_id", "BusinessRule"),
     RelSpec("applies_to.csv", "APPLIES_TO", "threshold_id", "Threshold", "term_id", "BusinessTerm"),
     RelSpec("maps_to.csv", "MAPS_TO", "edm_entity_id", "EDMEntity", "data_source_id", "DataSource"),
 ]

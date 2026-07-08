@@ -2,24 +2,28 @@
 
 The demo uses a dual data architecture. The Databricks lakehouse owns the data / instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge / semantic layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
 
-![Dual data architecture](dual-data-architecture.svg)
+![Dual data architecture](dual-data-architecture.png)
+
+## A note on BusinessUnit
+
+`BusinessUnit` is an internal division of the enterprise this demo models, not a unit of a supplier or a customer. It is the shared pivot of the instance layer: customers roll up into it (`BELONGS_TO`), suppliers feed it (`SUPPLIES`), and revenue is booked against it (`RECOGNIZES`). A customer is therefore a customer of the enterprise; `BELONGS_TO` only records which internal division carries that account for revenue roll-up, and `SUPPLIES` points a vendor into the division it serves. This convergence on the same unit is what lets Q4 propagate supplier risk to a division's customers along the path `Supplier-SUPPLIES->BusinessUnit<-BELONGS_TO-Customer`.
 
 ## Lakehouse Tables (Unity Catalog Delta)
 
 Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC. The two graph-derived gold tables are snake_case, built from Cypher `RETURN` aliases.
 
-| Table | Kind | Columns (key) | Notes |
-|---|---|---|---|
-| `invoices` | Fact | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Basis for payment-behavior rules; drives Q5 and the Q6 payment condition |
-| `payments` | Fact | `id, invoiceId, amount, date` | `invoiceId` joins to `invoices.id` |
-| `revenue_entries` | Fact | `id, businessUnitId, period, amount, currency, reconciled` | `businessUnitId` joins to `business_units.id`; `reconciled = false` drives Q1 |
-| `customers` | Dimension | `id, businessUnitId, name, segment, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | `businessUnitId` joins to `business_units.id`. The trend, churn, and score columns are derived ML features consumed by the graph |
-| `suppliers` | Dimension | `id, name, category, riskScore` | Procurement counterpart; drives Q4 |
-| `business_units` | Dimension | `id, name, region` | Rolls up customers, suppliers, and revenue |
-| `compliance_findings` | Operational log | `id, customerId, type, status, openedDate` | `customerId` joins to `customers.id`; `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
-| `supplier_business_units` | Bridge | `supplierId, businessUnitId` | The many-to-many supplier-to-unit link, so the lakehouse can join suppliers to the units they supply. Mirrors the `SUPPLIES` edge |
-| `classifications` | Write-back | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. Join `entity_id` to `customers.id` or `suppliers.id`. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
-| `business_unit_exposure` | Write-back | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | The Q4 supplier-risk propagation result, one row per business unit |
+| Table | Kind | Business description | Columns (key) | Notes |
+|---|---|---|---|---|
+| `invoices` | Fact | Bills the enterprise issued to its customers, each recording what was owed, when it was due, and how late it was paid | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Basis for payment-behavior rules; drives Q5 and the Q6 payment condition |
+| `payments` | Fact | Cash the enterprise received to settle invoices | `id, invoiceId, amount, date` | `invoiceId` joins to `invoices.id` |
+| `revenue_entries` | Fact | Revenue booked to an internal division for a period, marked reconciled or not | `id, businessUnitId, period, amount, currency, reconciled` | `businessUnitId` joins to `business_units.id`; `reconciled = false` drives Q1 |
+| `customers` | Dimension | The accounts the enterprise sells to, with commercial segment and risk/ML attributes | `id, businessUnitId, name, segment, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | `businessUnitId` joins to `business_units.id`. The trend, churn, and score columns are derived ML features consumed by the graph |
+| `suppliers` | Dimension | The vendors the enterprise buys from, each carrying a procurement risk score | `id, name, category, riskScore` | Procurement counterpart; drives Q4 |
+| `business_units` | Dimension | The enterprise's own internal divisions; the pivot customers roll up into, suppliers feed, and revenue is booked to | `id, name, region` | Rolls up customers, suppliers, and revenue |
+| `compliance_findings` | Operational log | Compliance issues (KYC, AML, sanctions) raised against a customer, open or closed | `id, customerId, type, status, openedDate` | `customerId` joins to `customers.id`; `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
+| `supplier_business_units` | Bridge | Which suppliers feed which internal divisions | `supplierId, businessUnitId` | The many-to-many supplier-to-unit link, so the lakehouse can join suppliers to the units they supply. Mirrors the `SUPPLIES` edge |
+| `classifications` | Write-back | Business-term labels assigned to customers and suppliers, with the reason and the source that produced them | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. Join `entity_id` to `customers.id` or `suppliers.id`. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
+| `business_unit_exposure` | Write-back | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | The Q4 supplier-risk propagation result, one row per business unit |
 
 ## Neo4j Nodes
 
@@ -27,56 +31,57 @@ Instance-table columns are camelCase, since the CSV headers load verbatim into b
 
 Because the instance CSVs are the single source for both sides, the mirror nodes also carry the foreign-key columns as properties (`Invoice.customerId`, `Payment.invoiceId`, `RevenueEntry.businessUnitId`, `ComplianceFinding.customerId`, `Customer.businessUnitId`). They are redundant with the instance-layer relationships below, which is what the demo's Cypher traverses.
 
-| Label | Key properties | Notes |
-|---|---|---|
-| `Customer` | `id, name, segment, profitabilityTrend, churnRisk, upsellScore` | Trend and score fields come from the warehouse ML features |
-| `Supplier` | `id, name, category, riskScore` | Procurement counterpart |
-| `BusinessUnit` | `id, name, region` | Rolls up customers, suppliers, revenue |
-| `Invoice` | `id, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | Basis for payment-behavior rules |
-| `Payment` | `id, amount, date` | Settles one or more invoices |
-| `RevenueEntry` | `period, amount, currency, reconciled` | `reconciled = false` drives Q1 |
-| `ComplianceFinding` | `id, type, status, openedDate` | `status = 'open'` drives Q2 and Q6 |
+| Label | Key properties | Business description | Notes |
+|---|---|---|---|
+| `Customer` | `id, name, segment, profitabilityTrend, churnRisk, upsellScore` | An account the enterprise sells to | Trend and score fields come from the warehouse ML features |
+| `Supplier` | `id, name, category, riskScore` | A vendor the enterprise buys from | Procurement counterpart |
+| `BusinessUnit` | `id, name, region` | An internal division of the enterprise; the pivot customers, suppliers, and revenue attach to | Rolls up customers, suppliers, revenue |
+| `Invoice` | `id, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | A bill issued to a customer | Basis for payment-behavior rules |
+| `Payment` | `id, amount, date` | Cash received to settle an invoice | Settles one or more invoices |
+| `RevenueEntry` | `period, amount, currency, reconciled` | Revenue booked to a division for a period | `reconciled = false` drives Q1 |
+| `ComplianceFinding` | `id, type, status, openedDate` | A compliance issue raised against a customer | `status = 'open'` drives Q2 and Q6 |
 
 ### Knowledge / semantic layer (graph only)
 
-| Label | Key properties | Notes |
-|---|---|---|
-| `EDMEntity` | `name, description` | Logical entities from the Enterprise Data Model |
-| `BusinessTerm` | `name, definition` | Human-readable definition, for example "Platinum Customer" |
-| `BusinessRule` | `name, expression, description` | Machine-evaluable logic behind a term |
-| `Policy` | `name, type` | For example KYC Policy, Procurement Policy |
-| `Threshold` | `name, value, currency` | For example Materiality Threshold |
-| `DataSource` | `name, system, table` | Lineage target; `table` holds the real Unity Catalog table name |
+| Label | Key properties | Business description | Notes |
+|---|---|---|---|
+| `EDMEntity` | `name, description` | A logical business entity from the Enterprise Data Model | Logical entities from the Enterprise Data Model |
+| `BusinessTerm` | `name, definition` | A named business definition the organization agrees on | Human-readable definition, for example "Platinum Customer" |
+| `BusinessRule` | `name, expression, description` | The machine-evaluable logic that backs a term | Machine-evaluable logic behind a term |
+| `Policy` | `name, type` | A governance policy that scopes entities and rules | For example KYC Policy, Procurement Policy |
+| `Threshold` | `name, value, currency` | A parameter value a business term depends on | For example Materiality Threshold |
+| `DataSource` | `name, system, table` | The physical table a logical entity is stored in | Lineage target; `table` holds the real Unity Catalog table name |
 
 ## Relationships
 
 ### Instance layer
 
-| Relationship | Pattern | Notes |
-|---|---|---|
-| `HAS_INVOICE` | `(:Customer)-[:HAS_INVOICE]->(:Invoice)` | Payment behavior per customer |
-| `SETTLED_BY` | `(:Invoice)-[:SETTLED_BY]->(:Payment)` | Invoice settlement |
-| `BELONGS_TO` | `(:Customer)-[:BELONGS_TO]->(:BusinessUnit)` | Customer roll-up |
-| `RECOGNIZES` | `(:BusinessUnit)-[:RECOGNIZES]->(:RevenueEntry)` | Revenue recognition per unit |
-| `SUPPLIES` | `(:Supplier)-[:SUPPLIES]->(:BusinessUnit)` | Supply relationships |
-| `HAS_FINDING` | `(:Customer)-[:HAS_FINDING]->(:ComplianceFinding)` | Compliance exposure |
+| Relationship | Pattern | Business description | Notes |
+|---|---|---|---|
+| `HAS_INVOICE` | `(:Customer)-[:HAS_INVOICE]->(:Invoice)` | A customer was billed on this invoice | Payment behavior per customer |
+| `SETTLED_BY` | `(:Invoice)-[:SETTLED_BY]->(:Payment)` | This invoice was paid off by this payment | Invoice settlement |
+| `BELONGS_TO` | `(:Customer)-[:BELONGS_TO]->(:BusinessUnit)` | A customer account rolls up into this internal division | Customer roll-up |
+| `RECOGNIZES` | `(:BusinessUnit)-[:RECOGNIZES]->(:RevenueEntry)` | A division books this revenue entry | Revenue recognition per unit |
+| `SUPPLIES` | `(:Supplier)-[:SUPPLIES]->(:BusinessUnit)` | A supplier feeds this internal division | Supply relationships |
+| `HAS_FINDING` | `(:Customer)-[:HAS_FINDING]->(:ComplianceFinding)` | A customer has this compliance issue | Compliance exposure |
 
 ### Knowledge layer
 
-| Relationship | Pattern | Notes |
-|---|---|---|
-| `DEFINED_BY` | `(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)` | A term is backed by an explicit rule |
-| `EVALUATES` | `(:BusinessRule)-[:EVALUATES]->(:EDMEntity)` | The rule operates over EDM entities |
-| `CONSTRAINS` | `(:Policy)-[:CONSTRAINS]->(:EDMEntity)` | Policy scope |
-| `APPLIES_TO` | `(:Threshold)-[:APPLIES_TO]->(:BusinessTerm)` | Threshold that parameterizes a term |
-| `MAPS_TO` | `(:EDMEntity)-[:MAPS_TO]->(:DataSource)` | Lineage from logical entity to physical source; `DataSource.table` points at the real UC table |
+| Relationship | Pattern | Business description | Notes |
+|---|---|---|---|
+| `DEFINED_BY` | `(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)` | A business term is backed by this rule | A term is backed by an explicit rule |
+| `EVALUATES` | `(:BusinessRule)-[:EVALUATES]->(:EDMEntity)` | A rule operates over this logical entity | The rule operates over EDM entities |
+| `CONSTRAINS` | `(:Policy)-[:CONSTRAINS]->(:EDMEntity)` | A policy governs this logical entity | Policy scope, the entity a policy governs |
+| `GOVERNS` | `(:Policy)-[:GOVERNS]->(:BusinessRule)` | A policy operationalizes this rule | The rules a policy operationalizes, an explicit edge so rules are read directly rather than inferred from a shared entity. Procurement governs the High-Risk Supplier rule, Revenue Recognition the Unreconciled Revenue rule. KYC governs no rule: it is operationalized through `ComplianceFinding` records, and the Platinum, Strategic, and Risky Customer rules are commercial and credit definitions outside its scope |
+| `APPLIES_TO` | `(:Threshold)-[:APPLIES_TO]->(:BusinessTerm)` | A threshold parameterizes this term | Threshold that parameterizes a term |
+| `MAPS_TO` | `(:EDMEntity)-[:MAPS_TO]->(:DataSource)` | A logical entity is stored in this physical source | Lineage from logical entity to physical source; `DataSource.table` points at the real UC table |
 
 ### Cross-layer
 
-| Relationship | Pattern | Notes |
-|---|---|---|
-| `REALIZED_AS` | `(:EDMEntity)-[:REALIZED_AS]->(:Customer\|:Invoice)` | Logical entity to its physical instances. The demo realizes only the Customer and Invoice entities, the ones the six questions traverse: 100 Customer edges and 612 Invoice edges. |
-| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | Materialized classification with provenance; written back to the `classifications` Delta table |
+| Relationship | Pattern | Business description | Notes |
+|---|---|---|---|
+| `REALIZED_AS` | `(:EDMEntity)-[:REALIZED_AS]->(:Customer\|:Invoice)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The demo realizes only the Customer and Invoice entities, the ones the six questions traverse: 100 Customer edges and 612 Invoice edges. |
+| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with this business term | Materialized classification with provenance; written back to the `classifications` Delta table |
 
 The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be traced instance to business term to rule to EDM entity to data source, so Q6 can report which business definitions and data sources were used.
 
@@ -85,7 +90,7 @@ The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be trace
 Each node label and each relationship type loads from one CSV in `data/`. The seven instance node CSVs, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer and relationship CSVs stay graph-only.
 
 - Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `payments.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `edm_entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
-- Relationship CSVs: `has_invoice.csv`, `settled_by.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
+- Relationship CSVs: `has_invoice.csv`, `settled_by.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
 - Lakehouse-only CSV: `supplier_business_units.csv`, the camelCase bridge uploaded to UC but not loaded into Neo4j, where the `SUPPLIES` edge already carries the link.
 
 `classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`.

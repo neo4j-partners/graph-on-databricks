@@ -137,6 +137,19 @@ CONSTRAINS = [
     {"policy_id": "POL-03", "edm_entity_id": "EDM-06"},
 ]
 
+# A policy GOVERNS the business rules that operationalize it. This is an explicit
+# edge so an agent reads a policy's rules directly instead of inferring them from
+# a shared EDM entity: the KYC Policy and the Platinum, Strategic, and Risky
+# Customer rules all touch the Customer entity, but KYC does not operationalize
+# them. KYC is a compliance policy operationalized through ComplianceFinding
+# records, not a business rule, so it governs no rule here. Platinum and
+# Strategic are commercial segmentation definitions and Risky Customer is a
+# credit / AR signal; none are governed by a policy in this model.
+GOVERNS = [
+    {"policy_id": "POL-02", "rule_id": "RULE-03"},
+    {"policy_id": "POL-03", "rule_id": "RULE-05"},
+]
+
 APPLIES_TO = [
     {"threshold_id": "THR-01", "term_id": "TERM-05"},
     {"threshold_id": "THR-02", "term_id": "TERM-03"},
@@ -733,6 +746,7 @@ def main() -> None:
     write_csv("defined_by.csv", ["term_id", "rule_id"], DEFINED_BY)
     write_csv("evaluates.csv", ["rule_id", "edm_entity_id"], EVALUATES)
     write_csv("constrains.csv", ["policy_id", "edm_entity_id"], CONSTRAINS)
+    write_csv("governs.csv", ["policy_id", "rule_id"], GOVERNS)
     write_csv("applies_to.csv", ["threshold_id", "term_id"], APPLIES_TO)
     write_csv("maps_to.csv", ["edm_entity_id", "data_source_id"], MAPS_TO)
     write_csv("realized_as.csv", ["edm_entity_id", "instance_id", "instance_label"], realized_as)

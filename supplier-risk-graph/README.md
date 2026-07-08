@@ -66,7 +66,7 @@ Run these in order from this folder. Steps 1 and 2 need no live service; steps 3
 
 Quick check that the load worked, before you walk through anything live. Open Neo4j Browser on the demo database with the results pane set to Table view, then confirm:
 
-- **Counts:** `uv run load.py --check` reports 1433 nodes and 2219 relationships.
+- **Counts:** `uv run load.py --check` reports 1433 nodes and 2221 relationships.
 - **Q1:** 2 business units.
 - **Q2:** 6 customers.
 - **Q6:** 3 customers.
@@ -97,6 +97,8 @@ The first three questions are definition lookups. The threshold and the definiti
 
 #### Q1 — Unreconciled revenue above the materiality threshold, per business unit
 
+**Plain English:** "Which business units have enough unmatched revenue above the materiality threshold that we'd better take a look at? And what is the materiality threshold currently set as?"
+
 Sums unreconciled revenue per business unit and keeps only the units whose total exceeds the Materiality Threshold read from the Threshold node. Backed by rule RULE-05, term "Unreconciled Revenue" (TERM-05), and Threshold "Materiality Threshold" (THR-01, 100000 EUR). Facts come from the `revenue_entries` table via `RevenueEntry`.
 
 ```cypher
@@ -117,8 +119,11 @@ Expected: 2 units, BU-04 Asia Pacific (189924.86) and BU-02 Southern Europe (175
 
 #### Q2 — Customers with open KYC compliance findings
 
+**Plain English:** "Which customers have open KYC compliance findings that we still need to clear? And which policy defines what KYC covers?"
+
 - **What it does:** starts at the KYC Policy, walks to the Customer entity it constrains, follows that entity to the mirrored `Customer` instances, and keeps the ones with an open KYC finding.
 - **Backed by:** policy "KYC Policy" (POL-01), which CONSTRAINS the Customer entity (EDM-01).
+- **Scope note:** KYC constrains the Customer *entity* and is operationalized through `ComplianceFinding` records, not a business rule, so it `GOVERNS` no rule. The Platinum, Strategic Account, and Risky Customer rules also evaluate the Customer entity, but they are commercial and credit definitions, not part of the KYC policy. Read `(:Policy)-[:GOVERNS]->(:BusinessRule)` to see what a policy operationalizes rather than inferring it from the shared entity.
 - **Facts from:** `customers` and `compliance_findings`.
 - **Where the findings come from:** the compliance findings are synthetic demo data, not real regulatory filings. `generate_data.py` deterministically selects a 6-customer KYC cohort from a fixed seed, which includes the first at-risk strategic account, and gives each customer one or two findings of `type: KYC, status: open`. Those rows land in the `compliance_findings` table (DS-07), and the loader mirrors them into Neo4j as `ComplianceFinding` nodes linked to each customer by `HAS_FINDING`. The cohort is sized so Q2 returns exactly 6 customers.
 
@@ -136,6 +141,8 @@ Why the graph: the policy is connected to the data it governs, so the query star
 Expected: 6 customers, CUST-016, CUST-017, CUST-024, CUST-040, CUST-067, CUST-080.
 
 #### Q3 — Platinum customers ranked by upsell score
+
+**Plain English:** "Which of our platinum customers are the best bets to sell more to, ranked by upsell score? And how is a platinum customer defined?"
 
 Returns platinum-segment customers ordered by upsell score. Backed by term "Platinum Customer" (TERM-01) and rule RULE-01 (`customer.segment = 'platinum'`). Facts come from `customers`, including the derived `upsellScore` ML feature.
 
@@ -157,6 +164,8 @@ These three questions answer the deeper ask: not just "return the rows" but "exp
 
 #### Q4 — High-risk suppliers
 
+**Plain English:** "Which suppliers are risky enough that we should worry about relying on them? And what is the supplier risk threshold currently set as?"
+
 Reads the supplier risk threshold from the rule behind the High-Risk Supplier term, then returns suppliers at or above it. Backed by rule RULE-03 and term "High-Risk Supplier" (TERM-03); the threshold of 70 is stored on the rule and also as Threshold "Supplier Risk Threshold" (THR-02). Facts come from `suppliers`.
 
 ```cypher
@@ -175,6 +184,8 @@ Why the graph: the rule and its threshold are data, so procurement can change th
 Expected: 5 suppliers, SUP-024 (94), SUP-010 (90), SUP-003 (86), SUP-007 (85), SUP-001 (77).
 
 #### Q5 — Risky customers: more than 60 days late on each of their last 3 invoices
+
+**Plain English:** "Which customers have been more than the late-payment threshold days late on each of their last three invoices? And what is the late payment threshold currently set as?"
 
 For each customer, takes the three most recent invoices by issue date and keeps only customers whose all three are more than the Late Payment Threshold days late. Backed by rule RULE-04, term "Risky Customer" (TERM-04), and Threshold "Late Payment Threshold" (THR-03, 60). Facts come from `invoices`.
 
@@ -198,6 +209,8 @@ Why the graph: this is a per-customer, ordered, last-three-of-N pattern. It read
 Expected: 5 customers, CUST-015, CUST-020, CUST-036, CUST-067, CUST-091.
 
 #### Q6 — Strategic accounts at risk
+
+**Plain English:** "Which strategic accounts are at risk on every dimension — declining profitability, high churn risk, at least one overdue invoice, and at least one open compliance finding? And how is a strategic account defined?"
 
 A strategic account that is also trending down on every risk dimension: profitability declining, churn risk high, at least one overdue invoice, and at least one open compliance finding. Backed by term "Strategic Account" (TERM-02), whose `CLASSIFIED_AS` edges are pre-planted. Facts come from `customers`, `invoices`, and `compliance_findings`.
 
@@ -321,11 +334,11 @@ Genie is the consumer of what the graph produces, not a competing answer path.
 
 Asked in the Genie space, these return answers that line up with the Cypher results, because both read from the same governed definitions.
 
-- "Which customers are classified as risky, and why?" Genie reads `classifications` and returns the `reason`, including the GDS-sourced candidates.
-- "Which business units have the highest supplier risk exposure?" Genie reads `business_unit_exposure` and returns BU-03 at the top, matching the GDS result.
-- "List our platinum customers ranked by upsell score." Matches Q3.
-- "Which suppliers are high risk?" Genie reads the governed `classifications` labels rather than guessing a threshold.
-- "How many strategic accounts have an open compliance finding?" Genie joins `classifications` (term = Strategic Account) to `customers` on `entity_id = id`, then to `compliance_findings` on `customerId`.
+- "Which customers are classified as risky, and what rule or model classified them and why?" Genie reads `classifications` and returns the `source` and `reason`, including the GDS-sourced candidates.
+- "Which business units carry the highest supplier risk exposure, and what business rule categorizes them and why?" Genie reads `business_unit_exposure` and returns BU-03 at the top, matching the GDS result, with the exposure score as the reason.
+- "List our platinum customers ranked by upsell score, and what rule defines a platinum customer?" Matches Q3; Genie returns the ranking and the governed Platinum Customer label from `classifications`.
+- "Which suppliers are high risk, and what rule categorizes them as high-risk and why?" Genie reads the governed `classifications` labels and their `reason` rather than guessing a threshold.
+- "How many strategic accounts have an open compliance finding, and what rule classifies them as strategic accounts?" Genie joins `classifications` (term = Strategic Account) to `customers` on `entity_id = id`, then to `compliance_findings` on `customerId`, and returns the classification `reason`.
 
 ### Why the graph makes Genie better
 
@@ -375,7 +388,12 @@ Key relationships:
 - (:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule): the rule behind a term.
 - (:BusinessRule)-[:EVALUATES]->(:EDMEntity): what the rule operates on.
 - (:Threshold)-[:APPLIES_TO]->(:BusinessTerm): the number parameterizing a term.
-- (:Policy)-[:CONSTRAINS]->(:EDMEntity): policy scope.
+- (:Policy)-[:CONSTRAINS]->(:EDMEntity): policy scope, the entity a policy governs.
+- (:Policy)-[:GOVERNS]->(:BusinessRule): the rules a policy operationalizes. Read
+  this to find a policy's rules; do NOT infer them from a shared EDMEntity. The
+  KYC Policy constrains the Customer entity but governs no rule (it is
+  operationalized through ComplianceFinding records), even though the Platinum,
+  Strategic, and Risky Customer rules also evaluate the Customer entity.
 - (:EDMEntity)-[:MAPS_TO]->(:DataSource): lineage; DataSource.table is the real
   Unity Catalog table.
 - (:Customer|:Supplier)-[:CLASSIFIED_AS]->(:BusinessTerm): a classification. The
