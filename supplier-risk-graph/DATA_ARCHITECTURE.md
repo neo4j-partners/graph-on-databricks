@@ -6,7 +6,7 @@ The demo uses a dual data architecture. The Databricks lakehouse owns the data /
 
 ## Lakehouse Tables (Unity Catalog Delta)
 
-Instance-table columns are camelCase (the CSV headers load verbatim into both Neo4j and UC). The two graph-derived gold tables are snake_case, built from Cypher `RETURN` aliases.
+Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC. The two graph-derived gold tables are snake_case, built from Cypher `RETURN` aliases.
 
 | Table | Kind | Columns (key) | Notes |
 |---|---|---|---|

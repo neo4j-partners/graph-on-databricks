@@ -1,5 +1,7 @@
 # Finance Genie — Pipeline Architecture
 
+![Finance Genie data architecture](data-architecture.png)
+
 ## What this document covers
 
 This document describes the enrichment pipeline in `finance-genie/enrichment-pipeline/`. It covers each major stage, the configuration variables that control each stage, what those variables do and why they exist, and an honest assessment of what could be removed without losing the before/after GDS enrichment contrast at the center of the demo.

@@ -274,6 +274,9 @@ def normal_invoice(rng: random.Random, inv_id: str, customer_id: str) -> dict:
     issue = AS_OF - timedelta(days=rng.randint(20, 380))
     due = issue + timedelta(days=30)
     amount = round(rng.uniform(800, 45_000), 2)
+    # customer_id (snake_case) feeds the has_invoice relationship CSV; customerId
+    # (camelCase) is the foreign key written to the invoices node/UC table. The
+    # settled and overdue invoice builders below carry the same pair.
     row = {
         "id": inv_id,
         "customer_id": customer_id,

@@ -23,7 +23,7 @@ Two layers, tied together by two cross-layer edges:
 - **`REALIZED_AS`:** links a logical EDM entity to its physical instances.
 - **`CLASSIFIED_AS`:** records a classification with provenance.
 
-See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the data diagram and the full label, relationship, and property model. All property names are camelCase in both Neo4j and Unity Catalog, so the Cypher below runs unchanged.
+See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the data diagram and the full label, relationship, and property model. Graph properties and the instance tables use camelCase, so the Cypher below runs unchanged against either side. The two graph-derived gold tables, `classifications` and `business_unit_exposure`, are snake_case.
 
 
 
