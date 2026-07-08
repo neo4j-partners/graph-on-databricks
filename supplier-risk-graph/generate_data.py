@@ -277,6 +277,7 @@ def normal_invoice(rng: random.Random, inv_id: str, customer_id: str) -> dict:
     row = {
         "id": inv_id,
         "customer_id": customer_id,
+        "customerId": customer_id,
         "amount": amount,
         "currency": CURRENCY,
         "issueDate": issue.isoformat(),
@@ -306,6 +307,7 @@ def settled_invoice(rng: random.Random, inv_id: str, customer_id: str) -> dict:
     return {
         "id": inv_id,
         "customer_id": customer_id,
+        "customerId": customer_id,
         "amount": round(rng.uniform(800, 45_000), 2),
         "currency": CURRENCY,
         "issueDate": issue.isoformat(),
@@ -321,6 +323,7 @@ def overdue_invoice(rng: random.Random, inv_id: str, customer_id: str, days_late
     return {
         "id": inv_id,
         "customer_id": customer_id,
+        "customerId": customer_id,
         "amount": round(rng.uniform(800, 45_000), 2),
         "currency": CURRENCY,
         "issueDate": (due - timedelta(days=30)).isoformat(),
@@ -371,6 +374,7 @@ def make_payments(invoices: list[dict]) -> list[dict]:
             payments.append({
                 "id": f"PAY-{len(payments) + 1:04d}",
                 "invoice_id": invoice["id"],
+                "invoiceId": invoice["id"],
                 "amount": invoice["amount"],
                 "date": invoice["paidDate"],
             })
@@ -397,6 +401,7 @@ def make_revenue_entries(rng: random.Random) -> list[dict]:
         entries.append({
             "id": f"REV-{len(entries) + 1:04d}",
             "business_unit_id": bu_id,
+            "businessUnitId": bu_id,
             "period": period,
             "amount": round(amount, 2),
             "currency": CURRENCY,
@@ -423,6 +428,7 @@ def make_findings(rng: random.Random, customers: list[dict], cohorts: dict) -> l
         findings.append({
             "id": f"CF-{len(findings) + 1:03d}",
             "customer_id": customer_id,
+            "customerId": customer_id,
             "type": finding_type,
             "status": status,
             "openedDate": opened.isoformat(),
@@ -632,6 +638,12 @@ def main() -> None:
         {"customer_id": c["id"], "business_unit_id": rng.choice(BUSINESS_UNITS)["id"]}
         for c in customers
     ]
+    # Surface the customer's business unit as a foreign key on the node so the
+    # lakehouse table can join to business_units. Reuse the belongs_to draws so
+    # the rng sequence, and the frozen ground truth, stay unchanged.
+    bu_by_customer = {b["customer_id"]: b["business_unit_id"] for b in belongs_to}
+    for c in customers:
+        c["businessUnitId"] = bu_by_customer[c["id"]]
     supplies = make_supplies(rng, suppliers)
 
     # Pre-planted classifications only: Platinum Customer and Strategic Account.
@@ -674,17 +686,19 @@ def main() -> None:
 
     print("Node CSVs:")
     write_csv("customers.csv",
-              ["id", "name", "segment", "profitabilityTrend", "churnRisk", "upsellScore",
-               "avgDaysLate", "overdueShare"], customers)
+              ["id", "businessUnitId", "name", "segment", "profitabilityTrend", "churnRisk",
+               "upsellScore", "avgDaysLate", "overdueShare"], customers)
     write_csv("suppliers.csv", ["id", "name", "category", "riskScore"], suppliers)
     write_csv("business_units.csv", ["id", "name", "region"], BUSINESS_UNITS)
     write_csv("invoices.csv",
-              ["id", "amount", "currency", "issueDate", "dueDate", "paidDate", "daysLate", "status"],
+              ["id", "customerId", "amount", "currency", "issueDate", "dueDate", "paidDate",
+               "daysLate", "status"],
               invoices)
-    write_csv("payments.csv", ["id", "amount", "date"], payments)
+    write_csv("payments.csv", ["id", "invoiceId", "amount", "date"], payments)
     write_csv("revenue_entries.csv",
-              ["id", "period", "amount", "currency", "reconciled"], revenue_entries)
-    write_csv("compliance_findings.csv", ["id", "type", "status", "openedDate"], findings)
+              ["id", "businessUnitId", "period", "amount", "currency", "reconciled"], revenue_entries)
+    write_csv("compliance_findings.csv",
+              ["id", "customerId", "type", "status", "openedDate"], findings)
     write_csv("edm_entities.csv", ["id", "name", "description"], EDM_ENTITIES)
     write_csv("business_terms.csv", ["id", "name", "definition"], BUSINESS_TERMS)
     write_csv("business_rules.csv",
@@ -703,6 +717,12 @@ def main() -> None:
               [{"business_unit_id": r["business_unit_id"], "revenue_entry_id": r["id"]}
                for r in revenue_entries])
     write_csv("supplies.csv", ["supplier_id", "business_unit_id"], supplies)
+    # Bridge table for the lakehouse: the supplier-to-business-unit link is
+    # many-to-many, so it cannot live as a column on either node table. Uploaded
+    # to UC as `supplier_business_units` so Genie can join suppliers to units.
+    write_csv("supplier_business_units.csv", ["supplierId", "businessUnitId"],
+              [{"supplierId": s["supplier_id"], "businessUnitId": s["business_unit_id"]}
+               for s in supplies])
     write_csv("has_finding.csv", ["customer_id", "finding_id"],
               [{"customer_id": f["customer_id"], "finding_id": f["id"]} for f in findings])
     write_csv("classified_as.csv",

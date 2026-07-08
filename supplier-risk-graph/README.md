@@ -344,6 +344,102 @@ Expose the Neo4j instance as an MCP server and a supervisor agent can pair it wi
 
 An off-the-shelf Neo4j Cypher MCP server exposes read-only, parameterized Cypher as tools, so the MCP layer does not have to be built from scratch. Keep it read-only so the agent cannot mutate the graph.
 
+### What to put in the MCP server description
+
+The supervisor decides when to call the graph from the server description alone, so make it spell out the graph's job, its shape, and the provenance pattern. Paste the block below into the server or tool `description` field and adjust names to match your deployment.
+
+```text
+This server exposes a Neo4j knowledge graph for the supplier and customer risk
+domain. Use it to resolve governed business definitions and to explain the
+provenance behind an answer. Databricks Genie owns the raw facts and
+aggregations; this graph owns their meaning and lineage.
+
+Use this server to:
+- Resolve what a business term means before querying facts. Terms: Platinum
+  Customer, Strategic Account, High-Risk Supplier, Risky Customer, Unreconciled
+  Revenue.
+- Read a governed threshold value instead of assuming one. Thresholds:
+  Materiality Threshold, Supplier Risk Threshold, Late Payment Threshold.
+- Explain why a record was classified, tracing it to the rule, entity, and
+  source table behind it.
+- Answer policy, governance, and impact questions that span definitions.
+
+Do NOT use this server for large scans, counts, sums, or joins over the fact
+tables. Send those to Genie.
+
+Graph shape. Knowledge layer: EDMEntity, BusinessTerm, BusinessRule, Policy,
+Threshold, DataSource. Instance layer, a mirror of the lakehouse tables:
+Customer, Supplier, BusinessUnit, Invoice, Payment, RevenueEntry,
+ComplianceFinding.
+
+Key relationships:
+- (:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule): the rule behind a term.
+- (:BusinessRule)-[:EVALUATES]->(:EDMEntity): what the rule operates on.
+- (:Threshold)-[:APPLIES_TO]->(:BusinessTerm): the number parameterizing a term.
+- (:Policy)-[:CONSTRAINS]->(:EDMEntity): policy scope.
+- (:EDMEntity)-[:MAPS_TO]->(:DataSource): lineage; DataSource.table is the real
+  Unity Catalog table.
+- (:Customer|:Supplier)-[:CLASSIFIED_AS]->(:BusinessTerm): a classification. The
+  edge carries reason, source of 'rule' or 'gds', algorithm, and score.
+
+To explain any classification, walk:
+  instance -[:CLASSIFIED_AS]-> term -[:DEFINED_BY]-> rule
+           -[:EVALUATES]-> entity -[:MAPS_TO]-> dataSource
+Return the term, the reason on the edge, the rule expression, and
+DataSource.table.
+
+Conventions:
+- All properties are camelCase.
+- Node ids are stable prefixes: EDM-0x, TERM-0x, RULE-0x, POL-0x, THR-0x, DS-0x,
+  CUST-0xx, SUP-0xx, BU-0x.
+- The graph is read-only. Emit read Cypher only, and prefer parameters over
+  string interpolation.
+```
+
+### What to put in the Genie space description
+
+The supervisor routes fact and count questions to Genie, so its description has to say what Genie owns and, just as important, what it does not. Paste the block below into the Genie space instructions or the tool `description` the supervisor sees.
+
+```text
+This Genie space answers questions over the supplier and customer risk data in
+Unity Catalog schema supplier_risk. Use it for facts and for the governed labels
+the graph wrote back. The Neo4j graph owns definitions, relationships, and
+provenance; this space owns the numbers.
+
+Use this space to:
+- Return rows, counts, totals, and rankings from a single table: customers by
+  segment, suppliers by risk, invoices by status.
+- Read graph-derived labels from classifications and exposure scores from
+  business_unit_exposure. Prefer these governed tables over recomputing a
+  definition from raw columns.
+- Apply a threshold the graph already resolved. Pass the concrete value in the
+  question.
+
+Do NOT use this space to:
+- Invent what a business term means. If a question depends on material,
+  high-risk, risky, strategic, or platinum, resolve it in the graph first.
+- Join two instance tables to each other. The instance tables carry no
+  foreign-key columns, so relationships between them live only in the graph.
+  Route relationship and multi-hop questions there.
+
+Tables:
+- Instance tables, primary key id, camelCase columns: customers, suppliers,
+  business_units, invoices, payments, revenue_entries, compliance_findings.
+- classifications (gold, snake_case): entity_id, entity_type, term, source,
+  algorithm, score, reason, evaluated_at, rule_version. source is 'rule' or
+  'gds'; reason explains each label. Join entity_id back to a customer or
+  supplier id. Use this, not ad hoc heuristics, to decide who is a Risky
+  Customer, High-Risk Supplier, Strategic Account, or Platinum Customer.
+- business_unit_exposure (gold, snake_case): business_unit_id, name,
+  supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk.
+  Use supplier_exposure_score for aggregate exposure, not raw supplier scores.
+
+Conventions:
+- Instance-table columns are camelCase: riskScore, upsellScore, daysLate,
+  issueDate. The two gold tables are snake_case.
+- The primary key on every instance table is id.
+```
+
 ### Provenance the supervisor can explain
 
 For any answer it can walk the same chain the Q6 explanation query uses and cite each hop:
@@ -364,6 +460,18 @@ So the answer to Q2 is not just "6 customers". It is 6 customers because the KYC
 - **Rule versus model provenance:** `CLASSIFIED_AS` carries `source`, `algorithm`, `score`, and `reason`, so the agent can separate policy-flagged accounts from kNN-similar ones and explain each, including the GDS candidates no rule caught.
 - **Multi-hop the fact side finds awkward:** supplier to business unit to customer exposure paths and similarity neighborhoods, the Q4 exposure and Q5/Q6 kNN stories.
 - **Consistency check:** both layers derive from one source, so the supervisor can cross-check Genie's Delta counts against the graph's classification counts and flag drift as a self-verification step.
+
+### Sample supervisor questions
+
+Each of these needs both agents. The graph supplies the definition or the provenance; Genie supplies the facts. All counts were verified against the loaded Aura instance.
+
+- **"Which customers have open KYC findings, and why are they flagged?"** The graph resolves the KYC Policy scope and the provenance chain; Genie returns the finding rows. The answer names policy POL-01, the Customer entity EDM-01, and the `compliance_findings` table. Returns the 6 Q2 customers.
+- **"What does high-risk supplier mean, and who qualifies?"** The graph reads the definition and the Supplier Risk Threshold off RULE-03; Genie scans `suppliers` against that threshold. Meaning is resolved once, not guessed.
+- **"If we lower the Late Payment Threshold to 45 days, which terms, rules, and answers change?"** A pure graph traversal from THR-03 through `APPLIES_TO`, `DEFINED_BY`, and `EVALUATES` to the affected entities and tables. Impact analysis with no clean SQL equivalent.
+- **"Which policies govern customer data?"** The graph follows `CONSTRAINS` from each `Policy` to its `EDMEntity`, returning the KYC Policy over the Customer entity.
+- **"Who is classified as a Risky Customer, and was it a rule or the model?"** The graph reads `CLASSIFIED_AS` with its `source`, `algorithm`, `score`, and `reason`, separating the rule-flagged accounts from the 4 kNN-similar ones.
+- **"Show the full lineage behind CUST-019's Strategic Account label."** The graph walks instance to term to rule to entity to the `supplier_risk.customers` table, the Q6 explanation payoff.
+- **"Which business units carry the highest supplier-risk exposure?"** Genie reads `business_unit_exposure`; the graph explains that the score is the mean supplier risk over `SUPPLIES` edges, surfacing BU-03 that the flat rule misses.
 
 ### The dependency that keeps it honest
 
