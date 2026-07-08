@@ -1,31 +1,31 @@
 id,name,category,riskScore
-SUP-001,Ridgeline Equipment,ingredients,68
-SUP-002,Summit Ingredients,services,35
-SUP-003,Atlas Malt Supply,packaging,62
-SUP-004,Summit Cooling Systems,ingredients,26
-SUP-005,Summit Hops Co,equipment,52
-SUP-006,Ridgeline Packaging,packaging,46
-SUP-007,Fjord Malt Supply,equipment,24
-SUP-008,Juniper Glassworks,services,37
-SUP-009,Lumen Malt Supply,services,34
-SUP-010,Birch Transport,services,91
-SUP-011,Ridgeline Malt Supply,logistics,18
-SUP-012,Zephyr Equipment,equipment,44
-SUP-013,Iris Ingredients,services,33
-SUP-014,Pinnacle Cooling Systems,services,25
-SUP-015,Iris Malt Supply,equipment,23
-SUP-016,Quartz Cooling Systems,services,31
-SUP-017,Vector Transport,equipment,32
-SUP-018,Delta Packaging,packaging,42
-SUP-019,Atlas Hops Co,equipment,83
-SUP-020,Zephyr Malt Supply,equipment,43
-SUP-021,Harbor Labels,logistics,10
-SUP-022,Meridian Cooling Systems,packaging,76
-SUP-023,Harbor Cooling Systems,logistics,74
-SUP-024,Zephyr Cooling Systems,services,82
-SUP-025,Kestrel Ingredients,equipment,64
-SUP-026,Iris Glassworks,packaging,7
-SUP-027,Kestrel Glassworks,logistics,5
-SUP-028,Ridgeline Hops Co,equipment,51
-SUP-029,Harbor Equipment,ingredients,66
-SUP-030,Orchid Packaging,logistics,15
+SUP-001,Orchid Glassworks,equipment,77
+SUP-002,Pinnacle Logistics,packaging,67
+SUP-003,Iris Packaging,equipment,86
+SUP-004,Atlas Glassworks,packaging,29
+SUP-005,Tidal Glassworks,services,64
+SUP-006,Willow Hops Co,services,13
+SUP-007,Lumen Glassworks,ingredients,85
+SUP-008,Pinnacle Labels,equipment,20
+SUP-009,Umber Hops Co,services,61
+SUP-010,Summit Ingredients,services,90
+SUP-011,Atlas Ingredients,ingredients,14
+SUP-012,Meridian Cooling Systems,ingredients,39
+SUP-013,Kestrel Cooling Systems,equipment,46
+SUP-014,Vector Logistics,packaging,11
+SUP-015,Zephyr Logistics,equipment,65
+SUP-016,Orchid Malt Supply,packaging,6
+SUP-017,Lumen Ingredients,ingredients,18
+SUP-018,Willow Cooling Systems,logistics,23
+SUP-019,Ember Malt Supply,equipment,22
+SUP-020,Tidal Malt Supply,logistics,31
+SUP-021,Willow Malt Supply,packaging,10
+SUP-022,Meridian Packaging,equipment,49
+SUP-023,Lumen Equipment,logistics,51
+SUP-024,Granite Labels,logistics,94
+SUP-025,Tidal Logistics,equipment,9
+SUP-026,Granite Glassworks,logistics,19
+SUP-027,Vector Equipment,equipment,40
+SUP-028,Quartz Glassworks,logistics,26
+SUP-029,Harbor Malt Supply,ingredients,25
+SUP-030,Tidal Labels,equipment,34

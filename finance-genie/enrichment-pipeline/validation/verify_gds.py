@@ -27,7 +27,7 @@ from pathlib import Path
 from graphdatascience import GraphDataScience
 from neo4j.exceptions import AuthError, ServiceUnavailable
 
-from _common import fail, header, load_env, ok
+from _common import fail, header, load_env, ok, warn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "jobs"))
 from _gold_constants import (  # noqa: E402
@@ -48,6 +48,9 @@ MAX_COMMUNITIES_OK = 500
 
 # Must match the degreeCutoff used in run_gds.py.
 NODESIM_DEGREE_CUTOFF = 5
+
+# Must match KYC_BUSINESS_TERM in run_gds.py.
+KYC_BUSINESS_TERM = "Shared Identity Ring"
 
 # Summary table column widths
 _LABEL_W = 38
@@ -445,6 +448,249 @@ def check_ring_candidate_precision(
     return [], f"precision={precision:.1%}  (warn below {_PRECISION_WARN:.0%})  [diagnostic only]"
 
 
+def check_kyc_identity(gds: GraphDataScience, kyc: dict) -> tuple[list[str], str]:
+    """Verify graph identity resolution against the kyc_story_ring ground truth.
+
+    The story ring must resolve to one WCC identity cluster containing exactly
+    its 8 accounts, its shared counts must match the planted phone and address
+    groups, and zero background accounts may show any shared-identity signal.
+    """
+    problems: list[str] = []
+    story_ids = [int(a) for a in kyc["account_ids"]]
+
+    # Expected per-account counts derived from the planted groups: each member
+    # shares its identifier with (group size - 1) other customers.
+    expected_phone = {a: 0 for a in story_ids}
+    for ids in kyc["shared_phones"].values():
+        for a in ids:
+            expected_phone[int(a)] = len(ids) - 1
+    expected_address = {a: 0 for a in story_ids}
+    for ids in kyc["shared_address"].values():
+        for a in ids:
+            expected_address[int(a)] = len(ids) - 1
+
+    coverage = gds.run_cypher(
+        """
+        MATCH (a:Account)
+        RETURN count(a) AS total,
+               count(a.identity_cluster_id)   AS has_cid,
+               count(a.identity_cluster_size) AS has_size,
+               count(a.shared_phone_count)    AS has_phone,
+               count(a.shared_address_count)  AS has_address
+        """
+    ).iloc[0]
+    total = int(coverage["total"])
+    print(
+        f"      {total:,} accounts | identity_cluster_id={int(coverage['has_cid']):,}  "
+        f"identity_cluster_size={int(coverage['has_size']):,}  "
+        f"shared_phone_count={int(coverage['has_phone']):,}  "
+        f"shared_address_count={int(coverage['has_address']):,}"
+    )
+    for name, label in (
+        ("has_cid", "identity_cluster_id"),
+        ("has_size", "identity_cluster_size"),
+        ("has_phone", "shared_phone_count"),
+        ("has_address", "shared_address_count"),
+    ):
+        if int(coverage[name]) < total:
+            problems.append(
+                f"{label} set on only {int(coverage[name]):,}/{total:,} accounts"
+            )
+    if problems:
+        return problems, "identity properties missing"
+
+    cids = gds.run_cypher(
+        """
+        MATCH (a:Account) WHERE a.account_id IN $ids
+        RETURN collect(DISTINCT a.identity_cluster_id) AS cids
+        """,
+        params={"ids": story_ids},
+    ).iloc[0]["cids"]
+    if len(cids) != 1:
+        problems.append(
+            f"story ring spans {len(cids)} identity clusters, expected 1: {cids}"
+        )
+        return problems, f"{len(cids)} clusters for story ring"
+
+    cluster_members = gds.run_cypher(
+        """
+        MATCH (a:Account) WHERE a.identity_cluster_id = $cid
+        RETURN collect(a.account_id) AS ids
+        """,
+        params={"cid": int(cids[0])},
+    ).iloc[0]["ids"]
+    member_set = {int(a) for a in cluster_members}
+    print(
+        f"      story cluster {int(cids[0])}: {len(member_set)} accounts "
+        f"(expected {len(story_ids)})"
+    )
+    if member_set != set(story_ids):
+        problems.append(
+            f"story identity cluster is {sorted(member_set)}, "
+            f"expected exactly {sorted(story_ids)}"
+        )
+
+    wrong_size = gds.run_cypher(
+        """
+        MATCH (a:Account)
+        WHERE a.account_id IN $ids AND a.identity_cluster_size <> $n
+        RETURN count(a) AS n
+        """,
+        params={"ids": story_ids, "n": len(story_ids)},
+    ).iloc[0]["n"]
+    if int(wrong_size):
+        problems.append(
+            f"{int(wrong_size)} story accounts have identity_cluster_size != "
+            f"{len(story_ids)}"
+        )
+
+    background_shared = gds.run_cypher(
+        """
+        MATCH (a:Account)
+        WHERE NOT a.account_id IN $ids
+          AND (a.identity_cluster_size > 1
+               OR a.shared_phone_count > 0
+               OR a.shared_address_count > 0)
+        RETURN count(a) AS n
+        """,
+        params={"ids": story_ids},
+    ).iloc[0]["n"]
+    print(
+        f"      background accounts with any shared-identity signal: "
+        f"{int(background_shared):,}"
+    )
+    if int(background_shared):
+        problems.append(
+            f"{int(background_shared):,} background accounts show shared-identity "
+            f"signal — background data contaminated the story ring"
+        )
+
+    counts = gds.run_cypher(
+        """
+        MATCH (a:Account) WHERE a.account_id IN $ids
+        RETURN a.account_id AS id,
+               a.shared_phone_count AS spc,
+               a.shared_address_count AS sac
+        """,
+        params={"ids": story_ids},
+    )
+    mismatches = [
+        f"account {int(r['id'])}: phone {int(r['spc'])} "
+        f"(want {expected_phone[int(r['id'])]}), address {int(r['sac'])} "
+        f"(want {expected_address[int(r['id'])]})"
+        for _, r in counts.iterrows()
+        if int(r["spc"]) != expected_phone[int(r["id"])]
+        or int(r["sac"]) != expected_address[int(r["id"])]
+    ]
+    print(
+        f"      shared counts match ground truth on "
+        f"{len(story_ids) - len(mismatches)}/{len(story_ids)} story accounts"
+    )
+    for m in mismatches:
+        problems.append(f"shared count mismatch — {m}")
+
+    detail = (
+        f"cluster of {len(member_set)}/{len(story_ids)}, background clean"
+        if not problems
+        else f"{len(problems)} identity problem(s)"
+    )
+    return problems, detail
+
+
+def check_kyc_provenance(gds: GraphDataScience, kyc: dict) -> tuple[list[str], str]:
+    """Verify the knowledge layer makes a KYC violation explainable as a traversal.
+
+    The 8 story-ring customers — owners of the 8 ground-truth accounts, mapped
+    via OWNS — must each be CLASSIFIED_AS 'Shared Identity Ring' and no
+    background customer may be. The explain path must resolve end to end:
+    (:Customer)-[:CLASSIFIED_AS]->(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)
+    plus (:BusinessTerm)-[:GOVERNED_BY]->(:Policy) and
+    (:BusinessRule)-[:DERIVED_FROM]->(:DataSource).
+    """
+    problems: list[str] = []
+    story_ids = [int(a) for a in kyc["account_ids"]]
+
+    # Story accounts map to their owning customers via OWNS.
+    owners = gds.run_cypher(
+        """
+        MATCH (c:Customer)-[:OWNS]->(a:Account)
+        WHERE a.account_id IN $ids
+        RETURN collect(DISTINCT c.customer_id) AS ids
+        """,
+        params={"ids": story_ids},
+    ).iloc[0]["ids"]
+    story_owner_ids = {int(c) for c in owners}
+    print(
+        f"      story ring: {len(story_ids)} accounts owned by "
+        f"{len(story_owner_ids)} customers"
+    )
+    if len(story_owner_ids) != len(story_ids):
+        problems.append(
+            f"{len(story_ids)} story accounts map to {len(story_owner_ids)} "
+            f"owning customers, expected {len(story_ids)}"
+        )
+
+    classified = gds.run_cypher(
+        """
+        MATCH (c:Customer)-[:CLASSIFIED_AS]->(:BusinessTerm {name: $term})
+        RETURN collect(DISTINCT c.customer_id) AS ids
+        """,
+        params={"term": KYC_BUSINESS_TERM},
+    ).iloc[0]["ids"]
+    classified_ids = {int(c) for c in classified}
+    story_classified = classified_ids & story_owner_ids
+    background_classified = classified_ids - story_owner_ids
+    print(
+        f"      CLASSIFIED_AS '{KYC_BUSINESS_TERM}': {len(classified_ids)} customers "
+        f"({len(story_classified)} story, {len(background_classified)} background)"
+    )
+    missing = story_owner_ids - classified_ids
+    if missing:
+        problems.append(
+            f"{len(missing)} story-ring customers are not CLASSIFIED_AS "
+            f"'{KYC_BUSINESS_TERM}'"
+        )
+    if background_classified:
+        problems.append(
+            f"{len(background_classified)} background customers are CLASSIFIED_AS "
+            f"'{KYC_BUSINESS_TERM}' — expected 0"
+        )
+
+    # The provenance path from the term back to the policy and data sources.
+    path = gds.run_cypher(
+        """
+        MATCH (term:BusinessTerm {name: $term})
+        RETURN count { (term)-[:GOVERNED_BY]->(:Policy) }      AS policy,
+               count { (term)-[:DEFINED_BY]->(:BusinessRule) } AS rule,
+               count { (term)-[:DEFINED_BY]->(:BusinessRule)
+                             -[:DERIVED_FROM]->(:DataSource) } AS sources
+        """,
+        params={"term": KYC_BUSINESS_TERM},
+    ).iloc[0]
+    n_policy = int(path["policy"])
+    n_rule = int(path["rule"])
+    n_sources = int(path["sources"])
+    print(
+        f"      explain path: GOVERNED_BY :Policy={n_policy}  "
+        f"DEFINED_BY :BusinessRule={n_rule}  "
+        f"DERIVED_FROM :DataSource={n_sources}"
+    )
+    if n_policy < 1:
+        problems.append("BusinessTerm has no GOVERNED_BY edge to a :Policy")
+    if n_rule < 1:
+        problems.append("BusinessTerm has no DEFINED_BY edge to a :BusinessRule")
+    if n_sources < 1:
+        problems.append("BusinessRule has no DERIVED_FROM edge to a :DataSource")
+
+    detail = (
+        f"{len(story_classified)}/{len(story_ids)} story classified, "
+        f"{len(background_classified)} background, path resolves"
+        if not problems
+        else f"{len(problems)} provenance problem(s)"
+    )
+    return problems, detail
+
+
 def print_summary(results: list[tuple[str, list[str], str]]) -> list[str]:
     W = 62
     all_problems: list[str] = []
@@ -479,6 +725,9 @@ def main() -> None:
     gt = load_ground_truth(script_dir)
     rings = gt["rings"]
     fraud_ids = [int(a) for r in rings for a in r["account_ids"]]
+    kyc_story = gt.get("kyc_story_ring")
+    if not kyc_story:
+        fail("kyc_story_ring missing from ground_truth.json — regenerate the data layer")
     ok(f"ground_truth.json loaded: {len(rings)} rings, {len(fraud_ids):,} fraud accounts")
 
     uri = os.environ["NEO4J_URI"]
@@ -490,33 +739,41 @@ def main() -> None:
     try:
         results: list[tuple[str, list[str], str]] = []
 
-        header("[1/7] Feature completeness")
+        header("[1/9] Feature completeness")
         problems, detail = check_feature_completeness(gds)
-        results.append(("[1/7] Feature completeness", problems, detail))
+        results.append(("[1/9] Feature completeness", problems, detail))
 
-        header("[2/7] PageRank (risk_score)")
+        header("[2/9] PageRank (risk_score)")
         problems, detail = check_pagerank(gds, fraud_ids)
-        results.append(("[2/7] PageRank (risk_score)", problems, detail))
+        results.append(("[2/9] PageRank (risk_score)", problems, detail))
 
-        header("[3/7] Betweenness (betweenness_centrality)")
+        header("[3/9] Betweenness (betweenness_centrality)")
         problems, detail = check_betweenness(gds, fraud_ids)
-        results.append(("[3/7] Betweenness", problems, detail))
+        results.append(("[3/9] Betweenness", problems, detail))
 
-        header("[4/7] Louvain (community_id) — per-ring coverage")
+        header("[4/9] Louvain (community_id) — per-ring coverage")
         problems, detail = check_louvain_per_ring(gds, rings)
-        results.append(("[4/7] Louvain (community_id)", problems, detail))
+        results.append(("[4/9] Louvain (community_id)", problems, detail))
 
-        header("[5/7] Node Similarity (similarity_score)")
+        header("[5/9] Node Similarity (similarity_score)")
         problems, detail = check_similarity(gds, fraud_ids)
-        results.append(("[5/7] Node Similarity", problems, detail))
+        results.append(("[5/9] Node Similarity", problems, detail))
 
-        header("[6/7] Ring-member NodeSim exclusion (degreeCutoff)")
+        header("[6/9] Ring-member NodeSim exclusion (degreeCutoff)")
         problems, detail = check_ring_member_nodesim_exclusion(gds, fraud_ids)
-        results.append(("[6/7] Ring-member exclusion", problems, detail))
+        results.append(("[6/9] Ring-member exclusion", problems, detail))
 
-        header("[7/7] Ring-candidate population precision (diagnostic)")
+        header("[7/9] Ring-candidate population precision (diagnostic)")
         problems, detail = check_ring_candidate_precision(gds, rings, fraud_ids)
-        results.append(("[7/7] Ring-candidate precision", problems, detail))
+        results.append(("[7/9] Ring-candidate precision", problems, detail))
+
+        header("[8/9] KYC identity resolution (WCC + shared counts)")
+        problems, detail = check_kyc_identity(gds, kyc_story)
+        results.append(("[8/9] KYC identity resolution", problems, detail))
+
+        header("[9/9] KYC provenance (knowledge layer)")
+        problems, detail = check_kyc_provenance(gds, kyc_story)
+        results.append(("[9/9] KYC provenance", problems, detail))
 
         all_problems = print_summary(results)
         if all_problems:

@@ -9,15 +9,19 @@
 # ///
 """Official one-shot GDS setup for the graph-fraud-analyst Databricks App.
 
-Run this once after ingesting account data into Aura. It writes the four
-node properties the deployed app reads via live Cypher:
+Run this once after ingesting account data into Aura. It writes the node
+properties the deployed app and the gold pull read via live Cypher:
 
     :Account.risk_score              (PageRank)
     :Account.community_id            (Louvain)
     :Account.betweenness_centrality  (Betweenness, sampled)
     :Account.similarity_score        (max JACCARD over :SIMILAR_TO)
+    :Account.identity_cluster_id     (WCC over the customer identity graph)
+    :Account.identity_cluster_size   (customers per identity cluster)
+    :Account.shared_phone_count      (other customers sharing the holder phone)
+    :Account.shared_address_count    (other customers sharing the holder address)
 
-By default the script is idempotent: if the four properties already exist and
+By default the script is idempotent: if these properties already exist and
 are populated on every :Account node, it exits 0 with a no-op message. Pass
 --force to recompute and overwrite.
 
@@ -53,6 +57,10 @@ REQUIRED_PROPERTIES = (
     "community_id",
     "betweenness_centrality",
     "similarity_score",
+    "identity_cluster_id",
+    "identity_cluster_size",
+    "shared_phone_count",
+    "shared_address_count",
 )
 
 
@@ -64,7 +72,11 @@ def _account_property_coverage(driver) -> dict[str, int]:
            count(a.risk_score)            AS risk_score,
            count(a.community_id)          AS community_id,
            count(a.betweenness_centrality) AS betweenness_centrality,
-           count(a.similarity_score)      AS similarity_score
+           count(a.similarity_score)      AS similarity_score,
+           count(a.identity_cluster_id)   AS identity_cluster_id,
+           count(a.identity_cluster_size) AS identity_cluster_size,
+           count(a.shared_phone_count)    AS shared_phone_count,
+           count(a.shared_address_count)  AS shared_address_count
     """
     with driver.session() as s:
         return dict(s.run(cypher).single())

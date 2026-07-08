@@ -159,7 +159,6 @@ def make_customers(rng: random.Random) -> tuple[list[dict], dict[str, list[str]]
         + ["silver"] * (N_CUSTOMERS - N_PLATINUM - N_GOLD)
     )
     rng.shuffle(segments)
-    upsell_scores = rng.sample(range(101), N_CUSTOMERS)
 
     customers = []
     for i in range(N_CUSTOMERS):
@@ -169,7 +168,6 @@ def make_customers(rng: random.Random) -> tuple[list[dict], dict[str, list[str]]
             "segment": segments[i],
             "profitabilityTrend": rng.choice(["improving", "stable", "declining"]),
             "churnRisk": rng.choice(["low", "medium", "high"]),
-            "upsellScore": upsell_scores[i],
         })
 
     by_id = {c["id"]: c for c in customers}
@@ -181,12 +179,14 @@ def make_customers(rng: random.Random) -> tuple[list[dict], dict[str, list[str]]
     kyc_pool = [cid for cid in non_strategic if cid not in risky]
     kyc = [at_risk[0]] + rng.sample(kyc_pool, N_KYC_VIOLATORS - 1)
 
-    # Give the top three upsell scores to platinum customers so Q3 has clear stars.
-    stars = rng.sample(platinum, 3)
-    top_holders = sorted(customers, key=lambda c: c["upsellScore"], reverse=True)[:3]
-    for star_id, holder in zip(stars, top_holders):
-        star = by_id[star_id]
-        star["upsellScore"], holder["upsellScore"] = holder["upsellScore"], star["upsellScore"]
+    # Deal the upsell scores: the three highest go to platinum customers so Q3
+    # has clear stars, the rest are shuffled across everyone else.
+    stars = set(rng.sample(platinum, 3))
+    scores = sorted(rng.sample(range(101), N_CUSTOMERS), reverse=True)
+    top, rest = scores[:3], scores[3:]
+    rng.shuffle(rest)
+    for customer in customers:
+        customer["upsellScore"] = top.pop() if customer["id"] in stars else rest.pop()
 
     # Q6: at-risk strategic accounts hit every condition; the rest must miss one,
     # so pin their trend away from 'declining'.
@@ -632,13 +632,15 @@ def check_planted_gds(gds: dict, cohorts: dict) -> None:
     assert {r["customer_id"] for r in gds["similarity"]} == set(cohorts["similar"])
 
 
-def check_planted(answers: dict, cohorts: dict) -> None:
+def check_planted(answers: dict, cohorts: dict, customers: list[dict]) -> None:
     """Fail fast if the recomputed answers drift from the planted cohorts."""
     assert {r["business_unit_id"] for r in answers["q1"]} == set(UNRECONCILED_BUS)
     assert {r["customer_id"] for r in answers["q2"]} == set(cohorts["kyc"])
     assert {r["customer_id"] for r in answers["q3"]} == set(cohorts["platinum"])
     scores = [r["upsellScore"] for r in answers["q3"]]
     assert len(scores) == len(set(scores)), "upsell scores must be distinct"
+    top_three = sorted(customers, key=lambda c: c["upsellScore"], reverse=True)[:3]
+    assert all(c["segment"] == "platinum" for c in top_three), "top-3 upsell must be platinum"
     assert len(answers["q4"]) == N_HIGH_RISK_SUPPLIERS
     assert {r["customer_id"] for r in answers["q5"]} == set(cohorts["risky"])
     assert {r["customer_id"] for r in answers["q6"]} == set(cohorts["at_risk"])
@@ -705,7 +707,7 @@ def main() -> None:
     answers = evaluate_questions(
         customers, suppliers, invoices, revenue_entries, findings, classified_as
     )
-    check_planted(answers, cohorts)
+    check_planted(answers, cohorts, customers)
     gds = evaluate_gds(customers, suppliers, supplies, cohorts)
     check_planted_gds(gds, cohorts)
 

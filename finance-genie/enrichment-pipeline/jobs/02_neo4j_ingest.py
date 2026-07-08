@@ -56,9 +56,10 @@ spark.sql(f"USE SCHEMA `{SCHEMA}`")
 # --------------------------------------------------------------------------- #
 gds = GraphDataScience(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 # Batch the wipe so it fits in memory on small Aura tiers. A single
-# unbatched DETACH DELETE of ~32k nodes + ~470k rels can trip
-# TransactionOutOfMemoryError. CALL ... IN TRANSACTIONS is auto-commit only,
-# which is what gds.run_cypher's session.run provides.
+# unbatched DETACH DELETE of ~107k nodes + ~550k rels (accounts, merchants,
+# and the customer identity layer) can trip TransactionOutOfMemoryError.
+# CALL ... IN TRANSACTIONS is auto-commit only, which is what
+# gds.run_cypher's session.run provides.
 gds.run_cypher(
     "MATCH (n) CALL { WITH n DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS"
 )
@@ -137,6 +138,26 @@ gds.run_cypher("""
     CREATE CONSTRAINT address_address_unique IF NOT EXISTS
     FOR (a:Address) REQUIRE a.address IS UNIQUE
 """)
+# Knowledge-layer keys. The Policy/BusinessTerm/BusinessRule/DataSource nodes
+# themselves are created by validation/run_gds.py so classification and
+# provenance are written together; their uniqueness constraints live here
+# alongside the other node keys.
+gds.run_cypher("""
+    CREATE CONSTRAINT policy_id_unique IF NOT EXISTS
+    FOR (p:Policy) REQUIRE p.policy_id IS UNIQUE
+""")
+gds.run_cypher("""
+    CREATE CONSTRAINT business_term_name_unique IF NOT EXISTS
+    FOR (t:BusinessTerm) REQUIRE t.name IS UNIQUE
+""")
+gds.run_cypher("""
+    CREATE CONSTRAINT business_rule_id_unique IF NOT EXISTS
+    FOR (r:BusinessRule) REQUIRE r.rule_id IS UNIQUE
+""")
+gds.run_cypher("""
+    CREATE CONSTRAINT data_source_name_unique IF NOT EXISTS
+    FOR (d:DataSource) REQUIRE d.name IS UNIQUE
+""")
 print("Indexes ready.")
 
 # --------------------------------------------------------------------------- #
@@ -198,10 +219,13 @@ print("OWNS relationships written.")
 # --------------------------------------------------------------------------- #
 # 12. Write HAS_PHONE relationships (Customer -> Phone)                        #
 #     target.save.mode Overwrite MERGEs :Phone on number, so customers        #
-#     sharing a phone converge on a single node.                              #
+#     sharing a phone converge on a single node. coalesce(1) serializes the   #
+#     write: two partitions MERGEing the same shared value concurrently race  #
+#     on node creation and one dies on the uniqueness constraint.             #
 # --------------------------------------------------------------------------- #
 (
     customers_df.select("customer_id", "phone")
+    .coalesce(1)
     .write.format("org.neo4j.spark.DataSource")
     .mode("Overwrite")
     .options(**NEO4J_OPTS)
@@ -218,9 +242,11 @@ print("HAS_PHONE relationships written.")
 
 # --------------------------------------------------------------------------- #
 # 13. Write HAS_ADDRESS relationships (Customer -> Address)                    #
+#     coalesce(1) for the same shared-target MERGE race as HAS_PHONE.         #
 # --------------------------------------------------------------------------- #
 (
     customers_df.select("customer_id", "address")
+    .coalesce(1)
     .write.format("org.neo4j.spark.DataSource")
     .mode("Overwrite")
     .options(**NEO4J_OPTS)

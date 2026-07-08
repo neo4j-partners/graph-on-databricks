@@ -8,10 +8,10 @@ The original plan computed shared-identity counts with Spark window functions du
 |-----------|--------|-------|
 | 1. Identity attributes in background data | Done, unchanged | `customers.csv` with 25,000 rows; all five pre-existing CSVs byte-identical |
 | 2. One named KYC story ring | Done, unchanged | 8 accounts inside fraud ring 0 share phones 312-555-0142 / 312-555-0143 with 4 accounts each, plus one address spanning both phone groups; recorded under `kyc_story_ring` in `ground_truth.json` |
-| 3. Gold columns computed in Spark | Superseded | The window-function logic in `03_pull_gold_tables.py` was never deployed and will be removed; the two gold columns survive but will be graph-derived |
-| 4. Identity layer in Neo4j | To do | `Customer`, `Phone`, `Address` nodes ingested in `02_neo4j_ingest.py` |
-| 5. GDS identity resolution + verification | To do | WCC over the identity graph in `validation/run_gds.py`, new checks in `validation/verify_gds.py` |
-| 6. Gold write-back from the graph | To do | `03_pull_gold_tables.py` reads the KYC columns from Neo4j exactly like `risk_score` and `community_id` |
+| 3. Gold columns computed in Spark | Superseded | The window-function logic in `03_pull_gold_tables.py` was never deployed and has been removed; the two gold columns survive but are graph-derived |
+| 4. Identity layer in Neo4j | Done, not deployed | `Customer`, `Phone`, `Address` nodes ingested in `02_neo4j_ingest.py` |
+| 5. GDS identity resolution + verification | Done, not deployed | WCC over the identity graph in `validation/run_gds.py`, new checks in `validation/verify_gds.py` |
+| 6. Gold write-back from the graph | Done, not deployed | `03_pull_gold_tables.py` reads the KYC columns from Neo4j exactly like `risk_score` and `community_id` |
 | 7. Knowledge-layer provenance | Optional, deferred | `Policy` / `BusinessTerm` / `CLASSIFIED_AS` edges; converges with the supplier-risk-graph two-layer pattern |
 
 Deployed state as of the pivot: the silver `customers` table is live in Unity Catalog with 25,000 rows, loaded 2026-07-07. The deployed `gold_accounts` still predates all KYC work, last written June 18. Nothing has to be unwound; the Spark KYC logic never shipped.
@@ -117,7 +117,7 @@ The GDS run writes `CLASSIFIED_AS` edges when it flags a cluster, so the answer 
 
 ## Deployment steps
 
-Silver is already deployed, so steps 2 through 6 do not need to run again. Do not run `./upload_and_create_tables.sh` standalone either, since step 5 is that script and running it twice double-loads every silver table. After implementing increments 4 through 6, run from `enrichment-pipeline/`:
+Increments 4 through 6 are implemented and compile clean, but nothing is deployed: the cluster still runs the pre-KYC copies of the job scripts, and the Aura graph has no identity layer. Silver is already deployed, so steps 2 through 6 do not need to run again. Do not run `./upload_and_create_tables.sh` standalone either, since step 5 is that script and running it twice double-loads every silver table. Run from `enrichment-pipeline/`:
 
 ```bash
 # Step 8: upload job scripts; cli upload --all also ships sql/gold_schema.sql,
@@ -132,11 +132,19 @@ PIPELINE_START_STEP=10 PIPELINE_STOP_STEP=14 ./run_existing_data_pipeline.py
 PIPELINE_START_STEP=16 ./run_existing_data_pipeline.py
 ```
 
+What each step now does:
+
+- Step 10 wipes Neo4j and re-ingests everything, adding `Customer`, `Phone`, and `Address` nodes with `OWNS` / `HAS_PHONE` / `HAS_ADDRESS` relationships and uniqueness constraints.
+- Step 11 runs the existing transfer-graph pipeline, then projects the identity graph, runs WCC, and writes `identity_cluster_id`, `identity_cluster_size`, `shared_phone_count`, and `shared_address_count` to customers and their accounts. Its sanity check fails fast with a clear message if step 10 has not loaded the identity layer.
+- Step 12 gates the run with the new check `[8/8] KYC identity resolution`: the story ring must resolve to one WCC cluster of exactly the 8 ground-truth accounts, shared counts must match the planted groups, and zero background accounts may show any shared-identity signal.
+- Step 13 writes `gold_accounts` at 25 columns, with all four KYC columns read from Neo4j `:Account` nodes.
+
 Notes:
 
 - Step 8 is mandatory before step 13; without it the cluster runs the stale copy of `03_pull_gold_tables.py`.
 - The gold validator in step 14 selects specific existing columns, so the new columns do not affect it.
 - `require_existing_data()` runs on every invocation and requires `customers.csv`, which is already generated.
+- `setup/run_gds.py` now requires all eight `:Account` properties before declaring a no-op, so it recomputes automatically on a graph enriched before the KYC pivot.
 
 ## What we take from the demostack
 

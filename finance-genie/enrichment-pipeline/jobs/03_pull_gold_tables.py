@@ -6,8 +6,8 @@ match in phase 11e.
 
 Writes three tables into `graph-on-databricks.graph-enriched-schema`:
   gold_accounts                   account metadata + GDS features + community
-                                  aggregates + KYC shared-identity counts +
-                                  fraud_risk_tier (22 cols)
+                                  aggregates + graph-derived KYC identity
+                                  columns + fraud_risk_tier (25 cols)
   gold_account_similarity_pairs   pair-level similarity + same_community flag
   gold_fraud_ring_communities     per-community summary for ring-level queries
 
@@ -123,6 +123,10 @@ def main() -> None:
             F.col("betweenness_centrality").cast("double"),
             F.col("community_id").cast("long"),
             F.col("similarity_score").cast("double"),
+            F.col("shared_phone_count").cast("long"),
+            F.col("shared_address_count").cast("long"),
+            F.col("identity_cluster_id").cast("long"),
+            F.col("identity_cluster_size").cast("long"),
         )
         .cache()
     )
@@ -131,10 +135,11 @@ def main() -> None:
     # ----------------------------------------------------------------------- #
     # Build gold_accounts with community aggregates + fraud_risk_tier          #
     #                                                                           #
-    # Targeted fillna on inbound_transfer_events only — leaving community_id,  #
-    # risk_score, and similarity_score null for unscored accounts is            #
-    # intentional: a blanket fillna(0) would bucket every unscored account     #
-    # into a synthetic community_id=0 and poison the window aggregates.        #
+    # Targeted fillna on the count columns only — leaving community_id,        #
+    # risk_score, similarity_score, identity_cluster_id, and                   #
+    # identity_cluster_size null for unscored accounts is intentional: a       #
+    # blanket fillna(0) would bucket every unscored account into a synthetic   #
+    # community_id=0 (or identity cluster 0) and poison the window aggregates. #
     #                                                                           #
     # gold_df is cached and reused in later sections; no write-then-read cycle. #
     # ----------------------------------------------------------------------- #
@@ -168,20 +173,6 @@ def main() -> None:
                 "distinct_merchant_count_30d"
             ),
         )
-    )
-
-    # KYC shared-identity counts from the customers silver table: for each
-    # account, how many OTHER accounts share its holder's phone / address.
-    # 0 for every background customer; only the KYC story ring exceeds it.
-    w_phone = Window.partitionBy("phone")
-    w_address = Window.partitionBy("address")
-    identity_share_counts = (
-        spark.table(f"`{CATALOG}`.`{SCHEMA}`.customers")
-        .withColumn("shared_phone_count", (F.count("*").over(w_phone) - 1).cast("long"))
-        .withColumn(
-            "shared_address_count", (F.count("*").over(w_address) - 1).cast("long")
-        )
-        .select("account_id", "shared_phone_count", "shared_address_count")
     )
 
     counterparty_counts = (
@@ -221,7 +212,6 @@ def main() -> None:
         .join(inbound_counts, "account_id", "left")
         .join(transaction_metrics, "account_id", "left")
         .join(counterparty_counts, "account_id", "left")
-        .join(identity_share_counts, "account_id", "left")
         .fillna(
             {
                 "inbound_transfer_events": 0,
@@ -266,6 +256,8 @@ def main() -> None:
             "distinct_counterparty_count",
             "shared_phone_count",
             "shared_address_count",
+            "identity_cluster_id",
+            "identity_cluster_size",
             "is_ring_community",
             "fraud_risk_tier",
         )
@@ -280,7 +272,7 @@ def main() -> None:
         .option("overwriteSchema", "false")
         .saveAsTable(GOLD_ACCOUNTS_TABLE)
     )
-    print(f"Written {GOLD_ACCOUNTS_TABLE} ({n_gold:,} rows, 22 columns)")
+    print(f"Written {GOLD_ACCOUNTS_TABLE} ({n_gold:,} rows, 25 columns)")
 
     # ----------------------------------------------------------------------- #
     # Build gold_account_similarity_pairs with same_community flag             #

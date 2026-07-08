@@ -15,7 +15,7 @@ The demo uses a dual data architecture. The Databricks lakehouse owns the data /
 | `suppliers` | Dimension | `id, name, category, risk_score` | Procurement counterpart; drives Q4 |
 | `business_units` | Dimension | `id, name, region` | Rolls up customers, suppliers, and revenue |
 | `compliance_findings` | Operational log | `id, customer_id, type, status, opened_date` | `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
-| `classifications` | Write-back | `entity_id, entity_type, term, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story |
+| `classifications` | Write-back | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
 
 ## Neo4j Nodes
 
@@ -82,3 +82,31 @@ Each node label and each relationship type loads from one CSV in `data/`. The sa
 - Relationship CSVs: `has_invoice.csv`, `settled_by.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
 
 `classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`.
+
+## GDS Algorithms
+
+The demo uses two Graph Data Science algorithms to extend the rule-based answers. Both write their results back as `CLASSIFIED_AS` edges, so they join the same provenance story and flow into the `classifications` Delta table.
+
+### Supplier risk propagation (extends Q4)
+
+- **ELI5:** think of each supplier as carrying a mild bug, more contagious the higher its risk score. Every supply line it has is a chance to pass the bug along. A business unit connected to many suppliers catches a little from each and ends up sick, even if no single supplier was very ill. Risk can even spread onward from one unit to the next. The algorithm measures how sick each business unit ends up.
+- **Algorithm:** weighted degree centrality or weighted PageRank, with supplier `riskScore` as the weight source. Degree centrality adds up the risk flowing in from direct neighbors; PageRank also lets risk flow onward through multiple hops.
+- **Graph projected:** `Supplier-SUPPLIES->BusinessUnit<-BELONGS_TO-Customer`.
+- **What it does:** propagates supplier risk scores through the supply network to score the exposure of business units and their customers.
+- **Why it matters:** the rule filter `riskScore >= 70` only finds individually risky suppliers. Propagation finds a business unit whose aggregate exposure is high because several mid-risk suppliers serve it, even though no single supplier crosses the threshold.
+- **Demo line:** the rule finds risky suppliers; the graph finds risky exposure.
+
+### Customer similarity (extends Q5 and Q6)
+
+- **ELI5:** describe every customer as a point on a map, where the coordinates are how late they pay, how much of their book is overdue, and how their profitability is trending. Customers who behave alike land close together. If a customer's point sits in the same neighborhood as the known troublemakers, they probably belong to that crowd, even if they have not broken a rule yet.
+- **Algorithm:** k-Nearest Neighbors over payment-behavior features. For each customer it finds the k most similar customers by feature distance.
+- **Features:** `avgDaysLate`, `overdueShare`, `churnRisk`, and `profitabilityTrend`, with the categorical fields encoded numerically. `upsellScore` is deliberately excluded because it is random relative to risk and would make results nondeterministic.
+- **What it does:** finds customers whose feature vectors sit close to the known risky and at-risk accounts.
+- **Why it matters:** the last-3-invoices rule only catches customers who already trip it. Similarity surfaces the ones trending toward the risky cohort before the rule fires.
+- **Demo line:** rule-based classification finds the ones already defined; GDS finds the next ones.
+
+### Write-back with provenance
+
+- Both algorithms write new `CLASSIFIED_AS` edges carrying `source: 'gds'`, the algorithm name, the score, and `evaluatedAt`.
+- The edges have the same shape as the rule-planted ones, so the Q6 explanation query returns them without modification.
+- Results are deterministic given the fixed-seed data and match the `gds_q4_*` and `gds_q5_*` entries in `ground_truth.json`.

@@ -32,13 +32,15 @@ CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.gold_accounts (
     txn_count_30d            BIGINT   COMMENT 'Count of merchant transactions for this account in the most recent 30 days present in the dataset',
     distinct_merchant_count_30d BIGINT COMMENT 'Count of distinct merchants visited by this account in the most recent 30 days present in the dataset',
     distinct_counterparty_count BIGINT COMMENT 'Count of distinct accounts this account sent funds to or received funds from across the account_links window',
-    shared_phone_count       BIGINT   COMMENT 'Number of other accounts whose customer shares this account holder phone number. 0 means the phone is unique. Values above 0 indicate shared-identity (synthetic identity) risk.',
-    shared_address_count     BIGINT   COMMENT 'Number of other accounts whose customer shares this account holder mailing address. 0 means the address is unique. Values above 0 indicate shared-identity (synthetic identity) risk.',
+    shared_phone_count       BIGINT   COMMENT 'Number of other customers who share this account holder phone number, derived from graph identity resolution over shared Phone nodes in the Neo4j customer identity graph. 0 means the phone is unique. Values above 0 indicate shared-identity (synthetic identity) risk.',
+    shared_address_count     BIGINT   COMMENT 'Number of other customers who share this account holder mailing address, derived from graph identity resolution over shared Address nodes in the Neo4j customer identity graph. 0 means the address is unique. Values above 0 indicate shared-identity (synthetic identity) risk.',
+    identity_cluster_id      BIGINT   COMMENT 'Identity cluster label from graph identity resolution (Weakly Connected Components over customers linked by shared phone numbers or addresses). Accounts whose holders are connected through shared identifiers carry the same identity_cluster_id.',
+    identity_cluster_size    BIGINT   COMMENT 'Number of distinct customers in this account identity cluster. 1 means the holder shares no phone or address with any other customer. Values above 1 indicate a shared-identity (synthetic identity) ring found by graph identity resolution.',
     is_ring_community        BOOLEAN  COMMENT 'True when the account community has between 50 and 200 members and a community_avg_risk_score above 1.0, indicating a tightly-knit transfer cluster of anomalous size and centrality',
     fraud_risk_tier          STRING   COMMENT 'Pre-computed binary risk classification based on community membership. Values: high (is_ring_community=true — the account belongs to a tightly-knit transfer cluster of anomalous size and centrality), low (all other accounts).'
 )
 USING DELTA
-COMMENT 'Account dimension enriched with graph analytics features derived from the transfer network';
+COMMENT 'Account dimension enriched with graph analytics features derived from the transfer network and the customer identity graph';
 
 CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.gold_account_similarity_pairs (
     account_id_a     BIGINT   COMMENT 'First account in the pair, always the smaller account_id (joins to gold_accounts.account_id)',
