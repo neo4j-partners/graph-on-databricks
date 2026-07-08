@@ -22,6 +22,7 @@ comes from and what to expect when you run the live before/after reveal.
 | Text instructions block | `enrichment-pipeline/genie_instructions.md` (lean — only table relationships and schema context) |
 | Column-level documentation | Unity Catalog column comments, applied from the inline DDL in `05_pull_gold_tables.ipynb` sections 2–4 (mirrors `enrichment-pipeline/sql/gold_schema.sql`). Genie reads column descriptions directly from UC. |
 | `fraud_risk_tier` / ring-size thresholds | `enrichment-pipeline/jobs/_gold_constants.py` — `RING_SIZE_LOW=50`, `RING_SIZE_HIGH=200`, `COMMUNITY_AVG_RISK_MIN=1.0` |
+| KYC columns on `gold_accounts` | `06_kyc_walkthrough.ipynb` Part C adds `shared_phone_count`, `shared_address_count`, `identity_cluster_id`, `identity_cluster_size` with their UC comments. Production source of truth: `enrichment-pipeline/sql/gold_schema.sql` + `jobs/03_pull_gold_tables.py`. |
 
 To change a column description, edit the DDL (either the workshop notebook
 or `enrichment-pipeline/sql/gold_schema.sql` — keep them in sync) and re-run the
@@ -57,6 +58,20 @@ community has 50–200 members AND `community_avg_risk_score > 1.0`;
 `is_ring_candidate` on `gold_fraud_ring_communities` uses the same
 predicate at the community level (`member_count` between 50 and 200 AND
 `avg_risk_score > 1.0`).
+
+The four **KYC columns** on `gold_accounts` come from `06_kyc_walkthrough`, not
+the fraud pipeline. `shared_phone_count` and `shared_address_count` count the
+other customers who share the account owner's phone or address; `0` is the clean
+baseline and any value above `0` is a synthetic-identity signal.
+`identity_cluster_id` is the Weakly Connected Component id over the shared-phone
+and shared-address graph, and `identity_cluster_size` is the number of customers
+in that cluster: `1` means a unique identity, greater than `1` means the owner
+shares identifiers with other customers. These land beside `risk_score` and
+`community_id` on `gold_accounts`, which the AFTER space already attaches, so
+once `06_kyc_walkthrough` has run Genie can answer questions like "Which accounts
+share a phone number with another customer?" (`shared_phone_count > 0`) and "Show
+me accounts in a shared-identity cluster" (`identity_cluster_size > 1`) with no
+extra provisioning.
 
 Full column definitions are in the Unity Catalog comments. To read them:
 

@@ -576,4 +576,226 @@ The graph now has three GDS-computed properties on every Account node:
 
 **Next →** Return to Databricks and run `05_pull_gold_tables` to read these
 features back into Unity Catalog as the three Gold tables the AFTER Genie
-space queries.
+space queries. For the KYC identity-resolution extension, continue with the
+appendix below, the Aura-tab equivalent of `06_kyc_walkthrough`.
+
+---
+
+## Appendix: KYC Identity Resolution in Aura
+
+These steps back `06_kyc_walkthrough.ipynb`. They run over the KYC identity
+layer that `03_neo4j_ingest` loaded (`:Customer` / `:Phone` / `:Address` joined
+by `OWNS` / `HAS_PHONE` / `HAS_ADDRESS`) and the `community_id` that Louvain
+wrote in Step 4. Run them in the Aura Query tab, then return to Databricks and
+run Part C of `06_kyc_walkthrough` to land the results in `gold_accounts`.
+
+The signal is a planted story ring: eight accounts owned by eight customers who
+share two phones and one address. No single phone connects all eight; the shared
+address is the bridge that collapses them into one Weakly Connected Component.
+That is the traversal a warehouse cannot express in one hop.
+
+### A1. Confirm the identity layer loaded
+
+```cypher
+RETURN count { (a:Account) }  AS accounts,
+       count { (c:Customer) } AS customers,
+       count { (p:Phone) }    AS phones,
+       count { (ad:Address) } AS addresses
+```
+
+If `customers` is zero, re-run the KYC identity-layer section of
+`03_neo4j_ingest` before continuing.
+
+### A2. Project the identity graph (UNDIRECTED)
+
+Project only the identity layer. `UNDIRECTED` so a shared identifier connects
+its owners in both directions.
+
+```cypher
+CALL gds.graph.drop('customer_identity', false) YIELD graphName RETURN graphName
+```
+
+```cypher
+CALL gds.graph.project(
+  'customer_identity',
+  ['Customer', 'Phone', 'Address'],
+  {
+    HAS_PHONE:   {orientation: 'UNDIRECTED'},
+    HAS_ADDRESS: {orientation: 'UNDIRECTED'}
+  }
+)
+YIELD graphName, nodeCount, relationshipCount
+RETURN graphName, nodeCount, relationshipCount
+```
+
+### A3. WCC → `identity_cluster_id`
+
+Every node in a connected component gets the same `identity_cluster_id`.
+Customers linked by any chain of shared phones or addresses land in one
+component.
+
+```cypher
+CALL gds.wcc.write('customer_identity', {writeProperty: 'identity_cluster_id'})
+YIELD componentCount, nodePropertiesWritten
+RETURN componentCount, nodePropertiesWritten
+```
+
+### A4. `identity_cluster_size` per customer
+
+Size counts customers only. WCC also labels the `:Phone` and `:Address` nodes in
+each component, but those are identifiers, not members. Expect
+`customers_in_shared_clusters` = 8.
+
+```cypher
+MATCH (c:Customer)
+WITH c.identity_cluster_id AS cid, collect(c) AS members
+UNWIND members AS c
+SET c.identity_cluster_size = size(members)
+WITH cid, size(members) AS cluster_size
+RETURN count(DISTINCT cid) AS clusters,
+       sum(CASE WHEN cluster_size > 1 THEN 1 ELSE 0 END) AS customers_in_shared_clusters
+```
+
+### A5. `shared_phone_count` / `shared_address_count` per customer
+
+For each customer, count the distinct *other* customers reached through a shared
+phone, and through a shared address. Run both queries. Expect 8 customers
+sharing a phone (four per phone group) and 4 sharing the address.
+
+```cypher
+MATCH (c:Customer)
+OPTIONAL MATCH (c)-[:HAS_PHONE]->()<-[:HAS_PHONE]-(other:Customer)
+WITH c, count(DISTINCT other) AS n
+SET c.shared_phone_count = n
+RETURN sum(CASE WHEN n > 0 THEN 1 ELSE 0 END) AS customers_sharing_a_phone
+```
+
+```cypher
+MATCH (c:Customer)
+OPTIONAL MATCH (c)-[:HAS_ADDRESS]->()<-[:HAS_ADDRESS]-(other:Customer)
+WITH c, count(DISTINCT other) AS n
+SET c.shared_address_count = n
+RETURN sum(CASE WHEN n > 0 THEN 1 ELSE 0 END) AS customers_sharing_an_address
+```
+
+### A6. Propagate identity properties to `:Account` via `OWNS`
+
+The Genie-facing columns live on `:Account`, so copy the four identity
+properties from each customer to the account they own.
+
+```cypher
+MATCH (c:Customer)-[:OWNS]->(a:Account)
+SET a.identity_cluster_id = c.identity_cluster_id,
+    a.identity_cluster_size = c.identity_cluster_size,
+    a.shared_phone_count = c.shared_phone_count,
+    a.shared_address_count = c.shared_address_count
+RETURN count(a) AS accounts_updated
+```
+
+### A7. Build the knowledge layer
+
+A thin semantic and provenance layer so "which policy, definition, and data
+sources flagged this customer" is a traversal, not tribal knowledge. All
+`MERGE`, so it is safe to re-run.
+
+```cypher
+MERGE (p:Policy {policy_id: 'KYC-CIP-001'})
+  SET p.name = 'Customer Identification Program (KYC)',
+      p.authority = 'FinCEN 31 CFR 1020.220',
+      p.description = 'Requires verifying customer identity and detecting customers operating under shared or synthetic identities.'
+MERGE (term:BusinessTerm {name: 'Shared Identity Ring'})
+  SET term.description = 'A group of customers linked into one identity cluster by shared phone numbers or addresses, indicating possible synthetic-identity or structuring activity.'
+MERGE (rule:BusinessRule {rule_id: 'KYC-WCC-001'})
+  SET rule.name = 'Shared-identity WCC cluster',
+      rule.logic = 'Weakly Connected Components over (:Customer)-[:HAS_PHONE|HAS_ADDRESS]->() ; flag every customer whose identity_cluster_size > 1.',
+      rule.threshold = 1
+MERGE (phone:DataSource {name: 'silver.customers.phone'})
+  SET phone.description = 'Customer phone column; feeds the :Phone identity nodes via HAS_PHONE.'
+MERGE (addr:DataSource {name: 'silver.customers.address'})
+  SET addr.description = 'Customer address column; feeds the :Address identity nodes via HAS_ADDRESS.'
+MERGE (term)-[:GOVERNED_BY]->(p)
+MERGE (term)-[:DEFINED_BY]->(rule)
+MERGE (rule)-[:DERIVED_FROM]->(phone)
+MERGE (rule)-[:DERIVED_FROM]->(addr)
+```
+
+### A8. Classify shared-identity customers → `:CLASSIFIED_AS`
+
+Every customer whose WCC cluster holds more than one customer is a member of a
+shared-identity ring. Run the first query to clear any stale edges from a prior
+run, then the second to reclassify. Expect 8 customers classified.
+
+```cypher
+MATCH (:Customer)-[r:CLASSIFIED_AS]->(:BusinessTerm)
+DELETE r RETURN count(r) AS deleted
+```
+
+```cypher
+MATCH (term:BusinessTerm {name: 'Shared Identity Ring'})
+MATCH (c:Customer) WHERE c.identity_cluster_size > 1
+MERGE (c)-[r:CLASSIFIED_AS]->(term)
+SET r.reason = 'shares ' + toString(c.shared_phone_count) +
+               ' phone(s) and ' + toString(c.shared_address_count) +
+               ' address with ' + toString(c.identity_cluster_size - 1) +
+               ' other customer(s) in identity cluster ' +
+               toString(c.identity_cluster_id),
+    r.evaluatedAt = datetime(),
+    r.cluster_id = c.identity_cluster_id,
+    r.cluster_size = c.identity_cluster_size
+RETURN count(r) AS classified
+```
+
+### A9. Drop the identity projection
+
+```cypher
+CALL gds.graph.drop('customer_identity') YIELD graphName RETURN graphName
+```
+
+### A10. Verify the story ring
+
+Sharing as pure structure. Expect two rows, one per planted phone, each with its
+four customers.
+
+```cypher
+MATCH (c:Customer)-[:HAS_PHONE]->(p:Phone)
+WITH p, collect(DISTINCT c.name) AS customers
+WHERE size(customers) > 1
+RETURN p.number AS phone, customers
+```
+
+The resolved identity cluster on the eight story accounts. Expect one `cluster`
+id with `cluster_size` = 8 on all eight rows, `shared_phones` = 3 everywhere, and
+`shared_addresses` = 3 on the four address-sharers.
+
+```cypher
+MATCH (a:Account)
+WHERE a.account_id IN [368, 927, 1033, 1696, 2184, 2216, 2612, 3003]
+RETURN a.account_id AS account,
+       a.identity_cluster_id AS cluster,
+       a.identity_cluster_size AS cluster_size,
+       a.shared_phone_count AS shared_phones,
+       a.shared_address_count AS shared_addresses
+ORDER BY a.account_id
+```
+
+The provenance path: every violator plus the rule, definition, policy, and data
+sources that classified it. Expect eight rows, no background customers.
+
+```cypher
+MATCH (c:Customer)-[cl:CLASSIFIED_AS]->(term:BusinessTerm)-[:DEFINED_BY]->(rule:BusinessRule)
+MATCH (term)-[:GOVERNED_BY]->(policy:Policy)
+MATCH (rule)-[:DERIVED_FROM]->(src:DataSource)
+RETURN c.customer_id      AS customer,
+       cl.reason          AS why,
+       term.name          AS business_term,
+       rule.rule_id       AS rule,
+       policy.policy_id   AS policy,
+       policy.authority   AS policy_authority,
+       collect(DISTINCT src.name) AS data_sources
+ORDER BY c.customer_id
+```
+
+**Next →** Return to Databricks and run Part C of `06_kyc_walkthrough` to land
+the four KYC columns (`shared_phone_count`, `shared_address_count`,
+`identity_cluster_id`, `identity_cluster_size`) on `gold_accounts`, then deliver
+the presenter beats in Part D.

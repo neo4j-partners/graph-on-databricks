@@ -10,50 +10,7 @@ This README reads on its own as a walkthrough. It covers the model, the one-time
 
 The instance layer is a mirror of the lakehouse tables. The knowledge layer holds the Enterprise Data Model, business terms, rules, policies, thresholds, and lineage to the real Unity Catalog tables. Two cross-layer edges tie them together: `REALIZED_AS` links a logical EDM entity to its physical instances, and `CLASSIFIED_AS` records a classification with provenance.
 
-See the rendered image `dual-data-architecture.svg` in this folder for the same picture. The model below is built from `DATA_ARCHITECTURE.md`.
-
-```mermaid
-graph LR
-  subgraph Instance["Instance layer (mirror of the lakehouse)"]
-    Customer
-    Supplier
-    BusinessUnit
-    Invoice
-    Payment
-    RevenueEntry
-    ComplianceFinding
-
-    Customer -->|HAS_INVOICE| Invoice
-    Invoice -->|SETTLED_BY| Payment
-    Customer -->|BELONGS_TO| BusinessUnit
-    BusinessUnit -->|RECOGNIZES| RevenueEntry
-    Supplier -->|SUPPLIES| BusinessUnit
-    Customer -->|HAS_FINDING| ComplianceFinding
-  end
-
-  subgraph Knowledge["Knowledge / semantic layer (graph only)"]
-    EDMEntity
-    BusinessTerm
-    BusinessRule
-    Policy
-    Threshold
-    DataSource
-
-    BusinessTerm -->|DEFINED_BY| BusinessRule
-    BusinessRule -->|EVALUATES| EDMEntity
-    Policy -->|CONSTRAINS| EDMEntity
-    Threshold -->|APPLIES_TO| BusinessTerm
-    EDMEntity -->|MAPS_TO| DataSource
-  end
-
-  EDMEntity -.->|REALIZED_AS| Customer
-  EDMEntity -.->|REALIZED_AS| Invoice
-  Customer -.->|CLASSIFIED_AS| BusinessTerm
-  Supplier -.->|CLASSIFIED_AS| BusinessTerm
-  DataSource -.->|table name| Instance
-```
-
-The full label, relationship, and property model is in `DATA_ARCHITECTURE.md`. All property names are camelCase in both Neo4j and Unity Catalog, so the Cypher below runs unchanged.
+See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the data diagram and the full label, relationship, and property model. All property names are camelCase in both Neo4j and Unity Catalog, so the Cypher below runs unchanged.
 
 
 
