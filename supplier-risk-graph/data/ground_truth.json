@@ -351,43 +351,5 @@
       "avg_supplier_risk": 33.2,
       "max_supplier_risk": 94
     }
-  ],
-  "gds_q5_similarity_candidates": [
-    {
-      "customer_id": "CUST-072",
-      "name": "Birch Drinks Co",
-      "avgDaysLate": 41.8,
-      "overdueShare": 0.75,
-      "churnRisk": "high",
-      "profitabilityTrend": "declining",
-      "distance_to_risky_centroid": 0.258
-    },
-    {
-      "customer_id": "CUST-025",
-      "name": "Atlas Drinks Co",
-      "avgDaysLate": 38.0,
-      "overdueShare": 0.75,
-      "churnRisk": "high",
-      "profitabilityTrend": "declining",
-      "distance_to_risky_centroid": 0.273
-    },
-    {
-      "customer_id": "CUST-082",
-      "name": "Lumen Foods",
-      "avgDaysLate": 37.2,
-      "overdueShare": 0.75,
-      "churnRisk": "high",
-      "profitabilityTrend": "declining",
-      "distance_to_risky_centroid": 0.277
-    },
-    {
-      "customer_id": "CUST-073",
-      "name": "Tidal Distribution",
-      "avgDaysLate": 23.6,
-      "overdueShare": 0.38,
-      "churnRisk": "high",
-      "profitabilityTrend": "declining",
-      "distance_to_risky_centroid": 0.3
-    }
   ]
 }

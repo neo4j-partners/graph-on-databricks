@@ -1,14 +1,15 @@
 # supplier-risk-graph: Call Runbook
 
-A single-page script for demoing the graph live. It separates one-time setup from
-what you click during the call, lists the queries in demo order with one talking
-point each, adds a Genie section, and closes with an appendix mapping each
-question to the Databricks integration modes.
+A walkthrough of the graph demo that reads on its own. It separates one-time setup
+from the queries run during the session, lists the queries in order with an
+explanation of what each one does and why the graph approach matters, adds a Genie
+section, and closes with an appendix mapping each question to the Databricks
+integration modes.
 
-The demo answers the six validation questions the customer asked and, for each
-one, shows which business definition, threshold, policy, and data source backed
-the answer. The narrative escalates: Q1 to Q3 are definition lookups, Q4 to Q6
-add multi-hop provenance, and the two GDS extensions find what the rules cannot.
+The demo answers the six validation questions and, for each one, shows which
+business definition, threshold, policy, and data source backed the answer. The
+questions build in graph value: Q1 to Q3 are definition lookups, Q4 to Q6 add
+multi-hop provenance, and the two graph analytics extensions find what the rules cannot.
 
 ---
 
@@ -34,16 +35,17 @@ Keep two windows visible during the call: Neo4j Browser for the Cypher, and the 
 
 ## The demo flow
 
-Open with the model, not a query. One sentence: "The lakehouse owns the facts,
-Neo4j owns the definitions plus a mirror of the facts, so every answer can be
-traced from an instance back to the business term, rule, EDM entity, and the
-Unity Catalog table it came from." Show `dual-data-architecture.svg` for ten
-seconds, then start querying.
+The demo starts from the model, not a query. The lakehouse owns the facts, Neo4j
+owns the definitions plus a mirror of the facts, so every answer can be traced
+from an instance back to the business term, rule, EDM entity, and the Unity
+Catalog table it came from. The diagram `dual-data-architecture.svg` shows both
+layers and the two cross-layer edges that connect them.
 
-### Warm-ups: definitions live in the graph (Q1 to Q3)
+### Definitions live in the graph (Q1 to Q3)
 
-These are fast. The point is that the threshold and the definition come from the
-knowledge layer, never from hardcoded SQL.
+The first three questions are definition lookups. The threshold and the definition
+come from the knowledge layer, so the answer stays consistent no matter who asks
+it, instead of being baked into hardcoded SQL.
 
 **Q1. Unreconciled revenue above the materiality threshold.** The threshold is a node, read at query time.
 
@@ -57,7 +59,7 @@ RETURN bu.id AS businessUnitId, bu.name AS name,
 ORDER BY unreconciledTotal DESC
 ```
 
-Talking point: "Materiality is not a magic number in a query. It is a governed threshold node, so finance owns it and every answer stays consistent." Expect BU-04 and BU-02.
+Materiality is a governed threshold node rather than a number buried in a query, so finance owns it and every answer stays consistent. Result: BU-04 and BU-02.
 
 **Q2. Customers with open KYC findings.** The KYC policy constrains the Customer entity; the entity realizes as the mirrored customers.
 
@@ -68,7 +70,7 @@ RETURN c.id AS customerId, c.name AS name, collect(f.id) AS openKycFindings
 ORDER BY c.id
 ```
 
-Talking point: "The policy is connected to the data it governs, so the query starts from the policy, not from a table name." Expect 6 customers.
+The policy is connected to the data it governs, so the query starts from the policy itself rather than from a table name. Result: 6 customers.
 
 **Q3. Platinum customers by upsell potential.** The definition of "platinum" is a business term backed by a rule.
 
@@ -78,13 +80,13 @@ RETURN c.id AS customerId, c.name AS name, c.upsellScore AS upsellScore
 ORDER BY c.upsellScore DESC
 ```
 
-Talking point: "`upsellScore` is an ML feature engineered in Databricks. The graph consumes it and joins it to the governed definition of a platinum customer." Expect 15 customers, led by CUST-065.
+`upsellScore` is an ML feature engineered in Databricks. The graph consumes it and joins it to the governed definition of a platinum customer, so feature engineering stays in the lakehouse while the definition stays governed. Result: 15 customers, led by CUST-065.
 
-### The climax: multi-hop provenance and explainability (Q4 to Q6)
+### Multi-hop provenance and explainability (Q4 to Q6)
 
-Slow down here. This is the part that answers the customer's real probe: not "can
-you return the rows" but "can you explain which definitions and data sources were
-used."
+These three questions answer the deeper ask: not just "return the rows" but
+"explain which definitions and data sources were used." Each traversal reaches
+across the two layers and returns the reasoning alongside the result.
 
 **Q4. High-risk suppliers.** The threshold lives on the rule, read at query time.
 
@@ -97,7 +99,7 @@ RETURN s.id AS supplierId, s.name AS name, s.riskScore AS riskScore,
 ORDER BY s.riskScore DESC
 ```
 
-Talking point: "The rule and its threshold are data, so procurement can change the policy without anyone rewriting a query." Expect 5 suppliers.
+The rule and its threshold are data, so procurement can change the policy without anyone rewriting a query. Result: 5 suppliers.
 
 **Q5. Risky customers: more than 60 days late on each of their last three invoices.**
 
@@ -114,7 +116,7 @@ RETURN c.id AS customerId, c.name AS name,
 ORDER BY c.id
 ```
 
-Talking point: "This is a per-customer, ordered, last-three-of-N pattern. It reads cleanly in one graph traversal and returns the evidence, not just the verdict." Expect 5 customers.
+This is a per-customer, ordered, last-three-of-N pattern. It reads cleanly in one graph traversal and returns the supporting invoices, not just the verdict. Result: 5 customers.
 
 **Q6. Strategic accounts at risk.** All four risk conditions on one governed term.
 
@@ -128,7 +130,7 @@ RETURN c.id AS customerId, c.name AS name,
 ORDER BY c.id
 ```
 
-Talking point: "Strategic, declining, high churn, overdue, and an open finding, all in one pattern." Expect CUST-019, CUST-065, CUST-067.
+Strategic, declining, high churn, overdue, and an open finding, all expressed in one pattern. Result: CUST-019, CUST-065, CUST-067.
 
 **Q6 explanation. The payoff.** For any account above, trace the full lineage.
 
@@ -140,9 +142,9 @@ RETURN term.name AS term, cls.reason AS reason,
 ORDER BY term.name, edm.name
 ```
 
-Talking point: "Every classification returns why (the rule), by what definition (the term), and from where (the Unity Catalog table). This is the explainability that a text or RDF glossary cannot query." This is the single most important moment in the call.
+Every classification returns why it applies through the rule, by what definition through the term, and from where through the Unity Catalog table. This traceability is the core of what the demo proves, and it is what a text or RDF glossary cannot query.
 
-### The extensions: the graph finds what the rules miss
+### The extensions: finding what the rules miss
 
 Both algorithms already ran in setup and wrote their results back as
 `CLASSIFIED_AS` edges, so they share the same provenance story.
@@ -156,7 +158,7 @@ RETURN bu.id AS businessUnitId, bu.name AS name,
 ORDER BY bu.supplierExposureScore DESC
 ```
 
-Talking point: "BU-03 tops the exposure list from four mid-risk suppliers, none over the threshold. The rule finds risky suppliers; the graph finds risky exposure." Expect BU-03 first.
+BU-03 tops the exposure list because four mid-risk suppliers feed it, none of them over the threshold. The rule finds risky suppliers; the graph finds risky exposure. Result: BU-03 first.
 
 **GDS Q5 similarity.** kNN finds the customers trending toward the risky cohort before they trip the rule.
 
@@ -167,16 +169,16 @@ RETURN c.id AS customerId, c.name AS name,
 ORDER BY cls.score DESC
 ```
 
-Talking point: "Rule-based classification finds the ones already defined; GDS finds the next ones, and it writes them back with the same provenance shape." Expect 4 candidates.
+Rule-based classification finds the ones already defined; GDS finds the next ones, and writes them back with the same provenance shape. Result: 4 candidates.
 
 ---
 
 ## Genie: consuming the graph semantics
 
-The customer works heavily in Genie, so Genie should appear as the consumer of
-what the graph produces, never as a competing answer path. The graph supplies the
-governed definitions and writes its classifications back into Delta, so Genie
-answers over gold tables that already carry the graph's meaning.
+Genie is the consumer of what the graph produces, not a competing answer path.
+The graph supplies the governed definitions and writes its classifications back
+into Delta, so Genie answers over gold tables that already carry the graph's
+meaning.
 
 ### Setup (one-time, before the call)
 
@@ -191,9 +193,9 @@ answers over gold tables that already carry the graph's meaning.
 4. Add sample-question SQL for a couple of the questions below so Genie has curated examples to learn from.
 5. Publish and smoke-test the space with the first question before the call.
 
-### Sample Genie questions to ask live
+### Sample Genie questions
 
-Ask these in the Genie space and show that the answers line up with the Cypher
+Asked in the Genie space, these return answers that line up with the Cypher
 results, because both read from the same governed definitions.
 
 - "Which customers are classified as risky, and why?" Genie reads `classifications` and returns the `reason`, including the GDS-sourced candidates.
@@ -202,17 +204,18 @@ results, because both read from the same governed definitions.
 - "Which suppliers are high risk?" Genie reads the governed `classifications` labels rather than guessing a threshold.
 - "How many strategic accounts have an open compliance finding?" Genie joins `classifications` to `compliance_findings`.
 
-### The talking point for Genie
+### Why the graph makes Genie better
 
-Say it plainly: "Without the graph, Genie has to guess what 'risky' or 'material'
-or 'high-risk' means from column names. With the graph, those definitions are
-governed once, written back into Delta, and Genie answers over them. Same Genie,
-now accurate, consistent, and explainable, and cheaper because the meaning is
-resolved once in the graph instead of re-derived on every prompt."
+Without the graph, Genie has to infer what "risky" or "material" or "high-risk"
+means from column names. With the graph, those definitions are governed once,
+written back into Delta, and Genie answers over them. It is the same Genie, now
+accurate, consistent, and explainable, and cheaper because the meaning is resolved
+once in the graph instead of re-derived on every prompt.
 
-Contrast to show the value: ask Genie a "risky customers" question against the
-raw instance tables only, then against the space that includes `classifications`.
-The second answer carries the governed reason and matches the Cypher exactly.
+The difference is visible in a side-by-side comparison. A "risky customers"
+question asked against the raw instance tables alone forces Genie to guess a
+definition. The same question asked against a space that includes
+`classifications` returns the governed reason and matches the Cypher exactly.
 
 ---
 
@@ -220,8 +223,8 @@ The second answer carries the governed reason and matches the Cypher exactly.
 
 The demo runs one mode, Multi-Hop Native with write-back, because it is offline
 and self-contained. In production each question would use whichever mode fits its
-data gravity and hop count. Use this appendix to connect the live demo to the
-integration-options slide.
+data gravity and hop count. The table below maps each question to the mode it
+would use.
 
 | Mode | What it means | Where the data sits | Best-fit questions |
 |---|---|---|---|

@@ -2,7 +2,7 @@
 
 A small demo of a dual data architecture for supplier and customer risk. The Databricks lakehouse owns the data / instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge / semantic layer and holds a mirror of the instance data, so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides, so the demo runs offline and the two sides always match.
 
-The graph answers all six of the validation questions and explains which business definitions, thresholds, policies, and data sources backed each answer. Two Graph Data Science algorithms extend the rule-based answers: supplier risk exposure for Q4 and customer similarity for Q5 and Q6.
+The graph answers all six of the validation questions and explains which business definitions, thresholds, policies, and data sources backed each answer. Two graph analytics passes extend the rule-based answers: a supplier-risk exposure aggregation for Q4, and one Graph Data Science algorithm, kNN customer similarity, for Q5 and Q6.
 
 ## The two-layer model
 
@@ -204,9 +204,9 @@ For CUST-019 this returns the Platinum Customer and Strategic Account terms, the
 
 Genie stays prominent as the consumer of graph semantics, never as a standalone answer path. The graph supplies the definitions that make Genie answers accurate, cheaper, and explainable. When a user asks Genie "which business units have material unreconciled revenue" or "who are our high-risk suppliers", the meaning of "material" and "high-risk" lives in the knowledge layer as thresholds and rules, not in an ad hoc SQL guess. The graph resolves the definition, points at the real Unity Catalog tables through `MAPS_TO` lineage, and hands Genie a grounded query. Classification results, both rule-based and GDS-scored, flow back into Delta so Databricks users see the graph value in their own tables. Positioning Genie as a standalone path would concede the questions to the lakehouse alone and lose the definitions and provenance.
 
-## The two GDS extensions
+## The two graph analytics extensions
 
-Both algorithms write their results back into the graph so they join the same provenance story and flow into Unity Catalog. They are deterministic given the fixed-seed data.
+Q4 is a plain Cypher exposure aggregation; Q5/Q6 is the one genuine GDS algorithm, kNN. Both write their results back into the graph so they join the same provenance story and flow into Unity Catalog. They are deterministic given the fixed-seed data.
 
 ### Q4 exposure — supplier risk to business unit exposure
 
@@ -234,7 +234,7 @@ Expected top result: BU-03 Americas. It is served by 4 mid-risk suppliers with a
 
 ### Q5 / Q6 similarity — the next risky customers
 
-`gds.py` runs kNN over the payment-behavior features `avgDaysLate`, `overdueShare`, `churnRisk`, and `profitabilityTrend`, then writes `CLASSIFIED_AS {source: 'gds', algorithm: 'knn', score, evaluatedAt, reason}` edges from the similarity candidates to the "Risky Customer" term. These flow into the `classifications` gold table via `upload.py`.
+`gds.py` runs GDS kNN over the payment-behavior features `avgDaysLate`, `overdueShare`, `churnRisk`, and `profitabilityTrend` to build the similarity graph, then classifies the non-flagged customers most similar to the known risky cohort. It writes `CLASSIFIED_AS {source: 'gds', algorithm: 'knn', score, evaluatedAt, reason}` edges from those candidates to the "Risky Customer" term, where `score` is the kNN similarity to the nearest risky member. These flow into the `classifications` gold table via `upload.py`.
 
 ```cypher
 MATCH (c:Customer)-[cls:CLASSIFIED_AS {source: 'gds'}]->(:BusinessTerm {name: 'Risky Customer'})
@@ -243,7 +243,7 @@ RETURN c.id AS customerId, c.name AS name,
 ORDER BY cls.score DESC
 ```
 
-Expected: 4 candidates, CUST-072, CUST-025, CUST-082, CUST-073. None trips the last-3-invoices rule, but each sits close to the known risky cohort. Demo line: rule-based classification finds the ones already defined; GDS finds the next ones.
+Expected: 4 candidates, the non-flagged customers the kNN run ranks most similar to the risky cohort. None trips the last-3-invoices rule, but each sits close to the known risky cohort. The specific four emerge from the run rather than a planted list; check the `gds.py` output for the current set. Demo line: rule-based classification finds the ones already defined; GDS finds the next ones.
 
 ## Expected results
 
@@ -258,4 +258,5 @@ From `ground_truth.json`, so you can verify a load worked.
 | Q5 risky customers | CUST-015, CUST-020, CUST-036, CUST-067, CUST-091 | 5 |
 | Q6 strategic at risk | CUST-019, CUST-065, CUST-067 | 3 |
 | GDS Q4 exposed business unit | BU-03 Americas (top by exposure) | 1 |
-| GDS Q5 similarity candidates | CUST-072, CUST-025, CUST-082, CUST-073 | 4 |
+
+The GDS Q5/Q6 similarity candidates are not listed here: they emerge from the kNN run rather than a frozen key, so `gds.py` checks only their shape (four non-flagged customers, each near the risky cohort) and prints the current set.

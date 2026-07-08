@@ -83,9 +83,9 @@ Each node label and each relationship type loads from one CSV in `data/`. The sa
 
 `classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`.
 
-## GDS Algorithms
+## Graph Analytics Extensions
 
-The demo uses two Graph Data Science algorithms to extend the rule-based answers. Both write their results back as `CLASSIFIED_AS` edges, so they join the same provenance story and flow into the `classifications` Delta table.
+The demo uses two graph analytics passes to extend the rule-based answers: a plain Cypher exposure aggregation for Q4 and one Graph Data Science algorithm, kNN, for Q5/Q6. Both write their results back as `CLASSIFIED_AS` edges, so they join the same provenance story and flow into the `classifications` Delta table.
 
 ### Supplier risk exposure (extends Q4)
 
@@ -99,14 +99,14 @@ The demo uses two Graph Data Science algorithms to extend the rule-based answers
 ### Customer similarity (extends Q5 and Q6)
 
 - **ELI5:** describe every customer as a point on a map, where the coordinates are how late they pay, how much of their book is overdue, and how their profitability is trending. Customers who behave alike land close together. If a customer's point sits in the same neighborhood as the known troublemakers, they probably belong to that crowd, even if they have not broken a rule yet.
-- **Algorithm:** k-Nearest Neighbors over payment-behavior features. For each customer it finds the k most similar customers by feature distance.
+- **Algorithm:** GDS k-Nearest Neighbors over payment-behavior features. It builds a similarity graph, linking each customer to its most similar peers by feature distance, then ranks the non-flagged customers by their highest similarity to any member of the known risky cohort. The four nearest are the candidates; they emerge from the run, not a planted set.
 - **Features:** `avgDaysLate`, `overdueShare`, `churnRisk`, and `profitabilityTrend`, with the categorical fields encoded numerically. `upsellScore` is deliberately excluded because it is random relative to risk and would make results nondeterministic.
-- **What it does:** finds customers whose feature vectors sit close to the known risky and at-risk accounts.
+- **What it does:** surfaces the non-flagged customers whose feature vectors sit closest to the known risky accounts in the kNN similarity graph.
 - **Why it matters:** the last-3-invoices rule only catches customers who already trip it. Similarity surfaces the ones trending toward the risky cohort before the rule fires.
 - **Demo line:** rule-based classification finds the ones already defined; GDS finds the next ones.
 
 ### Write-back with provenance
 
-- Both algorithms write new `CLASSIFIED_AS` edges carrying `source: 'gds'`, the algorithm name, the score, and `evaluatedAt`.
+- Both passes write new `CLASSIFIED_AS` edges carrying `source: 'gds'`, the algorithm name, the score, and `evaluatedAt`.
 - The edges have the same shape as the rule-planted ones, so the Q6 explanation query returns them without modification.
-- Results are deterministic given the fixed-seed data and match the `gds_q4_*` and `gds_q5_*` entries in `ground_truth.json`.
+- Results are deterministic given the fixed-seed data. Q4 exposure matches the `gds_q4_*` entries in `ground_truth.json`; the Q5/Q6 kNN candidates emerge from the run and are checked only for shape (four non-flagged customers, each near the risky cohort).

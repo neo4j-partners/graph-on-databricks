@@ -198,11 +198,13 @@ def make_customers(rng: random.Random) -> tuple[list[dict], dict[str, list[str]]
         else:
             by_id[cid]["profitabilityTrend"] = rng.choice(["improving", "stable"])
 
-    # GDS Q5/Q6 plant: the risky cohort clusters on high churn and declining
-    # profitability, and the similar cohort shares that profile without
-    # tripping the last-3-invoices rule (its invoice pattern is planted in
-    # make_invoices). Kept out of the strategic and KYC cohorts so the
-    # similarity story stays clean.
+    # GDS Q5/Q6 feature-shaping plant: the risky cohort clusters on high churn
+    # and declining profitability, and the similar cohort shares that profile
+    # without tripping the last-3-invoices rule (its invoice pattern is planted
+    # in make_invoices). This seeds a believable near-risky population for the
+    # kNN pass to find; it does NOT define the Q5/Q6 answer, which emerges from
+    # the kNN run. Kept out of the strategic and KYC cohorts so the similarity
+    # story stays clean.
     similar_pool = [cid for cid in non_strategic if cid not in risky and cid not in kyc]
     similar = rng.sample(similar_pool, N_SIMILAR)
     for cid in risky + similar:
@@ -541,10 +543,6 @@ def evaluate_questions(
     return {"q1": q1, "q2": q2, "q3": q3, "q4": q4, "q5": q5, "q6": q6}
 
 
-TREND_SCALE = {"improving": 0.0, "stable": 0.5, "declining": 1.0}
-CHURN_SCALE = {"low": 0.0, "medium": 0.5, "high": 1.0}
-
-
 def add_payment_features(customers: list[dict], invoices: list[dict]) -> None:
     """Derive the per-customer payment-behavior features the GDS similarity angle uses."""
     per_customer: dict[str, list[dict]] = {}
@@ -558,26 +556,12 @@ def add_payment_features(customers: list[dict], invoices: list[dict]) -> None:
         )
 
 
-def similarity_vector(customer: dict) -> tuple[float, float, float, float]:
-    return (
-        min(customer["avgDaysLate"] / 100.0, 1.0),
-        customer["overdueShare"],
-        CHURN_SCALE[customer["churnRisk"]],
-        TREND_SCALE[customer["profitabilityTrend"]],
-    )
+def evaluate_gds(suppliers: list[dict], supplies: list[dict]) -> dict:
+    """Q4 supplier-exposure ground truth: mean supplier risk per business unit.
 
-
-def evaluate_gds(
-    customers: list[dict],
-    suppliers: list[dict],
-    supplies: list[dict],
-    cohorts: dict,
-) -> dict:
-    """Deterministic proxies for the two Phase 5 GDS answers.
-
-    Exposure: average supplier risk per business unit. Similarity: distance to
-    the risky-cohort centroid over the payment-behavior features. Plain
-    arithmetic, so ground truth stays reproducible without running GDS.
+    Plain arithmetic over the SUPPLIES edges, so the ground truth stays
+    reproducible offline. Q5/Q6 has no offline ground truth: those candidates
+    emerge from the GDS kNN run at analytics time.
     """
     by_supplier = {s["id"]: s for s in suppliers}
     bu_names = {bu["id"]: bu["name"] for bu in BUSINESS_UNITS}
@@ -598,39 +582,15 @@ def evaluate_gds(
         key=lambda r: r["avg_supplier_risk"],
         reverse=True,
     )
-
-    by_id = {c["id"]: c for c in customers}
-    vectors = {c["id"]: similarity_vector(c) for c in customers}
-    risky_vectors = [vectors[cid] for cid in cohorts["risky"]]
-    centroid = [sum(dim) / len(risky_vectors) for dim in zip(*risky_vectors)]
-
-    def distance(cid: str) -> float:
-        return sum((a - b) ** 2 for a, b in zip(vectors[cid], centroid)) ** 0.5
-
-    risky = set(cohorts["risky"])
-    nearest = sorted((c["id"] for c in customers if c["id"] not in risky), key=distance)
-    similarity = [
-        {
-            "customer_id": cid,
-            "name": by_id[cid]["name"],
-            "avgDaysLate": by_id[cid]["avgDaysLate"],
-            "overdueShare": by_id[cid]["overdueShare"],
-            "churnRisk": by_id[cid]["churnRisk"],
-            "profitabilityTrend": by_id[cid]["profitabilityTrend"],
-            "distance_to_risky_centroid": round(distance(cid), 3),
-        }
-        for cid in nearest[:N_SIMILAR]
-    ]
-    return {"exposure": exposure, "similarity": similarity}
+    return {"exposure": exposure}
 
 
-def check_planted_gds(gds: dict, cohorts: dict) -> None:
-    """Fail fast if the GDS plants drift from the recomputed proxies."""
+def check_planted_gds(gds: dict) -> None:
+    """Fail fast if the Q4 exposure plant drifts from the recomputed proxy."""
     top, runner_up = gds["exposure"][0], gds["exposure"][1]
     assert top["business_unit_id"] == EXPOSURE_BU
     assert top["max_supplier_risk"] < SUPPLIER_RISK_THRESHOLD
     assert top["avg_supplier_risk"] > runner_up["avg_supplier_risk"]
-    assert {r["customer_id"] for r in gds["similarity"]} == set(cohorts["similar"])
 
 
 def check_planted(answers: dict, cohorts: dict, customers: list[dict]) -> None:
@@ -709,8 +669,8 @@ def main() -> None:
         customers, suppliers, invoices, revenue_entries, findings, classified_as
     )
     check_planted(answers, cohorts, customers)
-    gds = evaluate_gds(customers, suppliers, supplies, cohorts)
-    check_planted_gds(gds, cohorts)
+    gds = evaluate_gds(suppliers, supplies)
+    check_planted_gds(gds)
 
     print("Node CSVs:")
     write_csv("customers.csv",
@@ -776,13 +736,12 @@ def main() -> None:
         "q6_strategic_at_risk": answers["q6"],
         "gds_q4_exposed_business_unit": EXPOSURE_BU,
         "gds_q4_supplier_exposure_by_business_unit": gds["exposure"],
-        "gds_q5_similarity_candidates": gds["similarity"],
     }
     gt_path = DATA_DIR / "ground_truth.json"
     gt_path.write_text(json.dumps(ground_truth, indent=2) + "\n")
     print(f"  ground_truth.json: answers {ground_truth['summary']['answers']}")
-    print(f"  gds: exposed BU {EXPOSURE_BU}, "
-          f"{len(gds['similarity'])} similarity candidates")
+    print(f"  gds: exposed BU {EXPOSURE_BU} "
+          f"(Q5/Q6 candidates emerge from the kNN run)")
 
 
 if __name__ == "__main__":
