@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # upload_and_create_tables.sh
 #
-# 1. Applies schema.sql — creates all five base tables with column-level
+# 1. Applies schema.sql — creates all six base tables with column-level
 #    Unity Catalog comments (DDL only, no data).
 # 2. Uploads CSVs from finance-genie/data/ to the Unity Catalog Volume.
 # 3. Inserts data into each table from the uploaded CSVs.
@@ -237,6 +237,23 @@ run_sql "INSERT INTO accounts" \
      schema      => 'account_id STRING, account_hash STRING, account_name STRING, account_type STRING, region STRING, balance STRING, opened_date STRING, holder_age STRING'
    )"
 
+run_sql "INSERT INTO customers" \
+  "INSERT OVERWRITE \`${CATALOG}\`.\`${SCHEMA}\`.customers
+   SELECT
+     CAST(customer_id AS BIGINT) AS customer_id,
+     CAST(account_id  AS BIGINT) AS account_id,
+     customer_name,
+     phone,
+     email,
+     address
+   FROM read_files(
+     '${VOLUME_PATH}/customers.csv',
+     format      => 'csv',
+     header      => 'true',
+     inferSchema => 'false',
+     schema      => 'customer_id STRING, account_id STRING, customer_name STRING, phone STRING, email STRING, address STRING'
+   )"
+
 run_sql "INSERT INTO merchants" \
   "INSERT OVERWRITE \`${CATALOG}\`.\`${SCHEMA}\`.merchants
    SELECT
@@ -307,6 +324,7 @@ log "=== All done! ==="
 log "Volume:  ${VOLUME_PATH}"
 log "Tables (schema defined in schema.sql, column comments visible in Catalog Explorer):"
 log "  \`${CATALOG}\`.\`${SCHEMA}\`.accounts"
+log "  \`${CATALOG}\`.\`${SCHEMA}\`.customers"
 log "  \`${CATALOG}\`.\`${SCHEMA}\`.merchants"
 log "  \`${CATALOG}\`.\`${SCHEMA}\`.transactions"
 log "  \`${CATALOG}\`.\`${SCHEMA}\`.account_links"

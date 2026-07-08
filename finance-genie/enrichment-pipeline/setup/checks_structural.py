@@ -25,6 +25,7 @@ def build_ring_index(rings: list[list[int]]) -> dict[int, int]:
 def load_data(input_dir: Path) -> dict:
     return {
         "accounts":       pd.read_csv(input_dir / "accounts.csv"),
+        "customers":      pd.read_csv(input_dir / "customers.csv"),
         "account_labels": pd.read_csv(input_dir / "account_labels.csv"),
         "merchants":      pd.read_csv(input_dir / "merchants.csv"),
         "transactions":   pd.read_csv(input_dir / "transactions.csv"),
@@ -228,6 +229,116 @@ def check_anchor_jaccard(transactions_df, rings, fraud_ids, sample_cross_pairs=2
             "ratio":               round(ratio, 2) if ratio != float("inf") else "inf",
             "within_pairs_sampled": len(within_jaccards),
             "cross_pairs_sampled":  len(cross_jaccards),
+        },
+        "diagnostic": diagnostic,
+        "passed": passed,
+    }
+
+
+def check_kyc_story_ring(customers_df, kyc_gt: dict):
+    """Verify the KYC story ring is intact: every shared identifier maps to
+    exactly its designed accounts, no more and no fewer."""
+    expected_members = set(int(a) for a in kyc_gt["account_ids"])
+
+    mismatches = []
+    covered = set()
+    for phone, accts in kyc_gt["shared_phones"].items():
+        expected = set(int(a) for a in accts)
+        actual = set(
+            customers_df[customers_df["phone"] == phone]["account_id"].astype(int)
+        )
+        covered |= actual
+        if actual != expected:
+            mismatches.append(
+                f"phone {phone}: expected {sorted(expected)}, got {sorted(actual)}"
+            )
+    for address, accts in kyc_gt["shared_address"].items():
+        expected = set(int(a) for a in accts)
+        actual = set(
+            customers_df[customers_df["address"] == address]["account_id"].astype(int)
+        )
+        if actual != expected:
+            mismatches.append(
+                f"address {address}: expected {sorted(expected)}, got {sorted(actual)}"
+            )
+
+    passed = not mismatches and covered == expected_members
+
+    diagnostic = None
+    if not passed:
+        if covered != expected_members:
+            mismatches.append(
+                f"phone coverage {sorted(covered)} != ring members "
+                f"{sorted(expected_members)}"
+            )
+        diagnostic = (
+            f"{'; '.join(mismatches)}. The story ring is hand-designed in "
+            "generate_customers(); a mismatch means customers.csv was generated "
+            "with different constants or edited. Re-run setup/generate_data.py."
+        )
+
+    return {
+        "name": "KYC-Story-Ring",
+        "target": (
+            f"each shared phone maps to exactly its designed accounts, the shared "
+            f"address maps to exactly its designed accounts, and the phones cover "
+            f"all {len(expected_members)} ring members"
+        ),
+        "measured": {
+            "ring_members":  sorted(expected_members),
+            "shared_phones": {p: sorted(a) for p, a in kyc_gt["shared_phones"].items()},
+            "mismatches":    mismatches,
+        },
+        "diagnostic": diagnostic,
+        "passed": passed,
+    }
+
+
+def check_kyc_background_uniqueness(customers_df, kyc_gt: dict):
+    """Verify zero contamination: outside the story identifiers, no two
+    customers share a phone or an address, and no background phone uses the
+    story-reserved 555 exchange."""
+    story_phones    = set(kyc_gt["shared_phones"])
+    story_addresses = set(kyc_gt["shared_address"])
+
+    background = customers_df[
+        ~customers_df["phone"].isin(story_phones)
+        & ~customers_df["address"].isin(story_addresses)
+    ]
+
+    dup_phones    = background["phone"].value_counts()
+    dup_addresses = background["address"].value_counts()
+    duplicate_phone_values   = dup_phones[dup_phones > 1].index.tolist()
+    duplicate_address_values = dup_addresses[dup_addresses > 1].index.tolist()
+    reserved_555_phones = int(
+        background["phone"].str.contains("-555-", regex=False).sum()
+    )
+
+    passed = (
+        not duplicate_phone_values
+        and not duplicate_address_values
+        and reserved_555_phones == 0
+    )
+
+    diagnostic = None
+    if not passed:
+        diagnostic = (
+            "background customers share identifiers or use the reserved 555 "
+            "exchange, which would contaminate KYC story queries with false "
+            "positives. Fix the exclusion rules in generate_customers()."
+        )
+
+    return {
+        "name": "KYC-Background-Uniqueness",
+        "target": (
+            "0 duplicate phones, 0 duplicate addresses, and 0 phones on the "
+            "reserved 555 exchange outside the story identifiers"
+        ),
+        "measured": {
+            "background_customers":     int(len(background)),
+            "duplicate_phone_values":   duplicate_phone_values[:10],
+            "duplicate_address_values": duplicate_address_values[:10],
+            "reserved_555_phones":      reserved_555_phones,
         },
         "diagnostic": diagnostic,
         "passed": passed,

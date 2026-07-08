@@ -32,6 +32,8 @@ CREATE OR REPLACE TABLE `${catalog}`.`${schema}`.gold_accounts (
     txn_count_30d            BIGINT   COMMENT 'Count of merchant transactions for this account in the most recent 30 days present in the dataset',
     distinct_merchant_count_30d BIGINT COMMENT 'Count of distinct merchants visited by this account in the most recent 30 days present in the dataset',
     distinct_counterparty_count BIGINT COMMENT 'Count of distinct accounts this account sent funds to or received funds from across the account_links window',
+    shared_phone_count       BIGINT   COMMENT 'Number of other accounts whose customer shares this account holder phone number. 0 means the phone is unique. Values above 0 indicate shared-identity (synthetic identity) risk.',
+    shared_address_count     BIGINT   COMMENT 'Number of other accounts whose customer shares this account holder mailing address. 0 means the address is unique. Values above 0 indicate shared-identity (synthetic identity) risk.',
     is_ring_community        BOOLEAN  COMMENT 'True when the account community has between 50 and 200 members and a community_avg_risk_score above 1.0, indicating a tightly-knit transfer cluster of anomalous size and centrality',
     fraud_risk_tier          STRING   COMMENT 'Pre-computed binary risk classification based on community membership. Values: high (is_ring_community=true — the account belongs to a tightly-knit transfer cluster of anomalous size and centrality), low (all other accounts).'
 )

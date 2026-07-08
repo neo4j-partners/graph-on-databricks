@@ -6,7 +6,8 @@ match in phase 11e.
 
 Writes three tables into `graph-on-databricks.graph-enriched-schema`:
   gold_accounts                   account metadata + GDS features + community
-                                  aggregates + fraud_risk_tier (20 cols)
+                                  aggregates + KYC shared-identity counts +
+                                  fraud_risk_tier (22 cols)
   gold_account_similarity_pairs   pair-level similarity + same_community flag
   gold_fraud_ring_communities     per-community summary for ring-level queries
 
@@ -169,6 +170,20 @@ def main() -> None:
         )
     )
 
+    # KYC shared-identity counts from the customers silver table: for each
+    # account, how many OTHER accounts share its holder's phone / address.
+    # 0 for every background customer; only the KYC story ring exceeds it.
+    w_phone = Window.partitionBy("phone")
+    w_address = Window.partitionBy("address")
+    identity_share_counts = (
+        spark.table(f"`{CATALOG}`.`{SCHEMA}`.customers")
+        .withColumn("shared_phone_count", (F.count("*").over(w_phone) - 1).cast("long"))
+        .withColumn(
+            "shared_address_count", (F.count("*").over(w_address) - 1).cast("long")
+        )
+        .select("account_id", "shared_phone_count", "shared_address_count")
+    )
+
     counterparty_counts = (
         account_links_df
         .select(
@@ -206,12 +221,15 @@ def main() -> None:
         .join(inbound_counts, "account_id", "left")
         .join(transaction_metrics, "account_id", "left")
         .join(counterparty_counts, "account_id", "left")
+        .join(identity_share_counts, "account_id", "left")
         .fillna(
             {
                 "inbound_transfer_events": 0,
                 "txn_count_30d": 0,
                 "distinct_merchant_count_30d": 0,
                 "distinct_counterparty_count": 0,
+                "shared_phone_count": 0,
+                "shared_address_count": 0,
             }
         )
         .withColumn("community_size", F.count("*").over(w_community))
@@ -246,6 +264,8 @@ def main() -> None:
             "txn_count_30d",
             "distinct_merchant_count_30d",
             "distinct_counterparty_count",
+            "shared_phone_count",
+            "shared_address_count",
             "is_ring_community",
             "fraud_risk_tier",
         )
@@ -260,7 +280,7 @@ def main() -> None:
         .option("overwriteSchema", "false")
         .saveAsTable(GOLD_ACCOUNTS_TABLE)
     )
-    print(f"Written {GOLD_ACCOUNTS_TABLE} ({n_gold:,} rows, 20 columns)")
+    print(f"Written {GOLD_ACCOUNTS_TABLE} ({n_gold:,} rows, 22 columns)")
 
     # ----------------------------------------------------------------------- #
     # Build gold_account_similarity_pairs with same_community flag             #

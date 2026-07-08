@@ -5,6 +5,7 @@ Finance Genie — Synthetic Fraud Dataset Generator (v2)
 the three gaps described in genie-demo.md:
 
   accounts.csv        25,000 rows  Bank accounts with KYC attributes
+  customers.csv       25,000 rows  Customer identity (phone, email, address)
   merchants.csv        7,500 rows  Merchants with category and risk tier
   transactions.csv   250,000 rows  Account -> Merchant transactions
   account_links.csv  300,000 rows  Peer-to-peer account transfers
@@ -87,6 +88,16 @@ NORMAL_LOGNORM_SIGMA = 1.2
 P2P_LOGNORM_MU = 5.0
 P2P_LOGNORM_SIGMA = 1.5
 
+# KYC story ring (two-layer data model, layer 1). Hand-designed shared
+# identifiers inside one existing fraud ring: two shared phones cover 4
+# accounts each, one shared address spans both phone groups so the identity
+# graph connects all 8 members. The 555 exchange is reserved for story data;
+# background phones never use it (see _background_phone).
+KYC_STORY_RING_ID = 0
+KYC_STORY_RING_SIZE = 8
+KYC_STORY_PHONES = ("312-555-0142", "312-555-0143")
+KYC_STORY_ADDRESS = "1247 W Cermak Rd, Chicago, IL 60608"
+
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -141,6 +152,24 @@ def _build_whale_recipient_pools(
     return {whale: random.sample(eligible, pool_size) for whale in whale_ids}
 
 
+def kyc_story_assignments(rings: list) -> tuple[list[int], dict, dict]:
+    """Return (members, phone→accounts, address→accounts) for the KYC story ring.
+
+    Pure function of the ring partition — consumes no RNG, so it can be called
+    from both the generator and the verifier without perturbing the seeded
+    stream. Members are the first KYC_STORY_RING_SIZE accounts of the story
+    ring in sorted order.
+    """
+    members = sorted(rings[KYC_STORY_RING_ID])[:KYC_STORY_RING_SIZE]
+    half = KYC_STORY_RING_SIZE // 2
+    phone_map = {
+        KYC_STORY_PHONES[0]: members[:half],
+        KYC_STORY_PHONES[1]: members[half:],
+    }
+    address_map = {KYC_STORY_ADDRESS: members[half // 2 : half // 2 + half]}
+    return members, phone_map, address_map
+
+
 # ── Generators ────────────────────────────────────────────────────────
 
 def generate_accounts() -> pd.DataFrame:
@@ -168,6 +197,55 @@ def generate_accounts() -> pd.DataFrame:
             "balance":      round(random.uniform(100, 500_000), 2),
             "opened_date":  open_date.strftime("%Y-%m-%d"),
             "holder_age":   random.randint(18, 80),
+        })
+    return pd.DataFrame(rows)
+
+
+def generate_customers(accounts_df: pd.DataFrame, rings: list) -> pd.DataFrame:
+    """Generate one customer per account with phone, email, and address.
+
+    Two-layer model: the KYC story ring members get the hand-designed shared
+    identifiers; every other customer (background layer) gets identifiers that
+    are unique across the dataset and can never collide with story values.
+    """
+    _, phone_map, address_map = kyc_story_assignments(rings)
+    story_phone   = {a: p for p, accts in phone_map.items() for a in accts}
+    story_address = {a: addr for addr, accts in address_map.items() for a in accts}
+
+    seen_phones = set(phone_map)
+
+    def _background_phone() -> str:
+        # NANP format. The 555 exchange is reserved for story data, so a
+        # background customer can never share a story phone.
+        while True:
+            exchange = random.randint(200, 999)
+            if exchange == 555:
+                continue
+            phone = f"{random.randint(200, 989)}-{exchange}-{random.randint(0, 9999):04d}"
+            if phone not in seen_phones:
+                seen_phones.add(phone)
+                return phone
+
+    def _background_address() -> str:
+        # fake.unique guarantees a distinct street per customer; the story
+        # address is excluded explicitly in case Faker ever produces it.
+        while True:
+            addr = (
+                f"{fake.unique.street_address()}, {fake.city()}, "
+                f"{fake.state_abbr()} {fake.zipcode()}"
+            )
+            if addr not in address_map:
+                return addr
+
+    rows = []
+    for acct in accounts_df.itertuples():
+        rows.append({
+            "customer_id":   acct.account_id,
+            "account_id":    acct.account_id,
+            "customer_name": acct.account_name,
+            "phone":         story_phone.get(acct.account_id) or _background_phone(),
+            "email":         fake.unique.email(),
+            "address":       story_address.get(acct.account_id) or _background_address(),
         })
     return pd.DataFrame(rows)
 
@@ -262,6 +340,7 @@ def build_ground_truth_json(
         merchants_df.set_index("merchant_id")[["category"]]
         .to_dict("index")
     )
+    kyc_members, kyc_phone_map, kyc_address_map = kyc_story_assignments(rings)
     return {
         "schema_version": 1,
         "seed": SEED,
@@ -286,6 +365,12 @@ def build_ground_truth_json(
             for i, ring in enumerate(rings)
         ],
         "whale_account_ids": sorted(whale_ids),
+        "kyc_story_ring": {
+            "ring_id":        KYC_STORY_RING_ID,
+            "account_ids":    kyc_members,
+            "shared_phones":  kyc_phone_map,
+            "shared_address": kyc_address_map,
+        },
     }
 
 
@@ -442,8 +527,21 @@ def generate_all(output_dir: Path) -> dict:
         f"whale outbound: fixed pool ({WHALE_RECIPIENT_POOL_SIZE} recipients/whale)"
     )
 
+    # Customers are generated LAST so the extra RNG consumption cannot shift
+    # the seeded stream that produces every table above — all pre-KYC outputs
+    # stay byte-identical to what earlier generator versions produced.
+    print("Generating customers ...")
+    customers_df = generate_customers(accounts_df, rings)
+    customers_df.to_csv(output_dir / "customers.csv", index=False)
+    print(
+        f"  customers: {len(customers_df):,}  |  KYC story ring: "
+        f"{KYC_STORY_RING_SIZE} accounts, {len(KYC_STORY_PHONES)} shared phones, "
+        f"1 shared address"
+    )
+
     return {
         "accounts":        len(accounts_df),
+        "customers":       len(customers_df),
         "account_labels":  len(labels_df),
         "merchants":       len(merchants_df),
         "transactions":    len(txn_df),
