@@ -87,13 +87,13 @@ Each node label and each relationship type loads from one CSV in `data/`. The sa
 
 The demo uses two Graph Data Science algorithms to extend the rule-based answers. Both write their results back as `CLASSIFIED_AS` edges, so they join the same provenance story and flow into the `classifications` Delta table.
 
-### Supplier risk propagation (extends Q4)
+### Supplier risk exposure (extends Q4)
 
-- **ELI5:** think of each supplier as carrying a mild bug, more contagious the higher its risk score. Every supply line it has is a chance to pass the bug along. A business unit connected to many suppliers catches a little from each and ends up sick, even if no single supplier was very ill. Risk can even spread onward from one unit to the next. The algorithm measures how sick each business unit ends up.
-- **Algorithm:** weighted degree centrality or weighted PageRank, with supplier `riskScore` as the weight source. Degree centrality adds up the risk flowing in from direct neighbors; PageRank also lets risk flow onward through multiple hops.
-- **Graph projected:** `Supplier-SUPPLIES->BusinessUnit<-BELONGS_TO-Customer`.
-- **What it does:** propagates supplier risk scores through the supply network to score the exposure of business units and their customers.
-- **Why it matters:** the rule filter `riskScore >= 70` only finds individually risky suppliers. Propagation finds a business unit whose aggregate exposure is high because several mid-risk suppliers serve it, even though no single supplier crosses the threshold.
+- **ELI5:** think of each supplier as carrying a risk score. A business unit's exposure is the average risk of all the suppliers feeding it. A unit served by several middling-risk suppliers can carry high average exposure even when no single supplier looks alarming on its own.
+- **Method:** the mean supplier `riskScore` per business unit. This is a one-hop aggregation, computed with a single Cypher `avg()` over the supply edges.
+- **Edges aggregated:** `Supplier-SUPPLIES->BusinessUnit`.
+- **What it does:** averages supplier risk per business unit to score its exposure.
+- **Why it matters:** the rule filter `riskScore >= 70` only finds individually risky suppliers. The aggregation finds a business unit whose average exposure is high because several mid-risk suppliers serve it, even though no single supplier crosses the threshold.
 - **Demo line:** the rule finds risky suppliers; the graph finds risky exposure.
 
 ### Customer similarity (extends Q5 and Q6)

@@ -1,121 +1,140 @@
-# Fix plan: make the Q5/Q6 similarity method honest
+# Fix plan: make Q5/Q6 a genuine, emergent GDS kNN finding
 
 ## Problem
 
 `gds.py` projects a customer graph, calls `gds.knn.stream`, prints the neighbor-pair
-count, and then throws the kNN result away. The four similarity candidates are
-actually chosen by a different computation: Euclidean distance to the risky-cohort
-centroid. So the algorithm the code advertises is not the algorithm that produces the
-answer.
+count, and throws the result away. Selection is done by a different computation: Euclidean
+distance to the risky-cohort centroid. The algorithm the code advertises is not the
+algorithm that produces the answer.
 
-This is algorithm theater. The kNN call is dead computation: its output is never
-written back, never acted on, and never shown. In a demo the first question is "how
-does the kNN pick those four?" and the honest answer is "it does not."
+The dishonesty runs one layer deeper than the code. `generate_data.py` (`evaluate_gds`,
+lines 601-622) computes `gds_q5_similarity_candidates` with the *same* centroid proxy, so
+the recorded ground truth is the output of a hand-rolled centroid calc, not of any GDS
+run. No kNN output influences the Q5/Q6 result at any layer, code or ground truth. The kNN
+call is pure theater.
 
-## Why nearest-centroid, not kNN
+## Goal
 
-kNN and centroid distance answer different questions:
+Q5/Q6 becomes a real GDS kNN finding whose answer *emerges from the algorithm*: run kNN,
+let it pick the candidates, show them. The data is fixed-seed and kNN is deterministic, so
+the result is stable across runs without an exact-value ground-truth freeze.
 
-- **kNN** is node-to-node. It ranks customers by similarity to *each other* and yields a
-  similarity graph. It does not rank nodes against a labeled group.
-- **Nearest-centroid** is node-to-class. It ranks unlabeled customers by distance to the
-  *center* of the known-risky cohort.
+This gives the demo two genuine GDS algorithms: Q4 weighted degree centrality and Q5/Q6 kNN
+similarity. Q4 already earns the GDS claim; this makes Q5/Q6 earn it too, with a stronger
+graph story than centroid distance because the answer comes from similarity-graph structure
+(who is a near neighbor of the known-risky customers), not from distance to a mean.
 
-The Q5/Q6 question is "who is trending toward the known risky cohort before the rule
-fires." That is a node-to-class question, so distance to the cohort centroid is the
-metric that actually answers it. The centroid computation is correct for the task. The
-only defect is dressing it up as kNN.
+## Design
 
-## Why this is the right call for the demo
+Selection:
 
-The demo already earns its GDS claim once. Q4 is a genuine GDS algorithm: weighted
-degree centrality over the projected `SUPPLIES` network, where the `gds.degree` output
-is the numerator that is then normalized by degree to give exposure. Q5/Q6 does not need
-to repeat a named GDS algorithm to make the "the graph finds the next ones" point. The
-features live on the graph and the risky cohort is defined by a graph rule, so it stays a
-graph story. It is a nearest-centroid classifier over graph-resident features, and naming
-it that way is honest.
+1. Build the kNN similarity graph over the four encoded features (`avgDaysLate`,
+   `overdueShare`, `churnRisk`, `profitabilityTrend`; `upsellScore` still excluded). This
+   yields SIMILAR_TO neighbor pairs with a similarity score.
+2. Identify the risky cohort with the existing rule (`find_risky_cohort`, last-3-invoices
+   over the 60-day threshold).
+3. Candidates are the non-flagged customers that are kNN neighbors of risky-cohort members,
+   ranked by max similarity to any risky member, taking the top `N_SIMILAR` (4). The
+   interpretable line for the demo: "the customers the similarity graph places nearest to
+   the known-risky ones, that do not yet trip the rule."
 
-The alternative, forcing kNN to drive the selection through `SIMILAR_TO` edges, would be
-methodologically clean but would change the planted data: the candidate set would then be
-derived from graph structure, so `generate_data.py` and `ground_truth.json` would have to
-be regenerated to match. That is more change and more risk for no added demo value given
-Q4 already carries the GDS story. We keep the plant frozen and stay honest.
+Determinism: run GDS kNN with `concurrency=1`, `sampleRate=1.0`, a fixed `randomSeed`, and
+an explicit similarity metric (Euclidean over the four-feature vector; do not rely on the
+GDS default for a float-list property). Ties break by internal node id, reproducible on the
+same fixed-seed projection.
+
+No exact-value ground-truth freeze for Q5. Assert only a shape invariant so gross breakage
+still fails loud: exactly four candidates, all non-flagged, each with at least one risky
+neighbor.
 
 ## The fix, file by file
 
-Scope: `gds.py` plus the three docs that describe the method. No change to the generator,
-the planted data, `ground_truth.json`, or `upload.py`.
-
 ### 1. `gds.py`
 
-- Delete the kNN graph projection and the `gds.knn.stream` call in `compute_similarity`,
-  along with the `SIMILARITY_GRAPH` constant, its `drop_graph` calls, and the
-  neighbor-pair print line. The projection exists only to feed the discarded kNN call.
-- Keep the customer feature read, the `similarity_vector` encoding, `find_risky_cohort`,
-  the centroid computation, the distance ranking, and the assertion against
-  `ground_truth`. These already reproduce the four candidates exactly.
-- Change the write-back edge label `r.algorithm = 'knn'` to `r.algorithm = 'nearest-centroid'`.
-- Rewrite the `reason` string to drop the word kNN, for example: "nearest the
-  risky-customer cohort centroid; not yet tripping the last-3-invoices rule."
-- Update the module docstring and the `compute_similarity` docstring and comments to
-  describe nearest-centroid selection, not kNN.
+- `compute_similarity`: keep the feature read, `find_risky_cohort`, the kNN projection, and
+  the `gds.knn.stream` call, but now *use* the result. Delete the centroid computation and
+  the `distance` ranking. Rank the risky cohort's kNN neighbors by similarity and take the
+  top four. Set `concurrency=1`, `sampleRate=1.0`, fixed `randomSeed`, explicit metric.
+- `write_similarity`: `r.algorithm = 'knn'` is now true and stays. `r.score` becomes the kNN
+  similarity score (higher is more similar). Rewrite `r.reason` to describe the kNN
+  neighbor-of-risky finding, dropping the centroid wording.
+- `assert_similarity`: replace the exact-value comparison against `ground_truth` with the
+  shape invariant (four candidates, all non-flagged, each with a risky neighbor).
+- Remove `similarity_vector`, `CHURN_SCALE`, `TREND_SCALE` if nothing else uses them after
+  the centroid math is gone.
+- Update the module docstring and `compute_similarity` docstring/comments to describe two
+  genuine GDS algorithms and the emergent kNN selection.
 
-Result: `compute_similarity` reads features, builds the risky-cohort centroid from the
-last-3-invoices rule, ranks non-flagged customers by distance to that centroid, and takes
-the four nearest. The GDS client is still used for Q4. Q5/Q6 uses it only as a Cypher
-session for reads and the write-back, which is fine.
+### 2. `generate_data.py`
 
-### 2. `README.md`
+- `evaluate_gds`: remove the Q5 centroid block (lines 601-622) and the local `similarity`
+  return. Keep the Q4 exposure proxy: mean supplier risk per business unit maps exactly to
+  the GDS degree-centrality result, so it stays a valid offline ground truth.
+- Remove the module-level `similarity_vector` helper (lines 560-566) and the
+  `CHURN_SCALE`/`TREND_SCALE` scales if unused after that.
+- Ground-truth emission (lines 756-782): stop writing `gds_q5_similarity_candidates`.
+- Keep the `similar` cohort plant (lines 205-209) as a feature-shaping device: it seeds a
+  believable population of near-risky customers for kNN to find. Add a comment that it
+  shapes the feature distribution but no longer defines the Q5 answer. The emergent top-four
+  may or may not equal the planted `similar` set; that is expected and fine.
 
-- Intro line: reword "Two Graph Data Science algorithms extend the rule-based answers" so
-  it reads as one GDS algorithm for Q4 and one nearest-centroid similarity classifier for
-  Q5/Q6.
-- Section heading "The two GDS extensions": rename to something honest across both, for
-  example "The two graph analytics extensions," and state which is GDS and which is a
-  classifier.
-- Q5/Q6 subsection: change "runs kNN over the payment-behavior features" to nearest-centroid
-  distance to the risky cohort. In the `source:'gds'` query, the returned `cls.algorithm`
-  value is now `nearest-centroid`, so update any prose that names it.
+### 3. `README.md`
 
-### 3. `DATA_ARCHITECTURE.md`
+- Intro (line 5): reword "Two Graph Data Science algorithms extend the rule-based answers"
+  so both are genuine GDS; Q5/Q6 is kNN similarity whose answer emerges from the run.
+- "The two GDS extensions" (line 207): Q5/Q6 subsection describes the kNN SIMILAR_TO graph
+  and risky-neighbor ranking. The `source:'gds'` write-back and `algorithm:'knn'` are now
+  literally accurate, so prose naming them is correct as written.
+- Hard-coded Q5 candidate IDs (line 246 "Expected: 4 candidates..." and the line 261 results
+  table row) are refreshed from the actual run, not left as CUST-072/025/082/073. The wording
+  also drops "close to the known risky cohort" phrasing in favor of the kNN-neighbor framing.
 
-- "GDS Algorithms" intro: state one GDS algorithm plus one nearest-centroid classifier
-  rather than "two Graph Data Science algorithms."
-- "Customer similarity" subsection: replace the "Algorithm: k-Nearest Neighbors" line and
-  the ELI5 with a nearest-centroid description. Keep the feature list and the reasons the
-  features and `upsellScore` exclusion are what they are.
-- Write-back section: the algorithm name recorded on the edge is now `nearest-centroid`.
+### 4. `DATA_ARCHITECTURE.md`
 
-### 4. `suppliers.md`
+- Intro (line 88): keep "two Graph Data Science algorithms"; it is now true for both.
+- "Algorithm: k-Nearest Neighbors" (line 102): keep the name and correct the description to
+  a node-to-node similarity graph feeding a risky-neighbor ranking, with the answer emerging
+  from the run rather than a planted set.
 
-- Phase 5 body: the "kNN over payment-behavior features" bullet becomes nearest-centroid.
-- Status line for Phase 5: reword the "runs deterministic kNN" phrasing to nearest-centroid
-  so the status matches the code.
+### 5. `suppliers.md`
+
+- Phase 5 body and status line (and the Phase 1 rev note, line 16): Q5/Q6 runs real GDS kNN;
+  the answer is emergent, not asserted against a frozen Q5 key; the Q5 candidates are no
+  longer in `ground_truth.json`. Drop the "nearest the risky-cohort centroid" and
+  "deterministic kNN ... then classifies the four nearest the centroid" wording, and refresh
+  the hard-coded CUST-072/025/082/073 list (line 20) from the actual run.
 
 ## What deliberately does not change
 
-- **Q4 supplier risk propagation.** It is the genuine GDS algorithm and stays as written.
-- **`generate_data.py` and `ground_truth.json`.** The planted cohorts and recorded
-  distances stay frozen. The centroid method already matches them.
-- **`upload.py`.** It reads `r.algorithm` generically, so the value flowing into the
-  `classifications` gold table simply becomes `nearest-centroid`. No code change.
-- **`source:'gds'` on the write-back edge.** `source` marks provenance of the analytics
-  pass versus rule-planted edges. The analytics script is the GDS pass, since Q4 is real
-  GDS, and the `algorithm` field already names the specific method. Keeping `source:'gds'`
-  is honest and avoids rippling into `upload.py`, the README query, and the classifications
-  contract. If we later prefer an algorithm-neutral marker, `source:'graph'` is the change,
-  but it is out of scope here.
+- **Q4 supplier risk propagation.** Genuine GDS, unchanged, keeps its exact ground-truth
+  assertion.
+- **`find_risky_cohort`, `N_SIMILAR = 4`, the four encoded features, the `upsellScore`
+  exclusion.** The rule-defined cohort and the feature set stay.
+- **`upload.py`.** It reads `r.algorithm` generically; the value is now a truthful `'knn'`.
+  No code change.
+- **`source:'gds'` on the write-back edge.** Now literally correct: the pass is real GDS.
 
 ## Validation
 
-- `python -m py_compile gds.py` passes.
-- `uv run upload.py --check` and `uv run load.py --check` still pass.
-- Offline reproduction from the CSVs still yields the four candidates
-  CUST-072, CUST-025, CUST-082, CUST-073 with distances 0.258, 0.273, 0.277, 0.300,
-  matching `gds_q5_similarity_candidates`. The centroid path is unchanged, so this holds.
-- `grep -rniE 'knn|k-nearest|nearest neighbor|two (graph data science|gds)' supplier-risk-graph`
-  returns nothing except intended history. The spelled-out forms matter: `DATA_ARCHITECTURE.md`
-  writes "k-Nearest Neighbors" (no `knn` substring), and the "two GDS algorithms" framing lives in
-  the README intro, the DATA_ARCHITECTURE intro, and `suppliers.md`. Run this before finishing to
-  catch every residual reference in code and docs.
+- `python -m py_compile gds.py` passes. `uv run upload.py --check` and `uv run load.py
+  --check` still pass.
+- On the target Aura + GDS instance: run `gds.py` and confirm a clean top-four with real
+  separation (no fragile near-ties that would make the demo brittle), then run it again and
+  confirm identical output (determinism). Note the four companies for the demo talk track.
+- `grep -rniE 'centroid|distance_to_risky|nearest.centroid' supplier-risk-graph` returns
+  nothing in code or docs except intended history: the centroid method is fully gone from
+  both `gds.py` and `generate_data.py`.
+- `grep -rniE 'knn|k-nearest|two (graph data science|gds)' supplier-risk-graph` shows both
+  algorithms described as genuine GDS, with no leftover "runs kNN then ranks by centroid"
+  wording.
+
+## Decisions to confirm
+
+1. **Ranking rule:** max similarity to any risky member (recommended), versus count of risky
+   members in a customer's top-k, versus mean similarity to the cohort.
+
+Data is regenerated as part of this change, so the four surfaced companies will simply be
+whatever kNN produces on the new data; there is no old set worth preserving. But the current
+four IDs are hard-coded in the docs (`README.md` lines 246 and 261, `suppliers.md` lines 16
+and 20), so those must be refreshed from the actual run once the change lands, not left as
+CUST-072/025/082/073. Q4's BU-03 references are unchanged and stay valid.

@@ -65,9 +65,10 @@ Features it implements:
 Shared identifiers as pure structure:
 
 ```cypher
-MATCH (c1:Customer)-[:HAS_PHONE]->(p:Phone)<-[:HAS_PHONE]-(c2:Customer)
-WHERE c1.customer_id < c2.customer_id
-RETURN p.number, collect(DISTINCT c1.name) + collect(DISTINCT c2.name) AS customers
+MATCH (c:Customer)-[:HAS_PHONE]->(p:Phone)
+WITH p, collect(DISTINCT c.name) AS customers
+WHERE size(customers) > 1
+RETURN p.number, customers
 ```
 
 The flagship beat, fraud ring meets identity cluster:
@@ -76,8 +77,10 @@ The flagship beat, fraud ring meets identity cluster:
 MATCH (a:Account)
 WHERE a.community_id = $ring_community
 MATCH (c:Customer)-[:OWNS]->(a)
-RETURN c.identity_cluster_id, count(DISTINCT c) AS customers,
-       collect(DISTINCT a.account_id) AS accounts
+WITH c.identity_cluster_id AS cluster, count(DISTINCT c) AS customers,
+     collect(DISTINCT a.account_id) AS accounts
+WHERE customers > 1
+RETURN cluster, customers, accounts
 ```
 
 The explain beat, each violator with the rule, definition, policy, and data-source lineage that classified it:

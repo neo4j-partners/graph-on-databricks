@@ -1,27 +1,32 @@
-"""Phase 5 GDS analytics for the supplier-risk-graph demo.
+"""Phase 5 graph analytics for the supplier-risk-graph demo.
 
-Runs two Graph Data Science algorithms with the graphdatascience Python client
-and writes the results back into Neo4j so they join the same provenance story
-as the rule-based classifications:
+Runs two analytics passes over the graph with the graphdatascience Python client
+and writes the results back into Neo4j so they join the same provenance story as
+the rule-based classifications:
 
-  1. Supplier risk propagation (extends Q4). Projects the supply network
+  1. Supplier risk exposure (extends Q4). Aggregates the supply network
      Supplier-[:SUPPLIES]->BusinessUnit and computes each business unit's
-     exposure as degree-normalized weighted centrality: the mean riskScore of
-     the suppliers feeding it. Surfaces BU-03, exposed through four mid-band
-     suppliers that the flat riskScore >= 70 filter misses. Written back as a
+     exposure as the mean riskScore of the suppliers feeding it. This is a
+     one-hop aggregation, so a plain Cypher avg() computes it exactly, no GDS
+     algorithm required. Surfaces BU-03, exposed through four mid-band suppliers
+     that the flat riskScore >= 70 filter misses. Written back as a
      supplierExposureScore property on every BusinessUnit node.
 
-  2. Customer similarity (extends Q5/Q6). Runs kNN over the payment-behavior
-     features (avgDaysLate, overdueShare, churnRisk, profitabilityTrend, the
-     categorical fields encoded numerically; upsellScore deliberately excluded)
-     and ranks non-flagged customers by distance to the known risky cohort's
-     centroid. The four nearest are classified as Risky Customer (TERM-04) with
-     a source:'gds' CLASSIFIED_AS edge.
+  2. Customer similarity (extends Q5/Q6). The one genuine GDS algorithm: runs
+     gds.knn over the payment-behavior features (avgDaysLate, overdueShare,
+     churnRisk, profitabilityTrend, the categorical fields encoded numerically;
+     upsellScore deliberately excluded) to build the similarity graph, then
+     surfaces the non-flagged customers with the highest similarity to any member
+     of the rule-defined risky cohort. The four nearest are classified as Risky
+     Customer (TERM-04) with a source:'gds' CLASSIFIED_AS edge. The candidates
+     emerge from the kNN run, not a planted set.
 
-Both outputs are asserted against data/ground_truth.json so a drift fails loud.
-Deterministic given the fixed-seed data. Re-runnable: GDS projections are
-dropped on entry and exit, and prior source:'gds' edges are cleared before the
-similarity write-back.
+Q4 exposure is asserted against data/ground_truth.json so a drift fails loud.
+Q5/Q6 has no exact-value ground truth: the answer emerges from the deterministic
+kNN run and is checked only for shape (four non-flagged candidates, each with a
+risky neighbor). Deterministic given the fixed-seed data. Re-runnable: the
+similarity projection is dropped on entry and exit, and prior source:'gds' edges
+are cleared before the similarity write-back.
 
 Run from the project directory after load.py:
 
@@ -45,7 +50,6 @@ from graphdatascience import GraphDataScience
 
 HERE = Path(__file__).parent
 
-SUPPLY_GRAPH = "supplyExposure"
 SIMILARITY_GRAPH = "customerSimilarity"
 
 RISKY_TERM_ID = "TERM-04"  # Risky Customer
@@ -53,11 +57,7 @@ GDS_SOURCE = "gds"
 EVALUATED_AT = "2026-07-01T00:00:00Z"  # frozen as-of, matches the planted edges
 LATE_DAYS_THRESHOLD = 60  # Q5 last-3-invoices rule, identifies the risky cohort
 N_SIMILAR = 4  # candidates to surface near the risky cohort
-
-# Numeric encoding of the categorical similarity features. Mirrors the scales
-# the generator used to compute ground_truth, so the distances match exactly.
-CHURN_SCALE = {"low": 0.0, "medium": 0.5, "high": 1.0}
-TREND_SCALE = {"improving": 0.0, "stable": 0.5, "declining": 1.0}
+KNN_TOP_K = 10  # neighbors per node; wide enough to link candidates to the cohort
 
 
 def require_env(name: str, default: str | None = None) -> str:
@@ -71,92 +71,42 @@ def header(title: str) -> None:
     print(f"\n=== {title} ===")
 
 
-def similarity_vector(row: dict[str, Any]) -> tuple[float, float, float, float]:
-    """Encode a customer's payment-behavior features exactly as the generator."""
-    return (
-        min(float(row["avgDaysLate"]) / 100.0, 1.0),
-        float(row["overdueShare"]),
-        CHURN_SCALE[row["churnRisk"]],
-        TREND_SCALE[row["profitabilityTrend"]],
-    )
-
-
 def drop_graph(gds: GraphDataScience, name: str) -> None:
     gds.run_cypher("CALL gds.graph.drop($name, false) YIELD graphName", params={"name": name})
 
 
 def compute_exposure(gds: GraphDataScience) -> list[dict[str, Any]]:
-    """Algorithm 1: mean supplier risk per BusinessUnit via degree centrality.
+    """Algorithm 1: mean supplier risk per BusinessUnit.
 
-    Projects the supply network with the supplier riskScore carried onto each
-    SUPPLIES relationship, then reads two reverse-orientation degree centralities
-    over the projection: the weighted degree (total incoming supplier risk) and
-    the plain degree (supplier count). The exposure score is the ratio, i.e. the
-    risk propagated in from the supply network normalized by connectivity.
+    Each business unit's exposure is the mean riskScore of the suppliers feeding
+    it over the SUPPLIES edges. This is a one-hop aggregation, so a single Cypher
+    query with sum, count, and max computes the ranking rows exactly. The mean is
+    the metric that surfaces BU-03: several mid-band suppliers give it a high
+    average even though no single score crosses the flat riskScore >= 70 filter.
     """
-    header("Algorithm 1: supplier risk propagation (Q4)")
-    drop_graph(gds, SUPPLY_GRAPH)
-    G, project = gds.graph.cypher.project(
+    header("Algorithm 1: supplier risk exposure (Q4)")
+    rows = gds.run_cypher(
         """
         MATCH (s:Supplier)-[:SUPPLIES]->(b:BusinessUnit)
-        RETURN gds.graph.project(
-            $graph_name, s, b,
-            {relationshipProperties: {risk: s.riskScore}}
-        )
-        """,
-        database=gds.database(),
-        graph_name=SUPPLY_GRAPH,
-    )
-    print(
-        f"  projected '{G.name()}': {G.node_count()} nodes, "
-        f"{G.relationship_count()} SUPPLIES relationships"
-    )
-
-    weighted = gds.run_cypher(
-        """
-        CALL gds.degree.stream($graph, {orientation: 'REVERSE', relationshipWeightProperty: 'risk'})
-        YIELD nodeId, score
-        WITH gds.util.asNode(nodeId) AS n, score
-        WHERE n:BusinessUnit
-        RETURN n.id AS bu, n.name AS name, score AS total_risk
-        """,
-        params={"graph": SUPPLY_GRAPH},
-    )
-    counts = gds.run_cypher(
-        """
-        CALL gds.degree.stream($graph, {orientation: 'REVERSE'})
-        YIELD nodeId, score
-        WITH gds.util.asNode(nodeId) AS n, score
-        WHERE n:BusinessUnit
-        RETURN n.id AS bu, score AS supplier_count
-        """,
-        params={"graph": SUPPLY_GRAPH},
-    )
-    # max_supplier_risk completes the ground_truth ranking rows; it is a plain
-    # aggregate over the same edges, not part of the propagation metric.
-    maxima = gds.run_cypher(
-        """
-        MATCH (s:Supplier)-[:SUPPLIES]->(b:BusinessUnit)
-        RETURN b.id AS bu, max(s.riskScore) AS max_supplier_risk
+        RETURN b.id AS bu, b.name AS name,
+               sum(s.riskScore) AS total_risk,
+               count(s) AS supplier_count,
+               max(s.riskScore) AS max_supplier_risk
         """
     )
-    drop_graph(gds, SUPPLY_GRAPH)
-
-    total = {r["bu"]: float(r["total_risk"]) for _, r in weighted.iterrows()}
-    names = {r["bu"]: r["name"] for _, r in weighted.iterrows()}
-    count = {r["bu"]: int(round(float(r["supplier_count"]))) for _, r in counts.iterrows()}
-    mx = {r["bu"]: int(r["max_supplier_risk"]) for _, r in maxima.iterrows()}
 
     exposure = sorted(
         (
             {
-                "business_unit_id": bu,
-                "name": names[bu],
-                "supplier_count": count[bu],
-                "avg_supplier_risk": round(total[bu] / count[bu], 1),
-                "max_supplier_risk": mx[bu],
+                "business_unit_id": r["bu"],
+                "name": r["name"],
+                "supplier_count": int(r["supplier_count"]),
+                "avg_supplier_risk": round(
+                    float(r["total_risk"]) / int(r["supplier_count"]), 1
+                ),
+                "max_supplier_risk": int(r["max_supplier_risk"]),
             }
-            for bu in total
+            for _, r in rows.iterrows()
         ),
         key=lambda r: r["avg_supplier_risk"],
         reverse=True,
@@ -204,33 +154,25 @@ def find_risky_cohort(gds: GraphDataScience) -> list[str]:
     return [r["cid"] for _, r in df.iterrows()]
 
 
-def compute_similarity(gds: GraphDataScience) -> list[dict[str, Any]]:
-    """Algorithm 2: kNN over payment-behavior features, ranked to the risky cohort.
+def compute_similarity(gds: GraphDataScience, risky: list[str]) -> list[dict[str, Any]]:
+    """Algorithm 2: GDS kNN similarity, ranked to the risky cohort.
 
-    kNN establishes the similarity structure over the four encoded features.
-    Candidate selection then ranks non-flagged customers by Euclidean distance
-    to the risky cohort's centroid, the same metric the generator recorded in
-    ground_truth, so the surfaced set and distances reproduce exactly.
+    Projects the customers with their encoded payment-behavior features, runs
+    gds.knn to build the similarity graph, then ranks the non-flagged customers
+    by their highest similarity to any member of the rule-defined risky cohort.
+    The four nearest are the emergent Q5/Q6 candidates: they come out of the kNN
+    run, not a planted set.
     """
     header("Algorithm 2: customer similarity (Q5/Q6)")
-
-    customers = gds.run_cypher(
-        """
-        MATCH (c:Customer)
-        RETURN c.id AS id, c.name AS name, c.avgDaysLate AS avgDaysLate,
-               c.overdueShare AS overdueShare, c.churnRisk AS churnRisk,
-               c.profitabilityTrend AS profitabilityTrend
-        """
-    )
-    rows = {r["id"]: dict(r) for _, r in customers.iterrows()}
-    vectors = {cid: similarity_vector(row) for cid, row in rows.items()}
-
-    risky = find_risky_cohort(gds)
     print(f"  risky cohort (last-3-invoices rule): {', '.join(risky)}")
 
-    # kNN over the encoded feature vector: fully deterministic so re-runs match.
+    names = {
+        r["id"]: r["name"]
+        for _, r in gds.run_cypher("MATCH (c:Customer) RETURN c.id AS id, c.name AS name").iterrows()
+    }
+
     drop_graph(gds, SIMILARITY_GRAPH)
-    G, _ = gds.graph.cypher.project(
+    gds.graph.cypher.project(
         """
         MATCH (c:Customer)
         RETURN gds.graph.project(
@@ -246,46 +188,53 @@ def compute_similarity(gds: GraphDataScience) -> list[dict[str, Any]]:
         database=gds.database(),
         graph_name=SIMILARITY_GRAPH,
     )
-    knn = gds.knn.stream(
-        G,
-        nodeProperties=["features"],
-        topK=5,
-        randomSeed=42,
-        concurrency=1,
-        sampleRate=1.0,
+    # kNN similarity graph over the encoded features. concurrency=1, full
+    # sampling, and a fixed seed make it deterministic; Euclidean similarity is
+    # normalized by GDS to (0, 1], higher meaning more alike.
+    neighbors = gds.run_cypher(
+        """
+        CALL gds.knn.stream($graph, {
+            nodeProperties: {features: 'EUCLIDEAN'},
+            topK: $top_k, sampleRate: 1.0, randomSeed: 42, concurrency: 1
+        })
+        YIELD node1, node2, similarity
+        RETURN gds.util.asNode(node1).id AS c1, gds.util.asNode(node2).id AS c2, similarity
+        """,
+        params={"graph": SIMILARITY_GRAPH, "top_k": KNN_TOP_K},
     )
-    print(f"  kNN computed {len(knn)} neighbor pairs over 4 encoded features")
     drop_graph(gds, SIMILARITY_GRAPH)
+    print(f"  kNN produced {len(neighbors)} neighbor pairs over 4 encoded features")
 
-    # Rank to the known cohort: distance to the risky centroid (ground_truth metric).
-    risky_vecs = [vectors[cid] for cid in risky]
-    centroid = [sum(dim) / len(risky_vecs) for dim in zip(*risky_vecs)]
-
-    def distance(cid: str) -> float:
-        return sum((a - b) ** 2 for a, b in zip(vectors[cid], centroid)) ** 0.5
-
+    # Each non-flagged customer's highest similarity to any risky member. kNN
+    # pairs are directed per source's top-K, so scan both endpoints.
     risky_set = set(risky)
-    nearest = sorted((cid for cid in vectors if cid not in risky_set), key=distance)[:N_SIMILAR]
+    best: dict[str, float] = {}
+    for _, row in neighbors.iterrows():
+        c1, c2, sim = row["c1"], row["c2"], float(row["similarity"])
+        if c1 in risky_set and c2 not in risky_set:
+            candidate = c2
+        elif c2 in risky_set and c1 not in risky_set:
+            candidate = c1
+        else:
+            continue
+        if sim > best.get(candidate, 0.0):
+            best[candidate] = sim
 
+    nearest = sorted(best, key=lambda cid: (-best[cid], cid))[:N_SIMILAR]
     candidates = [
         {
             "customer_id": cid,
-            "name": rows[cid]["name"],
-            "avgDaysLate": float(rows[cid]["avgDaysLate"]),
-            "overdueShare": float(rows[cid]["overdueShare"]),
-            "churnRisk": rows[cid]["churnRisk"],
-            "profitabilityTrend": rows[cid]["profitabilityTrend"],
-            "distance_to_risky_centroid": round(distance(cid), 3),
+            "name": names[cid],
+            "similarity_to_risky": round(best[cid], 4),
         }
         for cid in nearest
     ]
 
-    print("  Nearest non-flagged customers to the risky centroid:")
+    print("  Non-flagged customers most similar to the risky cohort (GDS kNN):")
     for rank, row in enumerate(candidates, start=1):
         print(
             f"    {rank}. {row['customer_id']} {row['name']:<20} "
-            f"distance={row['distance_to_risky_centroid']:<6} "
-            f"churn={row['churnRisk']} trend={row['profitabilityTrend']}"
+            f"similarity={row['similarity_to_risky']}"
         )
     return candidates
 
@@ -301,11 +250,8 @@ def write_similarity(gds: GraphDataScience, candidates: list[dict[str, Any]]) ->
     print(f"  cleared {int(cleared['deleted'].iloc[0])} prior source:'gds' classifications")
 
     rows = [
-        {
-            "cid": c["customer_id"],
-            # score: higher is closer to the risky cohort (inverse of distance).
-            "score": round(1.0 / (1.0 + c["distance_to_risky_centroid"]), 4),
-        }
+        # score: kNN similarity to the nearest risky member, higher is more alike.
+        {"cid": c["customer_id"], "score": c["similarity_to_risky"]}
         for c in candidates
     ]
     result = gds.run_cypher(
@@ -317,7 +263,7 @@ def write_similarity(gds: GraphDataScience, candidates: list[dict[str, Any]]) ->
         SET r.algorithm = 'knn',
             r.score = row.score,
             r.evaluatedAt = datetime($evaluated_at),
-            r.reason = 'kNN nearest the risky-customer cohort; not yet tripping the last-3-invoices rule'
+            r.reason = 'GDS kNN: among the known risky cohort''s nearest neighbors; not yet tripping the last-3-invoices rule'
         RETURN count(r) AS written
         """,
         params={
@@ -346,23 +292,23 @@ def assert_exposure(exposure: list[dict[str, Any]], ground_truth: dict[str, Any]
     print(f"  assert OK: exposure ranking matches ground_truth, {top} on top")
 
 
-def assert_similarity(candidates: list[dict[str, Any]], ground_truth: dict[str, Any]) -> None:
-    expected = ground_truth["gds_q5_similarity_candidates"]
-    got = [
-        {k: c[k] for k in ("customer_id", "distance_to_risky_centroid")}
-        for c in candidates
-    ]
-    want = [
-        {k: c[k] for k in ("customer_id", "distance_to_risky_centroid")}
-        for c in expected
-    ]
-    if got != want:
-        sys.exit(
-            "Q5 similarity candidates drifted from ground_truth.\n"
-            f"  computed: {got}\n  expected: {want}"
-        )
+def assert_similarity(candidates: list[dict[str, Any]], risky: list[str]) -> None:
+    """Shape check: N_SIMILAR non-flagged candidates, each with a risky neighbor.
+
+    The candidates are emergent from the kNN run, so there is no exact-value
+    ground truth to compare against. This guards only against gross breakage.
+    """
+    risky_set = set(risky)
+    if len(candidates) != N_SIMILAR:
+        sys.exit(f"Q5 expected {N_SIMILAR} candidates, got {len(candidates)}: {candidates}")
+    flagged = [c["customer_id"] for c in candidates if c["customer_id"] in risky_set]
+    if flagged:
+        sys.exit(f"Q5 candidates include rule-flagged customers: {flagged}")
+    unlinked = [c["customer_id"] for c in candidates if not c["similarity_to_risky"] > 0.0]
+    if unlinked:
+        sys.exit(f"Q5 candidates have no similarity to the risky cohort: {unlinked}")
     ids = ", ".join(c["customer_id"] for c in candidates)
-    print(f"  assert OK: candidates match ground_truth ({ids})")
+    print(f"  assert OK: {N_SIMILAR} non-flagged candidates, each near the risky cohort ({ids})")
 
 
 def main() -> None:
@@ -390,8 +336,9 @@ def main() -> None:
         assert_exposure(exposure, ground_truth)
         write_exposure(gds, exposure)
 
-        candidates = compute_similarity(gds)
-        assert_similarity(candidates, ground_truth)
+        risky = find_risky_cohort(gds)
+        candidates = compute_similarity(gds, risky)
+        assert_similarity(candidates, risky)
         write_similarity(gds, candidates)
 
     print("\nGDS analytics complete: Q4 exposure and Q5 similarity written back to Neo4j.")

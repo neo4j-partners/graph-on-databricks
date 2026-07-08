@@ -2,11 +2,12 @@
 
 Writes one CSV per node type and one per relationship type to data/, plus
 ground_truth.json holding the expected answer set for each of the 6
-validation questions and the two GDS plants: a business unit exposed through
-mid-risk suppliers (Q4 propagation) and customers near the risky cohort
-without tripping the rule (Q5/Q6 similarity). Deterministic: fixed seed,
-frozen as-of date, all daysLate values computed once at generation time and
-stored.
+validation questions and the Q4 exposure plant: a business unit exposed through
+mid-risk suppliers. The data also seeds a cohort of customers near the risky
+group without tripping the rule; the Q5/Q6 GDS kNN pass surfaces those at
+analytics time, so the candidates emerge from the run and are not recorded here.
+Deterministic: fixed seed, frozen as-of date, all daysLate values computed once
+at generation time and stored.
 
 Run with: uv run generate_data.py
 """

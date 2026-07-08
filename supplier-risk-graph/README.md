@@ -2,7 +2,7 @@
 
 A small demo of a dual data architecture for supplier and customer risk. The Databricks lakehouse owns the data / instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge / semantic layer and holds a mirror of the instance data, so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides, so the demo runs offline and the two sides always match.
 
-The graph answers all six of the validation questions and explains which business definitions, thresholds, policies, and data sources backed each answer. Two Graph Data Science algorithms extend the rule-based answers: supplier risk propagation for Q4 and customer similarity for Q5 and Q6.
+The graph answers all six of the validation questions and explains which business definitions, thresholds, policies, and data sources backed each answer. Two Graph Data Science algorithms extend the rule-based answers: supplier risk exposure for Q4 and customer similarity for Q5 and Q6.
 
 ## The two-layer model
 
@@ -208,9 +208,9 @@ Genie stays prominent as the consumer of graph semantics, never as a standalone 
 
 Both algorithms write their results back into the graph so they join the same provenance story and flow into Unity Catalog. They are deterministic given the fixed-seed data.
 
-### Q4 propagation — supplier risk to business unit exposure
+### Q4 exposure — supplier risk to business unit exposure
 
-The flat rule finds individually risky suppliers but says nothing about aggregate exposure. `gds.py` propagates supplier risk through the `Supplier-SUPPLIES->BusinessUnit<-BELONGS_TO-Customer` network and writes a `supplierExposureScore` onto each `BusinessUnit`. This result is materialized to the `business_unit_exposure` gold table by `upload.py`.
+The flat rule finds individually risky suppliers but says nothing about aggregate exposure. `gds.py` aggregates supplier risk over the `Supplier-SUPPLIES->BusinessUnit` edges and writes the mean supplying-supplier risk onto each `BusinessUnit` as `supplierExposureScore`. This result is materialized to the `business_unit_exposure` gold table by `upload.py`.
 
 The flat rule finds the 5 obvious suppliers and misses BU-03:
 
@@ -221,7 +221,7 @@ RETURN s.id AS supplierId, s.name AS name, s.riskScore AS riskScore
 ORDER BY s.riskScore DESC
 ```
 
-Propagation surfaces BU-03 Americas at the top, even though none of its suppliers cross 70:
+The mean-exposure aggregation surfaces BU-03 Americas at the top, even though none of its suppliers cross 70:
 
 ```cypher
 MATCH (bu:BusinessUnit)

@@ -125,10 +125,10 @@ Run the Cypher in Neo4j Browser or the Aura console. Keep Bloom open in a second
 **Show:** who shares an identifier with whom, as pure structure.
 
 ```cypher
-MATCH (c1:Customer)-[:HAS_PHONE]->(p:Phone)<-[:HAS_PHONE]-(c2:Customer)
-WHERE c1.customer_id < c2.customer_id
-RETURN p.number AS phone,
-       collect(DISTINCT c1.name) + collect(DISTINCT c2.name) AS customers
+MATCH (c:Customer)-[:HAS_PHONE]->(p:Phone)
+WITH p, collect(DISTINCT c.name) AS customers
+WHERE size(customers) > 1
+RETURN p.number AS phone, customers
 ```
 
 **Expected:** two rows, one per planted phone. `312-555-0142` returns the four customers behind accounts 368, 927, 1033, 1696. `312-555-0143` returns the four behind 2184, 2216, 2612, 3003. No background phone appears, because background customers each hold a unique number.
@@ -154,16 +154,20 @@ ORDER BY a.account_id
 
 **Expected:** all eight rows carry the same `cluster` id and `cluster_size` = 8. `shared_phones` = 3 on every row. `shared_addresses` = 3 on 1033, 1696, 2184, 2216 and 0 on the other four. The point to land: one cluster, eight members, no single phone connects all eight. The address is what makes it one ring.
 
-**The flagship beat:** fraud ring meets identity cluster. Louvain already put these accounts in one transfer community. WCC now shows that community is one identity.
+**The flagship beat:** fraud ring meets identity cluster. Louvain already put these accounts in one transfer community. WCC now shows that eight of its accounts collapse into a single identity.
 
 ```cypher
 MATCH (a:Account)
 WHERE a.community_id = $ring_community
 MATCH (c:Customer)-[:OWNS]->(a)
-RETURN c.identity_cluster_id AS cluster,
-       count(DISTINCT c) AS customers,
-       collect(DISTINCT a.account_id) AS accounts
+WITH c.identity_cluster_id AS cluster,
+     count(DISTINCT c) AS customers,
+     collect(DISTINCT a.account_id) AS accounts
+WHERE customers > 1
+RETURN cluster, customers, accounts
 ```
+
+**Expected:** one row. Ring 0's transfer community holds many accounts, but only its eight story accounts share identifiers, so the `customers > 1` filter leaves exactly one identity cluster of eight and lists its eight account ids. Every other member of the community is its own identity cluster of one and drops out.
 
 Set `$ring_community` to ring 0's Louvain community id. The gold pull emits `data/ring_community_map.json` on every rebuild, mapping each synthetic ring to its community id, so read the value for ring `"0"` from that file. The community ids change whenever the graph is re-projected, which is why the map is regenerated each run.
 
