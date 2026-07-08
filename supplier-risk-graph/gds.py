@@ -263,7 +263,7 @@ def write_similarity(gds: GraphDataScience, candidates: list[dict[str, Any]]) ->
         SET r.algorithm = 'knn',
             r.score = row.score,
             r.evaluatedAt = datetime($evaluated_at),
-            r.reason = 'GDS kNN: among the known risky cohort''s nearest neighbors; not yet tripping the last-3-invoices rule'
+            r.reason = 'GDS kNN: among the nearest neighbors of the known risky cohort; not yet tripping the last-3-invoices rule'
         RETURN count(r) AS written
         """,
         params={
@@ -293,10 +293,14 @@ def assert_exposure(exposure: list[dict[str, Any]], ground_truth: dict[str, Any]
 
 
 def assert_similarity(candidates: list[dict[str, Any]], risky: list[str]) -> None:
-    """Shape check: N_SIMILAR non-flagged candidates, each with a risky neighbor.
+    """Shape check: N_SIMILAR non-flagged candidates, each a genuine kNN neighbor
+    of the risky cohort.
 
     The candidates are emergent from the kNN run, so there is no exact-value
-    ground truth to compare against. This guards only against gross breakage.
+    ground truth to compare against. This guards against gross breakage: a wrong
+    count, a rule-flagged customer slipping in, or a similarity score outside
+    GDS's normalized (0, 1] band (which would mean the ranking regressed to a raw
+    distance rather than a similarity, the anti-pattern this pass replaced).
     """
     risky_set = set(risky)
     if len(candidates) != N_SIMILAR:
@@ -304,9 +308,13 @@ def assert_similarity(candidates: list[dict[str, Any]], risky: list[str]) -> Non
     flagged = [c["customer_id"] for c in candidates if c["customer_id"] in risky_set]
     if flagged:
         sys.exit(f"Q5 candidates include rule-flagged customers: {flagged}")
-    unlinked = [c["customer_id"] for c in candidates if not c["similarity_to_risky"] > 0.0]
-    if unlinked:
-        sys.exit(f"Q5 candidates have no similarity to the risky cohort: {unlinked}")
+    off_band = [
+        (c["customer_id"], c["similarity_to_risky"])
+        for c in candidates
+        if not 0.0 < c["similarity_to_risky"] <= 1.0
+    ]
+    if off_band:
+        sys.exit(f"Q5 candidate similarity outside GDS's (0, 1] band: {off_band}")
     ids = ", ".join(c["customer_id"] for c in candidates)
     print(f"  assert OK: {N_SIMILAR} non-flagged candidates, each near the risky cohort ({ids})")
 
