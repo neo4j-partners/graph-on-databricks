@@ -2,15 +2,19 @@
 
 Two-layer demo: the lakehouse owns the data/instance layer while Neo4j owns the
 knowledge layer. This script materializes the lakehouse side. It uploads the
-seven instance node CSVs into a UC volume and builds one Delta table each with
-`read_files`, then reads the two graph-derived tables back out of Neo4j:
+seven instance node CSVs plus the supplier-to-business-unit bridge into a UC
+volume and builds one Delta table each with `read_files`, then reads the two
+graph-derived tables back out of Neo4j:
 
   - `classifications`         — every CLASSIFIED_AS edge (rule- and GDS-planted)
   - `business_unit_exposure`  — the Q4 supplier-risk propagation result
 
 CSV headers stay verbatim (camelCase), so the demo's Cypher and the UC column
-names line up. Re-runnable: tables are CREATE OR REPLACE and the schema/volume
-are created idempotently.
+names line up. Instance tables carry foreign-key columns (invoices.customerId,
+payments.invoiceId, revenue_entries.businessUnitId, compliance_findings.customerId,
+customers.businessUnitId) so the lakehouse side can be joined like a star schema.
+Re-runnable: tables are CREATE OR REPLACE and the schema/volume are created
+idempotently.
 
 Usage:
     uv run upload.py            # upload CSVs, build tables, pull derived tables
@@ -105,6 +109,9 @@ BASE_SPECS = [
         {"amount": "float", "reconciled": "bool"},
     ),
     TableSpec("compliance_findings.csv", "compliance_findings", {"openedDate": "date"}),
+    # Bridge table for the many-to-many supplier-to-business-unit link, so Genie
+    # can join suppliers to the units they supply. Both columns are strings.
+    TableSpec("supplier_business_units.csv", "supplier_business_units"),
 ]
 
 # Gold table: all CLASSIFIED_AS edges written back from the graph. Rule-planted

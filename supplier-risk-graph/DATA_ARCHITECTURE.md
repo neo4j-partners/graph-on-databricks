@@ -6,20 +6,26 @@ The demo uses a dual data architecture. The Databricks lakehouse owns the data /
 
 ## Lakehouse Tables (Unity Catalog Delta)
 
+Instance-table columns are camelCase (the CSV headers load verbatim into both Neo4j and UC). The two graph-derived gold tables are snake_case, built from Cypher `RETURN` aliases.
+
 | Table | Kind | Columns (key) | Notes |
 |---|---|---|---|
-| `invoices` | Fact | `id, customer_id, amount, currency, issue_date, due_date, paid_date, days_late, status` | Basis for payment-behavior rules; drives Q5 and the Q6 payment condition |
-| `payments` | Fact | `id, invoice_id, amount, date` | Settles one or more invoices |
-| `revenue_entries` | Fact | `id, business_unit_id, period, amount, currency, reconciled` | `reconciled = false` drives Q1 |
-| `customers` | Dimension | `id, name, segment, business_unit_id, churn_risk, upsell_score, profitability_trend` | The last three columns are derived ML features consumed by the graph |
-| `suppliers` | Dimension | `id, name, category, risk_score` | Procurement counterpart; drives Q4 |
+| `invoices` | Fact | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Basis for payment-behavior rules; drives Q5 and the Q6 payment condition |
+| `payments` | Fact | `id, invoiceId, amount, date` | `invoiceId` joins to `invoices.id` |
+| `revenue_entries` | Fact | `id, businessUnitId, period, amount, currency, reconciled` | `businessUnitId` joins to `business_units.id`; `reconciled = false` drives Q1 |
+| `customers` | Dimension | `id, businessUnitId, name, segment, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | `businessUnitId` joins to `business_units.id`. The trend, churn, and score columns are derived ML features consumed by the graph |
+| `suppliers` | Dimension | `id, name, category, riskScore` | Procurement counterpart; drives Q4 |
 | `business_units` | Dimension | `id, name, region` | Rolls up customers, suppliers, and revenue |
-| `compliance_findings` | Operational log | `id, customer_id, type, status, opened_date` | `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
-| `classifications` | Write-back | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
+| `compliance_findings` | Operational log | `id, customerId, type, status, openedDate` | `customerId` joins to `customers.id`; `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
+| `supplier_business_units` | Bridge | `supplierId, businessUnitId` | The many-to-many supplier-to-unit link, so the lakehouse can join suppliers to the units they supply. Mirrors the `SUPPLIES` edge |
+| `classifications` | Write-back | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. Join `entity_id` to `customers.id` or `suppliers.id`. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
+| `business_unit_exposure` | Write-back | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | The Q4 supplier-risk propagation result, one row per business unit |
 
 ## Neo4j Nodes
 
 ### Data / instance layer (mirror of the lakehouse)
+
+Because the instance CSVs are the single source for both sides, the mirror nodes also carry the foreign-key columns as properties (`Invoice.customerId`, `Payment.invoiceId`, `RevenueEntry.businessUnitId`, `ComplianceFinding.customerId`, `Customer.businessUnitId`). They are redundant with the instance-layer relationships below, which is what the demo's Cypher traverses.
 
 | Label | Key properties | Notes |
 |---|---|---|
@@ -76,10 +82,11 @@ The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be trace
 
 ## CSV Mapping
 
-Each node label and each relationship type loads from one CSV in `data/`. The same node CSVs are uploaded to Unity Catalog as the tables above.
+Each node label and each relationship type loads from one CSV in `data/`. The seven instance node CSVs, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer and relationship CSVs stay graph-only.
 
 - Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `payments.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `edm_entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
 - Relationship CSVs: `has_invoice.csv`, `settled_by.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
+- Lakehouse-only CSV: `supplier_business_units.csv`, the camelCase bridge uploaded to UC but not loaded into Neo4j, where the `SUPPLIES` edge already carries the link.
 
 `classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`.
 

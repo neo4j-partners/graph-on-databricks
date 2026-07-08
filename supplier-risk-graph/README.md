@@ -32,7 +32,7 @@ See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the data diagram and the 
 
 Run these in order from this folder. Steps 1 and 2 need no live service; steps 3 to 5 need `.env` filled in.
 
-1. Generate the data. This writes the 13 node CSVs, 13 relationship CSVs, and `ground_truth.json` to `data/`. It is deterministic, with a fixed seed and a frozen as-of date of 2026-07-01.
+1. Generate the data. This writes the 13 node CSVs, 13 relationship CSVs, the `supplier_business_units` lakehouse bridge CSV, and `ground_truth.json` to `data/`. It is deterministic, with a fixed seed and a frozen as-of date of 2026-07-01.
 
    ```bash
    uv run generate_data.py
@@ -121,8 +121,6 @@ Expected: 2 units, BU-04 Asia Pacific (189924.86) and BU-02 Southern Europe (175
 - **Backed by:** policy "KYC Policy" (POL-01), which CONSTRAINS the Customer entity (EDM-01).
 - **Facts from:** `customers` and `compliance_findings`.
 - **Where the findings come from:** the compliance findings are synthetic demo data, not real regulatory filings. `generate_data.py` deterministically selects a 6-customer KYC cohort from a fixed seed, which includes the first at-risk strategic account, and gives each customer one or two findings of `type: KYC, status: open`. Those rows land in the `compliance_findings` table (DS-07), and the loader mirrors them into Neo4j as `ComplianceFinding` nodes linked to each customer by `HAS_FINDING`. The cohort is sized so Q2 returns exactly 6 customers.
-
-> Direction note: the requirements doc traverses `REALIZED_AS` the wrong way. The model uses the entity-to-instance direction `(:EDMEntity)-[:REALIZED_AS]->(:Customer)`, so this query traverses entity to instance. This is the query the requirements doc had backwards.
 
 ```cypher
 MATCH (pol:Policy {name: 'KYC Policy'})-[:CONSTRAINS]->(edm:EDMEntity)-[:REALIZED_AS]->(c:Customer)
@@ -308,13 +306,14 @@ Genie is the consumer of what the graph produces, not a competing answer path.
 ### Setup (one-time, before the call)
 
 1. Confirm `upload.py` has published these tables into `graph-on-databricks.supplier_risk`:
-   - Instance tables: `customers`, `suppliers`, `business_units`, `invoices`, `payments`, `revenue_entries`, `compliance_findings`.
+   - Instance tables: `customers`, `suppliers`, `business_units`, `invoices`, `payments`, `revenue_entries`, `compliance_findings`. These carry camelCase foreign keys, so the lakehouse side joins like a star schema: `invoices.customerId` and `compliance_findings.customerId` to `customers.id`, `payments.invoiceId` to `invoices.id`, and `revenue_entries.businessUnitId` and `customers.businessUnitId` to `business_units.id`.
+   - Bridge table: `supplier_business_units` (`supplierId`, `businessUnitId`) for the many-to-many supplier-to-unit link.
    - Graph-derived gold tables: `classifications` (every `CLASSIFIED_AS` edge, rule- and GDS-sourced) and `business_unit_exposure` (the Q4 propagation result).
-2. Create a Genie space scoped to the `supplier_risk` schema. Add all nine tables above.
+2. Create a Genie space scoped to the `supplier_risk` schema. Add all ten tables above.
 3. Add general instructions to the space so Genie prefers the governed tables:
-   - "`classifications` holds governed labels written back from the knowledge graph. Use it, not ad hoc heuristics, to decide who is a Risky Customer, High-Risk Supplier, Strategic Account, or Platinum Customer."
+   - "`classifications` holds governed labels written back from the knowledge graph. Use it, not ad hoc heuristics, to decide who is a Risky Customer, High-Risk Supplier, Strategic Account, or Platinum Customer. Join `classifications.entity_id` to `customers.id` or `suppliers.id`."
    - "The `source` column in `classifications` is `rule` for policy-based labels and `gds` for algorithm-derived ones. `reason` explains each label."
-   - "`business_unit_exposure` holds supplier-risk exposure per business unit. Use `supplier_exposure_score` for aggregate exposure, not just individual `suppliers.risk_score`."
+   - "`business_unit_exposure` holds supplier-risk exposure per business unit. Use `supplier_exposure_score` for aggregate exposure, not just individual `suppliers.riskScore`."
 4. Add sample-question SQL for a couple of the questions below so Genie has curated examples to learn from.
 5. Publish and smoke-test the space with the first question before the call.
 
@@ -326,7 +325,7 @@ Asked in the Genie space, these return answers that line up with the Cypher resu
 - "Which business units have the highest supplier risk exposure?" Genie reads `business_unit_exposure` and returns BU-03 at the top, matching the GDS result.
 - "List our platinum customers ranked by upsell score." Matches Q3.
 - "Which suppliers are high risk?" Genie reads the governed `classifications` labels rather than guessing a threshold.
-- "How many strategic accounts have an open compliance finding?" Genie joins `classifications` to `compliance_findings`.
+- "How many strategic accounts have an open compliance finding?" Genie joins `classifications` (term = Strategic Account) to `customers` on `entity_id = id`, then to `compliance_findings` on `customerId`.
 
 ### Why the graph makes Genie better
 
@@ -418,13 +417,18 @@ Use this space to:
 Do NOT use this space to:
 - Invent what a business term means. If a question depends on material,
   high-risk, risky, strategic, or platinum, resolve it in the graph first.
-- Join two instance tables to each other. The instance tables carry no
-  foreign-key columns, so relationships between them live only in the graph.
-  Route relationship and multi-hop questions there.
+- Trace long provenance chains. A join or two is fine here; anything deeper, or
+  any why-was-this-classified question, belongs to the graph.
 
-Tables:
+Tables and joins:
 - Instance tables, primary key id, camelCase columns: customers, suppliers,
   business_units, invoices, payments, revenue_entries, compliance_findings.
+- Foreign keys on the instance tables: invoices.customerId and
+  compliance_findings.customerId join to customers.id; payments.invoiceId joins
+  to invoices.id; revenue_entries.businessUnitId and customers.businessUnitId
+  join to business_units.id.
+- supplier_business_units (bridge): supplierId, businessUnitId. Join suppliers to
+  the units they supply; the supplier-to-unit link is many-to-many.
 - classifications (gold, snake_case): entity_id, entity_type, term, source,
   algorithm, score, reason, evaluated_at, rule_version. source is 'rule' or
   'gds'; reason explains each label. Join entity_id back to a customer or
@@ -435,8 +439,9 @@ Tables:
   Use supplier_exposure_score for aggregate exposure, not raw supplier scores.
 
 Conventions:
-- Instance-table columns are camelCase: riskScore, upsellScore, daysLate,
-  issueDate. The two gold tables are snake_case.
+- Instance-table columns, including the foreign keys, are camelCase: riskScore,
+  upsellScore, daysLate, issueDate, customerId. The two gold tables are
+  snake_case.
 - The primary key on every instance table is id.
 ```
 
