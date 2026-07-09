@@ -118,6 +118,8 @@ In plain English: walk from the High-Risk Supplier term to the rule that defines
 
 Why the graph: the rule and its threshold are data, so procurement can change the policy without anyone rewriting a query.
 
+Written back at load time: `load.py` evaluates this same rule and writes a `CLASSIFIED_AS` edge from each qualifying supplier to the High-Risk Supplier term, with the threshold comparison recorded as the edge `reason`. Expanding the term in Neo4j Browser reaches its 5 suppliers, and the label flows into the `classifications` gold table with `source` of `rule`.
+
 Expected: 5 suppliers, SUP-024 (94), SUP-010 (90), SUP-003 (86), SUP-007 (85), SUP-001 (77).
 
 #### Q5 — Risky customers: more than 60 days late on each of their last 3 invoices
@@ -142,6 +144,8 @@ ORDER BY c.id
 Read the late-payment threshold, then for each customer pull all their invoices sorted newest first, and take just the top three into a list. Drop any customer without a full three, then keep only the customers where all three of those recent invoices were more than the threshold days late. Return each surviving customer with those three invoices and how late each was.
 
 Why the graph: this is a per-customer, ordered, last-three-of-N pattern. It reads cleanly in one traversal and returns the supporting invoices, not just the verdict.
+
+Written back at load time: `load.py` evaluates this same rule and writes a `CLASSIFIED_AS` edge from each of these customers to the Risky Customer term, recording the reason on the edge. These rule-based edges carry no `source` and land in the `classifications` gold table as `source` of `rule`, distinct from the `source` of `gds` edges the kNN pass adds to the same term.
 
 Expected: 5 customers, CUST-015, CUST-020, CUST-036, CUST-067, CUST-091.
 
