@@ -2,7 +2,15 @@
 
 The demo uses a dual data architecture. The Databricks lakehouse owns the instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
 
-> **A note on "knowledge layer".** This demo uses the term narrowly, for the governed-meaning half of the graph: entities, business terms, business rules, policies, thresholds, and the semantic mapping (`MAPS_TO`), held distinct from the instance layer. This is deliberately tighter than the broader anchor sense, where the Knowledge Layer is the umbrella that also contains the instance data as its "Data" component. Here the two are kept as sibling layers because the split maps directly onto the demo's division of labor: the lakehouse owns the facts, Neo4j owns the meaning.
+> **A note on "knowledge layer".** This demo uses the term narrowly, for the governed-meaning half of the graph: entities, business terms, business rules, policies, thresholds, and the semantic mapping (`MAPS_TO`), held distinct from the instance layer. The two are kept as sibling layers because the split maps directly onto the demo's division of labor: the lakehouse owns the facts, Neo4j owns the meaning.
+
+## Classification and provenance
+
+A single classification, traced end to end. A Databricks job runs the graph algorithm, which classifies customer CUST-084 as a Risky Customer. The `CLASSIFIED_AS` edge carries the provenance: the source, the kNN algorithm, the similarity score, the evaluation date, and a human-readable reason. From that business term the chain continues through the rule that defines it, the entities the rule evaluates, and the `MAPS_TO` lineage down to the physical Unity Catalog tables `supplier_risk.customers` and `supplier_risk.invoices`. Every answer resolves from an instance record, to a business term, to a rule, to an entity, to the real table behind it. The customer id and score are illustrative, emergent from the run; every other value comes from the data files.
+
+![Classification and provenance](classification-provenance.png)
+
+## Dual data architecture
 
 ![Dual data architecture](dual-data-architecture.png)
 
@@ -12,25 +20,32 @@ The demo uses a dual data architecture. The Databricks lakehouse owns the instan
 
 ## Lakehouse Tables (Unity Catalog Delta)
 
-Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC. The two graph-derived gold tables are snake_case, built from Cypher `RETURN` aliases.
+The lakehouse holds two kinds of table: the six **core instance tables** that carry the facts, and the two **gold write-back tables** the graph produces. Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC. The two gold tables are snake_case, built from Cypher `RETURN` aliases.
 
-| Table | Kind | Business description | Columns (key) | Notes |
-|---|---|---|---|---|
-| `invoices` | Fact | Bills the enterprise issued to its customers, each recording what was owed, when it was due, and how late it was paid | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Basis for payment-behavior rules; drives Q5 and the Q6 payment condition |
-| `payments` | Fact | Cash the enterprise received to settle invoices | `id, invoiceId, amount, date` | `invoiceId` joins to `invoices.id` |
-| `revenue_entries` | Fact | Revenue booked to an internal division for a period, marked reconciled or not | `id, businessUnitId, period, amount, currency, reconciled` | `businessUnitId` joins to `business_units.id`; `reconciled = false` drives Q1 |
-| `customers` | Dimension | The accounts the enterprise sells to, with commercial segment and risk/ML attributes | `id, businessUnitId, name, segment, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | `businessUnitId` joins to `business_units.id`. The trend, churn, and score columns are derived ML features consumed by the graph |
-| `suppliers` | Dimension | The vendors the enterprise buys from, each carrying a procurement risk score | `id, name, category, riskScore` | Procurement counterpart; drives Q4 |
-| `business_units` | Dimension | The enterprise's own internal divisions; the pivot customers roll up into, suppliers feed, and revenue is booked to | `id, name, region` | Rolls up customers, suppliers, and revenue |
-| `compliance_findings` | Operational log | Compliance issues (KYC, AML, sanctions) raised against a customer, open or closed | `id, customerId, type, status, openedDate` | `customerId` joins to `customers.id`; `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
-| `supplier_business_units` | Bridge | Which suppliers feed which internal divisions | `supplierId, businessUnitId` | The many-to-many supplier-to-unit link, so the lakehouse can join suppliers to the units they supply. Mirrors the `SUPPLIES` edge |
-| `classifications` | Write-back | Business-term labels assigned to customers and suppliers, with the reason and the source that produced them | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. Join `entity_id` to `customers.id` or `suppliers.id`. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
-| `business_unit_exposure` | Write-back | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | The Q4 supplier-risk propagation result, one row per business unit |
+### Core instance tables
 
-The seven instance tables are mirrored into Neo4j as nodes; the two write-back tables surface as `CLASSIFIED_AS` edges and a `BusinessUnit` property. Sample a few of each mirrored instance label:
+| Table | Business description | Columns (key) | Notes |
+|---|---|---|---|
+| `customers` | The accounts the enterprise sells to, with commercial segment and risk/ML attributes | `id, businessUnitId, name, segment, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | The trend, churn, and score columns are derived ML features consumed by the graph. Drives Q3 |
+| `suppliers` | The vendors the enterprise buys from, each carrying a procurement risk score | `id, name, category, riskScore` | Procurement counterpart; drives Q4 |
+| `business_units` | The enterprise's own internal divisions; the pivot customers roll up into, suppliers feed, and revenue is booked to | `id, name, region` | Rolls up customers, suppliers, and revenue |
+| `invoices` | Bills the enterprise issued to its customers, each recording what was owed, when it was due, and how late it was paid | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Drives Q5 and the Q6 overdue condition |
+| `revenue_entries` | Revenue booked to an internal division for a period, marked reconciled or not | `id, businessUnitId, period, amount, currency, reconciled` | `businessUnitId` joins to `business_units.id`; `reconciled = false` drives Q1 |
+| `compliance_findings` | Compliance issues (KYC, AML, sanctions) raised against a customer, open or closed | `id, customerId, type, status, openedDate` | `customerId` joins to `customers.id`; `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
+
+One bridge table, `supplier_business_units` (`supplierId, businessUnitId`), carries the many-to-many supplier-to-unit link so the lakehouse can join suppliers to the units they supply. It mirrors the `SUPPLIES` edge and is uploaded to UC but not loaded into Neo4j.
+
+### Gold write-back tables
+
+| Table | Business description | Columns (key) | Notes |
+|---|---|---|---|
+| `classifications` | Business-term labels assigned to customers and suppliers, with the reason and the source that produced them | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. Join `entity_id` to `customers.id` or `suppliers.id`. `source` is `rule` for the pre-planted edges or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
+| `business_unit_exposure` | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | The Q4 supplier-risk propagation result, one row per business unit |
+
+The six instance tables are mirrored into Neo4j as nodes; the two write-back tables surface as `CLASSIFIED_AS` edges and a `supplierExposureScore` property on `BusinessUnit`. Sample a few of each mirrored instance label:
 
 ```cypher
-UNWIND ['Customer', 'Supplier', 'BusinessUnit', 'Invoice', 'Payment', 'RevenueEntry', 'ComplianceFinding'] AS label
+UNWIND ['Customer', 'Supplier', 'BusinessUnit', 'Invoice', 'RevenueEntry', 'ComplianceFinding'] AS label
 CALL {
   WITH label
   MATCH (n) WHERE label IN labels(n)
@@ -43,7 +58,7 @@ RETURN label, n;
 
 ### Instance layer (mirror of the lakehouse)
 
-Because the instance CSVs are the single source for both sides, the mirror nodes also carry the foreign-key columns as properties (`Invoice.customerId`, `Payment.invoiceId`, `RevenueEntry.businessUnitId`, `ComplianceFinding.customerId`, `Customer.businessUnitId`). They are redundant with the instance-layer relationships below, which is what the demo's Cypher traverses.
+Because the instance CSVs are the single source for both sides, the mirror nodes also carry the foreign-key columns as properties (`Invoice.customerId`, `RevenueEntry.businessUnitId`, `ComplianceFinding.customerId`, `Customer.businessUnitId`). They are redundant with the instance-layer relationships below, which is what the demo's Cypher traverses.
 
 | Label | Key properties | Business description | Notes |
 |---|---|---|---|
@@ -51,17 +66,16 @@ Because the instance CSVs are the single source for both sides, the mirror nodes
 | `Supplier` | `id, name, category, riskScore` | A vendor the enterprise buys from | Procurement counterpart |
 | `BusinessUnit` | `id, name, region` | An internal division of the enterprise; the pivot customers, suppliers, and revenue attach to | Rolls up customers, suppliers, revenue |
 | `Invoice` | `id, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | A bill issued to a customer | Basis for payment-behavior rules |
-| `Payment` | `id, amount, date` | Cash received to settle an invoice | Settles one or more invoices |
 | `RevenueEntry` | `period, amount, currency, reconciled` | Revenue booked to a division for a period | `reconciled = false` drives Q1 |
 | `ComplianceFinding` | `id, type, status, openedDate` | A compliance issue raised against a customer | `status = 'open'` drives Q2 and Q6 |
 
-Sample one customer's instance subgraph, its unit, invoices, payments, and findings:
+Sample one customer's instance subgraph, its unit, invoices, and findings:
 
 ```cypher
 MATCH (c:Customer)-[:BELONGS_TO]->(bu:BusinessUnit)
-OPTIONAL MATCH (c)-[:HAS_INVOICE]->(i:Invoice)-[:SETTLED_BY]->(p:Payment)
+OPTIONAL MATCH (c)-[:HAS_INVOICE]->(i:Invoice)
 OPTIONAL MATCH (c)-[:HAS_FINDING]->(f:ComplianceFinding)
-RETURN c, bu, i, p, f LIMIT 25;
+RETURN c, bu, i, f LIMIT 25;
 ```
 
 ### Knowledge layer (graph only)
@@ -94,7 +108,6 @@ RETURN label, n;
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
 | `HAS_INVOICE` | `(:Customer)-[:HAS_INVOICE]->(:Invoice)` | A customer was billed on this invoice | Payment behavior per customer |
-| `SETTLED_BY` | `(:Invoice)-[:SETTLED_BY]->(:Payment)` | This invoice was paid off by this payment | Invoice settlement |
 | `BELONGS_TO` | `(:Customer)-[:BELONGS_TO]->(:BusinessUnit)` | A customer account rolls up into this internal division | Customer roll-up |
 | `RECOGNIZES` | `(:BusinessUnit)-[:RECOGNIZES]->(:RevenueEntry)` | A division books this revenue entry | Revenue recognition per unit |
 | `SUPPLIES` | `(:Supplier)-[:SUPPLIES]->(:BusinessUnit)` | A supplier feeds this internal division | Supply relationships |
@@ -103,7 +116,7 @@ RETURN label, n;
 Sample a few of each instance-layer relationship:
 
 ```cypher
-UNWIND ['HAS_INVOICE', 'SETTLED_BY', 'BELONGS_TO', 'RECOGNIZES', 'SUPPLIES', 'HAS_FINDING'] AS relType
+UNWIND ['HAS_INVOICE', 'BELONGS_TO', 'RECOGNIZES', 'SUPPLIES', 'HAS_FINDING'] AS relType
 CALL {
   WITH relType
   MATCH (a)-[r]->(b) WHERE type(r) = relType
@@ -158,10 +171,10 @@ The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be trace
 
 ## CSV Mapping
 
-Each node label and each relationship type loads from one CSV in `data/`. The seven instance node CSVs, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer and relationship CSVs stay graph-only.
+Each node label and each relationship type loads from one CSV in `data/`. The six instance node CSVs, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer and relationship CSVs stay graph-only.
 
-- Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `payments.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
-- Relationship CSVs: `has_invoice.csv`, `settled_by.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
+- Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
+- Relationship CSVs: `has_invoice.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
 - Lakehouse-only CSV: `supplier_business_units.csv`, the camelCase bridge uploaded to UC but not loaded into Neo4j, where the `SUPPLIES` edge already carries the link.
 
 `classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`.
@@ -202,7 +215,7 @@ The `MAPS_TO` edge is the semantic mapping: the data lineage that connects a log
 (:Entity {name:'Customer'})-[:MAPS_TO]->(:DataSource {table:'supplier_risk.customers'})
 ```
 
-So "Customer" as a logical entity in the knowledge layer is realized in `supplier_risk.customers` on the lakehouse. The `DataSource.table` values are the actual UC table names (`supplier_risk.customers`, `.suppliers`, `.invoices`, and so on), which is why lineage points at real Databricks assets rather than placeholders. All seven instance entities have a 1:1 mapping.
+So "Customer" as a logical entity in the knowledge layer is realized in `supplier_risk.customers` on the lakehouse. The `DataSource.table` values are the actual UC table names (`supplier_risk.customers`, `.suppliers`, `.invoices`, and so on), which is why lineage points at real Databricks assets rather than placeholders. All six instance entities have a 1:1 mapping.
 
 Lineage is one link in a longer chain that answers "where did this answer come from". A business term traces down through its rule, to the logical entity, and finally to the exact UC table backing it, which is what Q6 reports:
 
@@ -244,4 +257,4 @@ OPTIONAL MATCH (e)-[:REALIZED_AS]->(inst)
 RETURN e, ds, inst LIMIT 25;
 ```
 
-Only `Customer` and `Invoice` have `REALIZED_AS` edges to instances in this demo; the other five entities have lineage (`MAPS_TO`) but no realized instances.
+Only `Customer` and `Invoice` have `REALIZED_AS` edges to instances in this demo; the other four entities have lineage (`MAPS_TO`) but no realized instances.

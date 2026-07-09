@@ -76,7 +76,6 @@ ENTITIES = [
     {"id": "ENT-02", "name": "Supplier", "description": "A party that provides goods or services to the company."},
     {"id": "ENT-03", "name": "BusinessUnit", "description": "An organizational unit that recognizes revenue and owns customer relationships."},
     {"id": "ENT-04", "name": "Invoice", "description": "A billing document issued to a customer with a due date and settlement status."},
-    {"id": "ENT-05", "name": "Payment", "description": "A settlement received against an invoice."},
     {"id": "ENT-06", "name": "RevenueEntry", "description": "A recognized revenue amount for a business unit in a period, reconciled or not."},
     {"id": "ENT-07", "name": "ComplianceFinding", "description": "An open or closed compliance issue raised against a customer."},
 ]
@@ -114,7 +113,6 @@ DATA_SOURCES = [
     {"id": "DS-02", "name": "suppliers", "system": "Databricks Unity Catalog", "table": "supplier_risk.suppliers"},
     {"id": "DS-03", "name": "business_units", "system": "Databricks Unity Catalog", "table": "supplier_risk.business_units"},
     {"id": "DS-04", "name": "invoices", "system": "Databricks Unity Catalog", "table": "supplier_risk.invoices"},
-    {"id": "DS-05", "name": "payments", "system": "Databricks Unity Catalog", "table": "supplier_risk.payments"},
     {"id": "DS-06", "name": "revenue_entries", "system": "Databricks Unity Catalog", "table": "supplier_risk.revenue_entries"},
     {"id": "DS-07", "name": "compliance_findings", "system": "Databricks Unity Catalog", "table": "supplier_risk.compliance_findings"},
 ]
@@ -156,7 +154,12 @@ APPLIES_TO = [
     {"threshold_id": "THR-03", "term_id": "TERM-04"},
 ]
 
-MAPS_TO = [{"entity_id": f"ENT-0{i}", "data_source_id": f"DS-0{i}"} for i in range(1, 8)]
+# Each logical entity maps 1:1 to the data source in the same position; pairing
+# by position keeps this correct as entities are added or removed.
+MAPS_TO = [
+    {"entity_id": e["id"], "data_source_id": d["id"]}
+    for e, d in zip(ENTITIES, DATA_SOURCES)
+]
 
 
 def make_names(rng: random.Random, suffixes: list[str], count: int) -> list[str]:
@@ -381,20 +384,6 @@ def make_invoices(rng: random.Random, customers: list[dict], cohorts: dict) -> l
             if cid in needs_overdue:
                 invoices.append(overdue_invoice(rng, next_id(), cid, rng.randint(20, 55)))
     return invoices
-
-
-def make_payments(invoices: list[dict]) -> list[dict]:
-    payments = []
-    for invoice in invoices:
-        if invoice["status"] == "paid":
-            payments.append({
-                "id": f"PAY-{len(payments) + 1:04d}",
-                "invoice_id": invoice["id"],
-                "invoiceId": invoice["id"],
-                "amount": invoice["amount"],
-                "date": invoice["paidDate"],
-            })
-    return payments
 
 
 def make_revenue_entries(rng: random.Random) -> list[dict]:
@@ -645,7 +634,6 @@ def main() -> None:
     customers, cohorts = make_customers(rng)
     suppliers = make_suppliers(rng)
     invoices = make_invoices(rng, customers, cohorts)
-    payments = make_payments(invoices)
     revenue_entries = make_revenue_entries(rng)
     findings = make_findings(rng, customers, cohorts)
     add_payment_features(customers, invoices)
@@ -710,7 +698,6 @@ def main() -> None:
               ["id", "customerId", "amount", "currency", "issueDate", "dueDate", "paidDate",
                "daysLate", "status"],
               invoices)
-    write_csv("payments.csv", ["id", "invoiceId", "amount", "date"], payments)
     write_csv("revenue_entries.csv",
               ["id", "businessUnitId", "period", "amount", "currency", "reconciled"], revenue_entries)
     write_csv("compliance_findings.csv",
@@ -726,8 +713,6 @@ def main() -> None:
     print("Relationship CSVs:")
     write_csv("has_invoice.csv", ["customer_id", "invoice_id"],
               [{"customer_id": i["customer_id"], "invoice_id": i["id"]} for i in invoices])
-    write_csv("settled_by.csv", ["invoice_id", "payment_id"],
-              [{"invoice_id": p["invoice_id"], "payment_id": p["id"]} for p in payments])
     write_csv("belongs_to.csv", ["customer_id", "business_unit_id"], belongs_to)
     write_csv("recognizes.csv", ["business_unit_id", "revenue_entry_id"],
               [{"business_unit_id": r["business_unit_id"], "revenue_entry_id": r["id"]}
@@ -760,7 +745,6 @@ def main() -> None:
             "suppliers": len(suppliers),
             "business_units": len(BUSINESS_UNITS),
             "invoices": len(invoices),
-            "payments": len(payments),
             "revenue_entries": len(revenue_entries),
             "compliance_findings": len(findings),
             "answers": {q: len(rows) for q, rows in answers.items()},

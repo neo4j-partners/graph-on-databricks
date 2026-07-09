@@ -1,24 +1,28 @@
 # supplier-risk-graph
 
-A runnable demo of Neo4j and Databricks working together on supplier and customer risk. It is built for two people: the sales engineer who has to stand it up and present it, and the customer evaluating whether a knowledge graph earns its place next to the lakehouse.
+**Governed, explainable risk classification across a Neo4j knowledge graph and a Databricks lakehouse.**
 
-## Why this demo exists
+A runnable demo built on a supplier and customer risk scenario. The Databricks lakehouse holds the facts as Unity Catalog Delta tables: customers, suppliers, invoices, revenue, and compliance findings. The Neo4j knowledge graph mirrors those facts and adds the governed meaning: the business definitions, thresholds, rules, and the multi-hop lineage that ties every risk classification back to the physical table behind it.
+
+The demo answers six risk questions end to end, from unreconciled revenue to at-risk strategic accounts, resolving each against definitions governed once in the graph rather than reinvented in ad hoc SQL. Two graph analytics passes surface risk that flat rules miss, and every classification is written back to Delta as gold tables, so Genie and other Databricks tools answer over consistent, explainable data. One set of CSVs feeds both sides, so it runs offline.
+
+## Overview
 
 In a lakehouse the facts are clean, but the *meaning* is scattered. What counts as "material" unreconciled revenue, a "high-risk" supplier, a "risky" customer, or a "strategic" account tends to live in ad hoc SQL, notebooks, and tribal knowledge. Different queries encode slightly different definitions, thresholds drift, and when someone asks "why was this flagged?" there is no clean answer to give.
 
 This demo fixes that with a division of labor:
 
-- **Databricks owns the facts.** The lakehouse holds the data as Unity Catalog Delta tables: customers, suppliers, invoices, revenue, compliance findings.
-- **Neo4j owns the meaning.** The knowledge layer holds the governed definitions, thresholds, policies, and the multi-hop lineage that ties every business term back to the physical table behind it.
+- **Databricks owns the facts.** The lakehouse is the source of truth, holding the raw data as Unity Catalog Delta tables.
+- **Neo4j owns the meaning.** The knowledge layer holds the governed definitions, thresholds, policies, and the multi-hop lineage that ties every business term back to the physical table. Neo4j also mirrors the instance data so one query can traverse facts and meaning together, but Databricks stays the source of truth for the facts.
 
-One set of CSVs in `data/` feeds both sides, so the demo runs offline and the two layers always agree.
+Because both sides load from the same CSVs in `data/`, the two layers always agree.
 
-What a sales engineer can say out loud while running it:
+What the demo shows:
 
 - **Definitions are governed once.** A threshold like the materiality cutoff is a node in the graph that finance owns, not a number buried in a query, so every answer stays consistent no matter who asks.
 - **Every answer is explainable.** A classification traces from the instance record to the business term to the rule to the entity to the real Unity Catalog table. That provenance chain is what a text or RDF glossary cannot query.
 - **The graph finds what flat rules miss.** Two analytics passes surface risk the rules never see: a supplier-risk *exposure* aggregation that flags a business unit no single supplier trips, and a kNN customer *similarity* pass that finds the next risky accounts before they break a rule.
-- **The value lands back in Delta.** Both rule-based and algorithm-derived classifications are written back to Unity Catalog as gold tables, so Databricks and Genie users get the graph's meaning in their own tables. It is the same Genie, now accurate, consistent, explainable, and cheaper, because the meaning is resolved once in the graph instead of re-guessed on every prompt.
+- **The value lands back in Delta.** Both rule-based and algorithm-derived classifications land in the gold tables, so it is the same Genie, now accurate, consistent, explainable, and cheaper, because the meaning is resolved once in the graph instead of re-guessed on every prompt.
 
 For the full walkthrough, the six validation questions and the Genie flow, see [`DEMO.md`](DEMO.md). For the complete data model, see [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md).
 
@@ -31,13 +35,13 @@ Two layers, tied together by two cross-layer edges:
 - **`REALIZED_AS`:** links a logical entity to its physical instances.
 - **`CLASSIFIED_AS`:** records a classification with provenance.
 
-See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the data diagram and the full label, relationship, and property model. Graph properties and the instance tables use camelCase, so the Cypher in the walkthrough runs unchanged against either side. The two graph-derived gold tables, `classifications` and `business_unit_exposure`, are snake_case.
+See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the data diagrams and the full label, relationship, and property model. Graph properties and the instance tables use camelCase, so the Cypher in the walkthrough runs unchanged against either side. The two graph-derived gold tables, `classifications` and `business_unit_exposure`, are snake_case.
 
 ## How to run
 
 Run these in order from this folder. Steps 1 and 2 need no live service; steps 3 to 5 need `.env` filled in.
 
-1. Generate the data. This writes the 13 node CSVs, 13 relationship CSVs, the `supplier_business_units` lakehouse bridge CSV, and `ground_truth.json` to `data/`. It is deterministic, with a fixed seed and a frozen as-of date of 2026-07-01.
+1. Generate the data. This writes the 12 node CSVs, 13 relationship CSVs, the `supplier_business_units` lakehouse bridge CSV, and `ground_truth.json` to `data/`. It is deterministic, with a fixed seed and a frozen as-of date of 2026-07-01.
 
    ```bash
    uv run generate_data.py
@@ -71,7 +75,7 @@ Run these in order from this folder. Steps 1 and 2 need no live service; steps 3
 
 Quick check that the load worked, before you walk through anything live. Open Neo4j Browser on the demo database with the results pane set to Table view, then confirm:
 
-- **Counts:** `uv run load.py --check` reports 1433 nodes and 2221 relationships.
+- **Counts:** `uv run load.py --check` reports 868 nodes and 1657 relationships.
 - **Q1:** 2 business units.
 - **Q2:** 6 customers.
 - **Q6:** 3 customers.
@@ -83,10 +87,10 @@ If those three match, everything upstream loaded correctly.
 Do this once before the call so Genie answers over the governed tables the graph wrote back.
 
 1. Confirm `upload.py` has published these tables into `graph-on-databricks.supplier_risk`:
-   - Instance tables: `customers`, `suppliers`, `business_units`, `invoices`, `payments`, `revenue_entries`, `compliance_findings`. These carry camelCase foreign keys, so the lakehouse side joins like a star schema: `invoices.customerId` and `compliance_findings.customerId` to `customers.id`, `payments.invoiceId` to `invoices.id`, and `revenue_entries.businessUnitId` and `customers.businessUnitId` to `business_units.id`.
+   - Core instance tables: `customers`, `suppliers`, `business_units`, `invoices`, `revenue_entries`, `compliance_findings`. Columns are camelCase and share keys where they join: `invoices.customerId` and `compliance_findings.customerId` to `customers.id`, `revenue_entries.businessUnitId` and `customers.businessUnitId` to `business_units.id`.
    - Bridge table: `supplier_business_units` (`supplierId`, `businessUnitId`) for the many-to-many supplier-to-unit link.
    - Graph-derived gold tables: `classifications` (every `CLASSIFIED_AS` edge, rule- and GDS-sourced) and `business_unit_exposure` (the Q4 propagation result).
-2. Create a Genie space scoped to the `supplier_risk` schema. Add all ten tables above.
+2. Create a Genie space scoped to the `supplier_risk` schema. Add the tables the questions actually read: `customers`, `suppliers`, `business_units`, `invoices`, `compliance_findings`, and the two gold tables `classifications` and `business_unit_exposure`. The `revenue_entries` and `supplier_business_units` tables back graph-side questions and do not need to be in the space.
 3. Add general instructions to the space so Genie prefers the governed tables:
    - "`classifications` holds governed labels written back from the knowledge graph. Use it, not ad hoc heuristics, to decide who is a Risky Customer, High-Risk Supplier, Strategic Account, or Platinum Customer. Join `classifications.entity_id` to `customers.id` or `suppliers.id`."
    - "The `source` column in `classifications` is `rule` for policy-based labels and `gds` for algorithm-derived ones. `reason` explains each label."

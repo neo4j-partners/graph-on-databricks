@@ -2,7 +2,7 @@
 
 Two-layer demo: the lakehouse owns the data/instance layer while Neo4j owns the
 knowledge layer. This script materializes the lakehouse side. It uploads the
-seven instance node CSVs plus the supplier-to-business-unit bridge into a UC
+six instance node CSVs plus the supplier-to-business-unit bridge into a UC
 volume and builds one Delta table each with `read_files`, then reads the two
 graph-derived tables back out of Neo4j:
 
@@ -11,8 +11,8 @@ graph-derived tables back out of Neo4j:
 
 CSV headers stay verbatim (camelCase), so the demo's Cypher and the UC column
 names line up. Instance tables carry foreign-key columns (invoices.customerId,
-payments.invoiceId, revenue_entries.businessUnitId, compliance_findings.customerId,
-customers.businessUnitId) so the lakehouse side can be joined like a star schema.
+revenue_entries.businessUnitId, compliance_findings.customerId,
+customers.businessUnitId) so the lakehouse side can be joined on shared keys.
 Re-runnable: tables are CREATE OR REPLACE and the schema/volume are created
 idempotently.
 
@@ -102,7 +102,6 @@ BASE_SPECS = [
             "daysLate": "int",
         },
     ),
-    TableSpec("payments.csv", "payments", {"amount": "float", "date": "date"}),
     TableSpec(
         "revenue_entries.csv",
         "revenue_entries",

@@ -306,8 +306,7 @@ tables. Send those to Genie.
 
 Graph shape. Knowledge layer: Entity, BusinessTerm, BusinessRule, Policy,
 Threshold, DataSource. Instance layer, a mirror of the lakehouse tables:
-Customer, Supplier, BusinessUnit, Invoice, Payment, RevenueEntry,
-ComplianceFinding.
+Customer, Supplier, BusinessUnit, Invoice, RevenueEntry, ComplianceFinding.
 
 Key relationships:
 - (:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule): the rule behind a term.
@@ -365,13 +364,10 @@ Do NOT use this space to:
 
 Tables and joins:
 - Instance tables, primary key id, camelCase columns: customers, suppliers,
-  business_units, invoices, payments, revenue_entries, compliance_findings.
+  business_units, invoices, compliance_findings.
 - Foreign keys on the instance tables: invoices.customerId and
-  compliance_findings.customerId join to customers.id; payments.invoiceId joins
-  to invoices.id; revenue_entries.businessUnitId and customers.businessUnitId
-  join to business_units.id.
-- supplier_business_units (bridge): supplierId, businessUnitId. Join suppliers to
-  the units they supply; the supplier-to-unit link is many-to-many.
+  compliance_findings.customerId join to customers.id; customers.businessUnitId
+  joins to business_units.id.
 - classifications (gold, snake_case): entity_id, entity_type, term, source,
   algorithm, score, reason, evaluated_at, rule_version. source is 'rule' or
   'gds'; reason explains each label. Join entity_id back to a customer or
@@ -445,3 +441,52 @@ Per-question summary for the slide:
 - Q6, GDS exposure, GDS similarity: **Multi-Hop Native**. Deep traversal and algorithms in Neo4j, results written back to Delta.
 
 The demo's write-back tables, `classifications` and `business_unit_exposure`, are the Multi-Hop Native story made concrete: graph-derived value landing back in Unity Catalog where Databricks users and Genie already work.
+
+## Generating a dashboard with Neo4j AI
+
+Neo4j's "Create with AI" dashboard generator builds a dashboard from a prompt and the database schema. Naming the exact labels, relationships, and camelCase property names gets far closer than a generic "show me risk" prompt, because the generator leans on the schema you describe.
+
+### Dashboard description
+
+Paste this into the **Dashboard description** box:
+
+```text
+Build a supplier and customer risk dashboard for an enterprise that
+sells to Customers, buys from Suppliers, and rolls both up into internal
+BusinessUnits. Use the governed classifications the graph already carries:
+Customers and Suppliers are CLASSIFIED_AS BusinessTerms (Platinum Customer,
+Strategic Account, High-Risk Supplier, Risky Customer), where each edge
+records a reason and a source of either 'rule' or 'gds'.
+
+Include:
+- A KPI row: total customers, total suppliers, count of high-risk suppliers
+  (Supplier.riskScore >= 70), count of customers classified as Risky Customer,
+  and count of open ComplianceFindings.
+- High-risk suppliers ranked by riskScore, with their category.
+- Supplier-risk exposure per BusinessUnit using
+  BusinessUnit.supplierExposureScore, sorted highest first, so a unit can rank
+  high even when no single supplier crosses the threshold.
+- Customers with open KYC findings (ComplianceFinding {type:'KYC',
+  status:'open'}) via HAS_FINDING.
+- Strategic accounts at risk: Customers CLASSIFIED_AS 'Strategic Account'
+  whose profitabilityTrend='declining' and churnRisk='high' with at least one
+  overdue Invoice and one open ComplianceFinding.
+- Platinum customers ranked by upsellScore.
+- A lineage/provenance view: for a selected classified Customer, walk
+  CLASSIFIED_AS -> BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> Entity
+  -MAPS_TO-> DataSource, showing the term, the reason, the rule, and the
+  physical DataSource.table.
+
+Prefer the governed CLASSIFIED_AS labels and BusinessRule thresholds over
+recomputing definitions from raw properties. All properties are camelCase.
+```
+
+### Optional focus
+
+Keep the focus field short:
+
+```text
+Supplier and customer risk exposure, with governed classifications and provenance
+```
+
+The prompt assumes the graph as loaded by `load.py` plus `gds.py`, so it expects `supplierExposureScore` and the `gds`-sourced `CLASSIFIED_AS` edges to exist. If you only ran `load.py` and skipped `gds.py`, drop the exposure and rule-vs-gds bullets, since those edges and properties will not be present.

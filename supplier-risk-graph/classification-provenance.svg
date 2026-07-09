@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="860" viewBox="0 0 1000 860" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4B5563"/>
+    </marker>
+    <marker id="arrow-gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A87E0D"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D82C4"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E1503A"/>
+    </marker>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="860" fill="#F3F2ED"/>
+
+  <!-- Title -->
+  <text x="500" y="38" text-anchor="middle" font-size="22" font-weight="bold" fill="#16233A">Classification + Provenance</text>
+  <text x="500" y="60" text-anchor="middle" font-size="12.5" fill="#5C6470">One classification, traced from the record to the physical Unity Catalog table — and written back to gold.</text>
+
+  <!-- ===================== Top flow: how the classification runs ===================== -->
+  <rect x="42" y="84" width="176" height="48" rx="8" fill="#EAF4FF" stroke="#66AEE8" stroke-width="1.4" filter="url(#sh)"/>
+  <text x="130" y="113" text-anchor="middle" font-size="13" font-weight="bold" fill="#0166BC">Databricks Job</text>
+
+  <rect x="252" y="84" width="176" height="48" rx="8" fill="#EAF4FF" stroke="#66AEE8" stroke-width="1.4" filter="url(#sh)"/>
+  <text x="340" y="113" text-anchor="middle" font-size="13" font-weight="bold" fill="#0166BC">Graph Algorithm</text>
+
+  <rect x="462" y="84" width="176" height="48" rx="8" fill="#EAF4FF" stroke="#66AEE8" stroke-width="1.4" filter="url(#sh)"/>
+  <text x="550" y="113" text-anchor="middle" font-size="13" font-weight="bold" fill="#0166BC">Classify</text>
+
+  <line x1="218" y1="108" x2="252" y2="108" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+  <line x1="428" y1="108" x2="462" y2="108" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+
+  <!-- connector from Classify into the traced chain -->
+  <path d="M 550 132 L 550 151 L 310 151 L 310 168" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+
+  <!-- ===================== Provenance chain ===================== -->
+  <!-- 1. Customer (instance) -->
+  <rect x="130" y="170" width="360" height="54" rx="8" fill="#E5F1FF" stroke="#66AEE8" stroke-width="1.4" filter="url(#sh)"/>
+  <text x="310" y="194" text-anchor="middle" font-size="14" font-weight="bold" fill="#0B4C7F">Customer</text>
+  <text x="310" y="213" text-anchor="middle" font-size="12" font-family="Menlo, monospace" fill="#0B4C7F">CUST-084</text>
+
+  <line x1="310" y1="224" x2="310" y2="238" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+
+  <!-- 2. CLASSIFIED_AS edge payload (the provenance) -->
+  <rect x="95" y="240" width="430" height="150" rx="8" fill="#FBFBFC" stroke="#4B5563" stroke-width="1.8" filter="url(#sh)"/>
+  <text x="115" y="264" font-size="13" font-weight="bold" fill="#1F2937">CLASSIFIED_AS</text>
+  <text x="115" y="288" font-size="12" font-family="Menlo, monospace" fill="#374151">source      = gds</text>
+  <text x="115" y="306" font-size="12" font-family="Menlo, monospace" fill="#374151">algorithm   = knn   <tspan fill="#6B7280">(similarity)</tspan></text>
+  <text x="115" y="324" font-size="12" font-family="Menlo, monospace" fill="#374151">score       = 0.91   <tspan fill="#6B7280">(similarity to nearest risky peer)</tspan></text>
+  <text x="115" y="342" font-size="12" font-family="Menlo, monospace" fill="#374151">evaluatedAt = 2026-07-01</text>
+  <text x="115" y="360" font-size="12" font-family="Menlo, monospace" fill="#374151">reason      = "GDS kNN: among the nearest neighbors of</text>
+  <text x="115" y="378" font-size="12" font-family="Menlo, monospace" fill="#374151">              the known risky cohort; not yet tripping the rule"</text>
+
+  <line x1="310" y1="390" x2="310" y2="404" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+
+  <!-- ===================== Write-back loop (CLASSIFIED_AS -> gold table) ===================== -->
+  <path d="M 525 315 L 750 315 L 750 674" fill="none" stroke="#E1503A" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="595" y="308" font-size="11" font-weight="bold" fill="#E1503A">WRITES BACK</text>
+
+  <!-- 3. BusinessTerm (ontology) -->
+  <rect x="130" y="408" width="360" height="54" rx="8" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.4" filter="url(#sh)"/>
+  <text x="310" y="432" text-anchor="middle" font-size="14" font-weight="bold" fill="#6B4E07">Risky Customer</text>
+  <text x="310" y="451" text-anchor="middle" font-size="11" fill="#6B4E07">BusinessTerm · TERM-04</text>
+
+  <line x1="310" y1="462" x2="310" y2="500" stroke="#A87E0D" stroke-width="1.4" marker-end="url(#arrow-gold)"/>
+  <text x="318" y="485" font-size="10.5" font-weight="bold" fill="#A87E0D">DEFINED_BY</text>
+
+  <!-- 4. BusinessRule -->
+  <rect x="130" y="502" width="360" height="62" rx="8" fill="#FFFAEC" stroke="#D4A017" stroke-width="1.4" filter="url(#sh)"/>
+  <text x="310" y="525" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#92660A">Risky Customer Rule · RULE-04</text>
+  <text x="310" y="547" text-anchor="middle" font-size="11" font-family="Menlo, monospace" fill="#92660A">all(last 3 invoices WHERE invoice.daysLate &gt; 60)</text>
+
+  <line x1="310" y1="564" x2="310" y2="602" stroke="#A87E0D" stroke-width="1.4" marker-end="url(#arrow-gold)"/>
+  <text x="318" y="587" font-size="10.5" font-weight="bold" fill="#A87E0D">EVALUATES</text>
+
+  <!-- 5. Entity -->
+  <rect x="130" y="604" width="360" height="58" rx="8" fill="#FDF6E3" stroke="#C9A227" stroke-width="1.4" filter="url(#sh)"/>
+  <text x="310" y="627" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#7A5A0A">Entity</text>
+  <text x="310" y="648" text-anchor="middle" font-size="11.5" fill="#7A5A0A">Customer (ENT-01)   ·   Invoice (ENT-04)</text>
+
+  <line x1="310" y1="662" x2="310" y2="700" stroke="#A87E0D" stroke-width="1.4" marker-end="url(#arrow-gold)"/>
+  <text x="318" y="685" font-size="10.5" font-weight="bold" fill="#A87E0D">MAPS_TO</text>
+
+  <!-- 6a. DataSource — SILVER (read) -->
+  <rect x="130" y="702" width="360" height="82" rx="8" fill="#FFF7F5" stroke="#E1503A" stroke-width="1.6" filter="url(#sh)"/>
+  <text x="310" y="724" text-anchor="middle" font-size="13" font-weight="bold" fill="#C42B12">DataSource · Unity Catalog</text>
+  <text x="310" y="745" text-anchor="middle" font-size="12" font-family="Menlo, monospace" fill="#C42B12">supplier_risk.customers</text>
+  <text x="310" y="762" text-anchor="middle" font-size="12" font-family="Menlo, monospace" fill="#C42B12">supplier_risk.invoices</text>
+  <text x="310" y="779" text-anchor="middle" font-size="10" font-style="italic" font-weight="bold" fill="#9A6B5E">SILVER — read</text>
+
+  <!-- 6b. DataSource — GOLD (written back) -->
+  <rect x="560" y="676" width="380" height="118" rx="8" fill="#FFF7F5" stroke="#E1503A" stroke-width="1.6" filter="url(#sh)"/>
+  <text x="750" y="700" text-anchor="middle" font-size="13" font-weight="bold" fill="#C42B12">DataSource · Unity Catalog</text>
+  <text x="750" y="720" text-anchor="middle" font-size="12" font-family="Menlo, monospace" fill="#C42B12">supplier_risk.gold_customer_risk</text>
+  <line x1="590" y1="730" x2="910" y2="730" stroke="#F2C4BA" stroke-width="1"/>
+  <text x="750" y="749" text-anchor="middle" font-size="11.5" font-family="Menlo, monospace" fill="#C42B12">customer_id · term · score</text>
+  <text x="750" y="766" text-anchor="middle" font-size="11.5" font-family="Menlo, monospace" fill="#C42B12">algorithm · evaluatedAt · reason</text>
+  <text x="750" y="785" text-anchor="middle" font-size="10" font-style="italic" font-weight="bold" fill="#9A6B5E">GOLD — written back</text>
+
+  <!-- footnote -->
+  <text x="500" y="828" text-anchor="middle" font-size="10" font-style="italic" fill="#8A8579">CUST-084 and 0.91 are illustrative, emergent from the run. All other values come from the data files.</text>
+</svg>

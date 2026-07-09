@@ -2,8 +2,11 @@
 
 Reads the node and relationship CSVs written by generate_data.py and loads
 them with the plain neo4j Python driver: uniqueness constraints first, then
-nodes, then relationships, batched with UNWIND. Re-runnable: the target
-database is wiped before loading, so it must be dedicated to this demo.
+nodes, then relationships, batched with UNWIND. Finally it derives the two
+threshold-driven classifications (High-Risk Supplier and Risky Customer) from
+the governed thresholds and writes them back as CLASSIFIED_AS edges.
+Re-runnable: the target database is wiped before loading, so it must be
+dedicated to this demo.
 
 Usage:
     uv run load.py            # wipe the database and load data/
@@ -30,6 +33,11 @@ from neo4j import GraphDatabase, Session
 
 HERE = Path(__file__).parent
 BATCH_SIZE = 1000
+
+# Frozen as-of stamp for the rule-materialized classifications, matching the
+# pre-planted edges in classified_as.csv and the gds.py write-back.
+EVALUATED_AT = "2026-07-01T00:00:00Z"
+RULE_VERSION = "v1.0"
 
 Converter = Callable[[str], Any]
 
@@ -87,7 +95,6 @@ NODE_SPECS = [
             "daysLate": "int",
         },
     ),
-    NodeSpec("payments.csv", "Payment", {"amount": "float", "date": "date"}),
     NodeSpec(
         "revenue_entries.csv",
         "RevenueEntry",
@@ -104,13 +111,15 @@ NODE_SPECS = [
 
 REL_SPECS = [
     RelSpec("has_invoice.csv", "HAS_INVOICE", "customer_id", "Customer", "invoice_id", "Invoice"),
-    RelSpec("settled_by.csv", "SETTLED_BY", "invoice_id", "Invoice", "payment_id", "Payment"),
     RelSpec("belongs_to.csv", "BELONGS_TO", "customer_id", "Customer", "business_unit_id", "BusinessUnit"),
     RelSpec("recognizes.csv", "RECOGNIZES", "business_unit_id", "BusinessUnit", "revenue_entry_id", "RevenueEntry"),
     RelSpec("supplies.csv", "SUPPLIES", "supplier_id", "Supplier", "business_unit_id", "BusinessUnit"),
     RelSpec("has_finding.csv", "HAS_FINDING", "customer_id", "Customer", "finding_id", "ComplianceFinding"),
     # Pre-planted classifications are customer-only (Platinum Customer and
-    # Strategic Account); the other terms get written live during the demo.
+    # Strategic Account). The two threshold-driven terms, High-Risk Supplier
+    # and Risky Customer, are derived from the governed thresholds and written
+    # back by materialize_rule_classifications after loading; GDS adds the
+    # source:'gds' Risky Customer edges in gds.py.
     RelSpec(
         "classified_as.csv",
         "CLASSIFIED_AS",
@@ -243,6 +252,64 @@ def load_rels(session: Session, spec: RelSpec, rows: list[dict[str, Any]]) -> in
     return created
 
 
+def materialize_rule_classifications(session: Session) -> None:
+    """Derive the threshold-driven rule classifications and write them back.
+
+    Platinum Customer and Strategic Account are pre-planted in classified_as.csv,
+    but High-Risk Supplier and Risky Customer are threshold-driven: they are
+    evaluated here against the governed threshold on each load, mirroring the Q4
+    and Q5 demo queries, and written back as CLASSIFIED_AS edges. Keeping them
+    derived from the rule and threshold (rather than hardcoded in seed data)
+    means raising a threshold and reloading re-derives the labels. These edges
+    follow the rule-planted contract: reason, evaluatedAt, and ruleVersion, but
+    no source (upload.py coalesces a missing source to 'rule'). The GDS-derived
+    Risky Customer edges (source:'gds') are added separately by gds.py.
+    """
+    # Q4 High-Risk Supplier: suppliers whose riskScore meets the threshold stored
+    # on the rule behind the term.
+    suppliers = session.run(
+        """
+        MATCH (term:BusinessTerm {name: 'High-Risk Supplier'})-[:DEFINED_BY]->(rule:BusinessRule)
+        MATCH (s:Supplier)
+        WHERE s.riskScore >= rule.threshold
+        MERGE (s)-[r:CLASSIFIED_AS]->(term)
+        SET r.reason = 'riskScore ' + toString(s.riskScore) +
+                       ' >= Supplier Risk Threshold ' + toString(rule.threshold) +
+                       ' per High-Risk Supplier Rule',
+            r.evaluatedAt = datetime($evaluated_at),
+            r.ruleVersion = $rule_version
+        RETURN count(r) AS written
+        """,
+        evaluated_at=EVALUATED_AT,
+        rule_version=RULE_VERSION,
+    ).single()["written"]
+    print(f"  High-Risk Supplier: {suppliers} CLASSIFIED_AS edges")
+
+    # Q5 Risky Customer: more than the Late Payment Threshold days late on each of
+    # the last three invoices by issue date.
+    customers = session.run(
+        """
+        MATCH (thr:Threshold {name: 'Late Payment Threshold'})
+        MATCH (c:Customer)-[:HAS_INVOICE]->(inv:Invoice)
+        WITH c, thr.value AS lateThreshold, inv
+        ORDER BY inv.issueDate DESC
+        WITH c, lateThreshold, collect(inv)[0..3] AS lastThree
+        WHERE size(lastThree) = 3
+          AND all(i IN lastThree WHERE i.daysLate > lateThreshold)
+        MATCH (term:BusinessTerm {name: 'Risky Customer'})
+        MERGE (c)-[r:CLASSIFIED_AS]->(term)
+        SET r.reason = 'last 3 invoices each > Late Payment Threshold ' +
+                       toString(lateThreshold) + ' days late per Risky Customer Rule',
+            r.evaluatedAt = datetime($evaluated_at),
+            r.ruleVersion = $rule_version
+        RETURN count(r) AS written
+        """,
+        evaluated_at=EVALUATED_AT,
+        rule_version=RULE_VERSION,
+    ).single()["written"]
+    print(f"  Risky Customer: {customers} CLASSIFIED_AS edges")
+
+
 def require_env(name: str, default: str | None = None) -> str:
     value = os.environ.get(name) or default
     if value is None:
@@ -309,8 +376,10 @@ def main() -> None:
                         f"created {created} of {len(rows)} relationships."
                     )
                 print(f"  {spec.rel_type} ({spec.src_label}->{spec.dst_label}): {created} relationships")
+            print("Rule classifications:")
+            materialize_rule_classifications(session)
 
-    print(f"Load complete: {total_nodes} nodes, {total_rels} relationships.")
+    print(f"Load complete: {total_nodes} nodes, {total_rels} relationships from CSVs.")
 
 
 if __name__ == "__main__":

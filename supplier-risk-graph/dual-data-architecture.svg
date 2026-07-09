@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="730" viewBox="0 0 1300 730" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="730" viewBox="0 0 1300 730" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <defs>
     <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#71717A"/>
@@ -15,62 +15,87 @@
     <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#3D82C4"/>
     </marker>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/>
+    </filter>
   </defs>
 
-  <rect width="1300" height="730" fill="#ffffff"/>
+  <rect width="1300" height="730" fill="#F3F2ED"/>
 
   <!-- Title -->
-  <text x="650" y="42" text-anchor="middle" font-size="22" font-weight="bold" fill="#1a1a1a">supplier-risk-graph: Dual Data Architecture</text>
-  <text x="650" y="68" text-anchor="middle" font-size="13" fill="#555">The lakehouse owns instance data; the graph owns definitions, lineage, and provenance.</text>
+  <text x="650" y="42" text-anchor="middle" font-size="22" font-weight="bold" fill="#16233A">supplier-risk-graph: Dual Data Architecture</text>
+  <text x="650" y="68" text-anchor="middle" font-size="13" fill="#5C6470">The lakehouse owns instance data; the graph owns definitions, lineage, and provenance.</text>
 
   <!-- ===================== LEFT: Databricks Lakehouse ===================== -->
-  <rect x="30" y="100" width="520" height="580" rx="12" fill="#FFF7F5" stroke="#FF3621" stroke-width="2"/>
-  <text x="290" y="132" text-anchor="middle" font-size="17" font-weight="bold" fill="#C42B12">Databricks Lakehouse</text>
-  <text x="290" y="152" text-anchor="middle" font-size="12" fill="#7A4A3F">Instance layer: Unity Catalog Delta tables</text>
+  <rect x="30" y="100" width="520" height="580" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M30,144 V114 a14,14 0 0 1 14,-14 H536 a14,14 0 0 1 14,14 V144 Z" fill="#E1503A"/>
+  <text x="290" y="130" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">Databricks Lakehouse</text>
+  <text x="290" y="165" text-anchor="middle" font-size="12" font-style="italic" fill="#8A8579">Instance layer: Unity Catalog Delta tables</text>
 
-  <!-- Fact tables -->
-  <rect x="50" y="180" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#E8998C" stroke-width="1.2"/>
-  <text x="66" y="203" font-size="12.5" font-weight="bold" fill="#C42B12">Fact tables</text>
-  <text x="66" y="230" font-size="12" font-family="Menlo, monospace" fill="#333">invoices</text>
-  <text x="66" y="252" font-size="12" font-family="Menlo, monospace" fill="#333">payments</text>
-  <text x="66" y="274" font-size="12" font-family="Menlo, monospace" fill="#333">revenue_entries</text>
-  <text x="66" y="302" font-size="10.5" font-style="italic" fill="#8A5B50">append-only, aggregation-friendly</text>
+  <!-- Core instance tables -->
+  <rect x="50" y="175" width="480" height="298" rx="8" fill="#FDF2EF" stroke="#E8998C" stroke-width="1.2"/>
+  <text x="66" y="199" font-size="11.5" font-weight="bold" letter-spacing="0.5" fill="#C42B12">CORE INSTANCE TABLES</text>
+  <text x="380" y="199" font-size="8.5" font-weight="bold" letter-spacing="0.5" fill="#C89187">MAPPED TO GRAPH NODE</text>
 
-  <!-- Dimension tables -->
-  <rect x="300" y="180" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#E8998C" stroke-width="1.2"/>
-  <text x="316" y="203" font-size="12.5" font-weight="bold" fill="#C42B12">Dimension tables</text>
-  <text x="316" y="230" font-size="12" font-family="Menlo, monospace" fill="#333">customers</text>
-  <text x="316" y="252" font-size="12" font-family="Menlo, monospace" fill="#333">suppliers</text>
-  <text x="316" y="274" font-size="12" font-family="Menlo, monospace" fill="#333">business_units</text>
-  <text x="316" y="302" font-size="10.5" font-style="italic" fill="#8A5B50">reference data</text>
+  <!-- customers -->
+  <rect x="64" y="213" width="13" height="15" rx="2" fill="#FDECE8" stroke="#E1503A" stroke-width="1"/>
+  <line x1="64" y1="217" x2="77" y2="217" stroke="#E1503A" stroke-width="1" stroke-opacity="0.45"/>
+  <text x="86" y="224" font-size="13" font-weight="bold" fill="#16233A">customers</text>
+  <circle cx="372" cy="220" r="4" fill="#3D82C4"/><text x="380" y="224" font-size="10" fill="#5C6470">&#8594; Customer</text>
+  <text x="86" y="238" font-size="8" font-family="ui-monospace, Menlo, monospace" fill="#A9A498">id · businessUnitId · segment · churnRisk · avgDaysLate</text>
 
-  <!-- Operational log -->
-  <rect x="50" y="360" width="230" height="120" rx="8" fill="#FFFFFF" stroke="#E8998C" stroke-width="1.2"/>
-  <text x="66" y="383" font-size="12.5" font-weight="bold" fill="#C42B12">Operational log</text>
-  <text x="66" y="410" font-size="12" font-family="Menlo, monospace" fill="#333">compliance_findings</text>
-  <text x="66" y="438" font-size="10.5" font-style="italic" fill="#8A5B50">open findings drive Q2 (KYC)</text>
-  <text x="66" y="455" font-size="10.5" font-style="italic" fill="#8A5B50">and Q6 (strategic accounts)</text>
+  <!-- suppliers -->
+  <rect x="64" y="255" width="13" height="15" rx="2" fill="#FDECE8" stroke="#E1503A" stroke-width="1"/>
+  <line x1="64" y1="259" x2="77" y2="259" stroke="#E1503A" stroke-width="1" stroke-opacity="0.45"/>
+  <text x="86" y="266" font-size="13" font-weight="bold" fill="#16233A">suppliers</text>
+  <circle cx="372" cy="262" r="4" fill="#3D82C4"/><text x="380" y="266" font-size="10" fill="#5C6470">&#8594; Supplier</text>
+  <text x="86" y="280" font-size="8" font-family="ui-monospace, Menlo, monospace" fill="#A9A498">id · name · category · riskScore</text>
 
-  <!-- ML features -->
-  <rect x="300" y="360" width="230" height="120" rx="8" fill="#FFFFFF" stroke="#E8998C" stroke-width="1.2"/>
-  <text x="316" y="383" font-size="12.5" font-weight="bold" fill="#C42B12">Derived ML features</text>
-  <text x="316" y="410" font-size="12" font-family="Menlo, monospace" fill="#333">churn_risk</text>
-  <text x="316" y="432" font-size="12" font-family="Menlo, monospace" fill="#333">upsell_score</text>
-  <text x="316" y="454" font-size="12" font-family="Menlo, monospace" fill="#333">profitability_trend</text>
+  <!-- business_units -->
+  <rect x="64" y="297" width="13" height="15" rx="2" fill="#FDECE8" stroke="#E1503A" stroke-width="1"/>
+  <line x1="64" y1="301" x2="77" y2="301" stroke="#E1503A" stroke-width="1" stroke-opacity="0.45"/>
+  <text x="86" y="308" font-size="13" font-weight="bold" fill="#16233A">business_units</text>
+  <circle cx="372" cy="304" r="4" fill="#3D82C4"/><text x="380" y="308" font-size="10" fill="#5C6470">&#8594; BusinessUnit</text>
+  <text x="86" y="322" font-size="8" font-family="ui-monospace, Menlo, monospace" fill="#A9A498">id · name · region</text>
 
-  <!-- classifications write-back table -->
-  <rect x="50" y="560" width="480" height="70" rx="8" fill="#ECFDF3" stroke="#1F9D55" stroke-width="1.6"/>
-  <text x="66" y="588" font-size="13" fill="#166534"><tspan font-family="Menlo, monospace" font-weight="bold">classifications</tspan><tspan dx="5">(Delta table)</tspan></text>
-  <text x="66" y="610" font-size="11.5" fill="#166534">CLASSIFIED_AS results written back from the graph (Multi-Hop Native story)</text>
+  <!-- invoices -->
+  <rect x="64" y="339" width="13" height="15" rx="2" fill="#FDECE8" stroke="#E1503A" stroke-width="1"/>
+  <line x1="64" y1="343" x2="77" y2="343" stroke="#E1503A" stroke-width="1" stroke-opacity="0.45"/>
+  <text x="86" y="350" font-size="13" font-weight="bold" fill="#16233A">invoices</text>
+  <circle cx="372" cy="346" r="4" fill="#3D82C4"/><text x="380" y="350" font-size="10" fill="#5C6470">&#8594; Invoice</text>
+  <text x="86" y="364" font-size="8" font-family="ui-monospace, Menlo, monospace" fill="#A9A498">id · customerId · amount · dueDate · daysLate · status</text>
+
+  <!-- revenue_entries -->
+  <rect x="64" y="381" width="13" height="15" rx="2" fill="#FDECE8" stroke="#E1503A" stroke-width="1"/>
+  <line x1="64" y1="385" x2="77" y2="385" stroke="#E1503A" stroke-width="1" stroke-opacity="0.45"/>
+  <text x="86" y="392" font-size="13" font-weight="bold" fill="#16233A">revenue_entries</text>
+  <circle cx="372" cy="388" r="4" fill="#3D82C4"/><text x="380" y="392" font-size="10" fill="#5C6470">&#8594; RevenueEntry</text>
+  <text x="86" y="406" font-size="8" font-family="ui-monospace, Menlo, monospace" fill="#A9A498">id · businessUnitId · period · amount · reconciled</text>
+
+  <!-- compliance_findings -->
+  <rect x="64" y="423" width="13" height="15" rx="2" fill="#FDECE8" stroke="#E1503A" stroke-width="1"/>
+  <line x1="64" y1="427" x2="77" y2="427" stroke="#E1503A" stroke-width="1" stroke-opacity="0.45"/>
+  <text x="86" y="434" font-size="13" font-weight="bold" fill="#16233A">compliance_findings</text>
+  <circle cx="372" cy="430" r="4" fill="#3D82C4"/><text x="380" y="434" font-size="10" fill="#5C6470">&#8594; ComplianceFinding</text>
+  <text x="86" y="448" font-size="8" font-family="ui-monospace, Menlo, monospace" fill="#A9A498">id · customerId · type · status · openedDate</text>
+
+  <!-- Gold write-back tables -->
+  <rect x="50" y="488" width="480" height="160" rx="8" fill="#ECFDF3" stroke="#1F9D55" stroke-width="1.6"/>
+  <text x="66" y="512" font-size="12.5" font-weight="bold" fill="#166534">Gold write-back tables</text>
+  <text x="66" y="542" font-size="13" fill="#166534"><tspan font-family="Menlo, monospace" font-weight="bold">classifications</tspan><tspan dx="5">(Delta table)</tspan></text>
+  <text x="66" y="562" font-size="11" fill="#166534">each row tags a customer or supplier with a governed business term + why</text>
+  <text x="66" y="602" font-size="13" fill="#166534"><tspan font-family="Menlo, monospace" font-weight="bold">business_unit_exposure</tspan><tspan dx="5">(Delta table)</tspan></text>
+  <text x="66" y="622" font-size="11" fill="#166534">supplierExposureScore per business unit: the mean risk of its suppliers</text>
 
   <!-- ===================== RIGHT: Neo4j ===================== -->
-  <rect x="750" y="100" width="520" height="580" rx="12" fill="#F2F8FF" stroke="#018BFF" stroke-width="2"/>
-  <text x="1010" y="132" text-anchor="middle" font-size="17" font-weight="bold" fill="#0166BC">Neo4j</text>
-  <text x="1010" y="152" text-anchor="middle" font-size="12" fill="#3F5A7A">Knowledge layer + instance mirror</text>
+  <rect x="750" y="100" width="520" height="580" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M750,144 V114 a14,14 0 0 1 14,-14 H1256 a14,14 0 0 1 14,14 V144 Z" fill="#018BFF"/>
+  <text x="1010" y="130" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">Neo4j</text>
+  <text x="1010" y="165" text-anchor="middle" font-size="12" font-style="italic" fill="#8A8579">Knowledge Graph</text>
 
   <!-- Knowledge layer -->
   <rect x="770" y="175" width="480" height="220" rx="8" fill="#FFFAEC" stroke="#D4A017" stroke-width="1.4"/>
-  <text x="786" y="197" font-size="12.5" font-weight="bold" fill="#92660A">Knowledge layer (entities + terms &amp; rules)</text>
+  <text x="786" y="197" font-size="12.5" font-weight="bold" fill="#92660A">Knowledge layer (entities, semantic map &amp; rules)</text>
 
   <!-- knowledge pills row 1 -->
   <rect x="786" y="212" width="124" height="32" rx="16" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.2"/>
@@ -95,8 +120,8 @@
   <text x="1092" y="207" text-anchor="middle" font-size="8.5" fill="#A87E0D">EVALUATES</text>
   <line x1="848" y1="335" x2="848" y2="248" stroke="#A87E0D" stroke-width="1.3" marker-end="url(#arrow-gold)"/>
   <text x="854" y="295" font-size="8.5" fill="#A87E0D">APPLIES_TO</text>
-  <line x1="1040" y1="335" x2="1138" y2="248" stroke="#A87E0D" stroke-width="1.3" marker-end="url(#arrow-gold)"/>
-  <text x="1064" y="285" font-size="8.5" fill="#A87E0D">CONSTRAINS</text>
+  <path d="M 1012 335 L 1012 286 L 1135 286 L 1135 246" fill="none" stroke="#A87E0D" stroke-width="1.3" marker-end="url(#arrow-gold)"/>
+  <text x="1072" y="281" text-anchor="middle" font-size="8.5" fill="#A87E0D">CONSTRAINS</text>
   <line x1="1173" y1="248" x2="1173" y2="331" stroke="#A87E0D" stroke-width="1.3" marker-end="url(#arrow-gold)"/>
   <text x="1179" y="295" font-size="8.5" fill="#A87E0D">MAPS_TO</text>
 
@@ -109,13 +134,11 @@
 
   <!-- Instance mirror -->
   <rect x="770" y="440" width="480" height="225" rx="8" fill="#E5F1FF" stroke="#018BFF" stroke-width="1.4"/>
-  <text x="786" y="462" font-size="12.5" font-weight="bold" fill="#0166BC">Instance mirror (same CSVs as the lakehouse)</text>
+  <text x="786" y="462" font-size="12.5" font-weight="bold" fill="#0166BC">Instance graph</text>
 
   <!-- instance edges (drawn under pills) -->
   <line x1="880" y1="531" x2="986" y2="494" stroke="#3D82C4" stroke-width="1.3" marker-end="url(#arrow-blue)"/>
   <text x="920" y="503" text-anchor="middle" font-size="8.5" fill="#3D82C4">HAS_INVOICE</text>
-  <line x1="1066" y1="484" x2="1136" y2="484" stroke="#3D82C4" stroke-width="1.3" marker-end="url(#arrow-blue)"/>
-  <text x="1101" y="475" text-anchor="middle" font-size="8.5" fill="#3D82C4">SETTLED_BY</text>
   <line x1="892" y1="545" x2="1086" y2="545" stroke="#3D82C4" stroke-width="1.3" marker-end="url(#arrow-blue)"/>
   <text x="990" y="538" text-anchor="middle" font-size="8.5" fill="#3D82C4">HAS_FINDING</text>
   <line x1="858" y1="559" x2="938" y2="600" stroke="#3D82C4" stroke-width="1.3" marker-end="url(#arrow-blue)"/>
@@ -128,8 +151,6 @@
   <!-- instance pills -->
   <rect x="990" y="470" width="76" height="28" rx="14" fill="#FFFFFF" stroke="#66AEE8" stroke-width="1.2"/>
   <text x="1028" y="488" text-anchor="middle" font-size="11.5" fill="#0B4C7F">Invoice</text>
-  <rect x="1140" y="470" width="84" height="28" rx="14" fill="#FFFFFF" stroke="#66AEE8" stroke-width="1.2"/>
-  <text x="1182" y="488" text-anchor="middle" font-size="11.5" fill="#0B4C7F">Payment</text>
 
   <rect x="800" y="531" width="92" height="28" rx="14" fill="#FFFFFF" stroke="#66AEE8" stroke-width="1.2"/>
   <text x="846" y="549" text-anchor="middle" font-size="11.5" fill="#0B4C7F">Customer</text>
@@ -143,18 +164,18 @@
   <rect x="1120" y="602" width="112" height="28" rx="14" fill="#FFFFFF" stroke="#66AEE8" stroke-width="1.2"/>
   <text x="1176" y="620" text-anchor="middle" font-size="11.5" fill="#0B4C7F">RevenueEntry</text>
 
-  <text x="786" y="652" font-size="10.5" font-style="italic" fill="#3F5A7A">loaded by load.py: UNWIND batches, MERGE for re-runs</text>
 
   <!-- ===================== Cross-panel flows ===================== -->
   <!-- MAPS_TO lineage -->
-  <path d="M 770 363 C 690 363 640 290 554 290" fill="none" stroke="#A87E0D" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrow-gold)"/>
-  <text x="660" y="296" text-anchor="middle" font-size="11" font-weight="bold" fill="#92660A">MAPS_TO lineage</text>
-  <text x="660" y="312" text-anchor="middle" font-size="10" fill="#92660A">DataSource.table points at real UC tables</text>
+  <path d="M 766 342 C 700 342 648 300 556 278" fill="none" stroke="#A87E0D" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrow-gold)"/>
+  <text x="662" y="360" text-anchor="middle" font-size="11" font-weight="bold" fill="#92660A">MAPS_TO lineage</text>
+  <text x="662" y="376" text-anchor="middle" font-size="10" fill="#92660A">DataSource.table points at real UC tables</text>
 
   <!-- Virtual access option -->
   <line x1="554" y1="460" x2="766" y2="460" stroke="#999999" stroke-width="1.4" stroke-dasharray="3,4" marker-start="url(#arrow-gray)" marker-end="url(#arrow-gray)"/>
-  <text x="660" y="434" text-anchor="middle" font-size="10" font-style="italic" fill="#777">Virtual access from Neo4j</text>
-  <text x="660" y="448" text-anchor="middle" font-size="10" font-style="italic" fill="#777">slide option, not built in this demo</text>
+  <rect x="556" y="422" width="208" height="30" rx="8" fill="#F7F7F8" stroke="#D0D0D5" stroke-width="1"/>
+  <text x="660" y="434" text-anchor="middle" font-size="10" font-style="italic" fill="#8A8579">Virtual access from Neo4j</text>
+  <text x="660" y="448" text-anchor="middle" font-size="10" font-style="italic" fill="#8A8579">slide option, not built in this demo</text>
 
   <!-- Write-back -->
   <line x1="766" y1="595" x2="536" y2="595" stroke="#1F9D55" stroke-width="2" marker-end="url(#arrow-green)"/>
@@ -163,9 +184,9 @@
 
   <!-- Legend -->
   <line x1="320" y1="708" x2="356" y2="708" stroke="#4B5563" stroke-width="1.8"/>
-  <text x="364" y="712" font-size="10.5" fill="#555">data flow (built in demo)</text>
+  <text x="364" y="712" font-size="10.5" fill="#5C6470">data flow (built in demo)</text>
   <line x1="520" y1="708" x2="556" y2="708" stroke="#A87E0D" stroke-width="1.6" stroke-dasharray="5,4"/>
-  <text x="564" y="712" font-size="10.5" fill="#555">lineage / metadata pointer</text>
+  <text x="564" y="712" font-size="10.5" fill="#5C6470">lineage / metadata pointer</text>
   <line x1="720" y1="708" x2="756" y2="708" stroke="#999999" stroke-width="1.4" stroke-dasharray="3,4"/>
-  <text x="764" y="712" font-size="10.5" fill="#555">architecture option (not built in demo)</text>
+  <text x="764" y="712" font-size="10.5" fill="#5C6470">architecture option (not built in demo)</text>
 </svg>
