@@ -2,6 +2,8 @@
 
 The demo uses a dual data architecture. The Databricks lakehouse owns the instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
 
+> **A note on "knowledge layer".** This demo uses the term narrowly, for the governed-meaning half of the graph: entities, business terms, business rules, policies, thresholds, and the semantic mapping (`MAPS_TO`), held distinct from the instance layer. This is deliberately tighter than the broader anchor sense, where the Knowledge Layer is the umbrella that also contains the instance data as its "Data" component. Here the two are kept as sibling layers because the split maps directly onto the demo's division of labor: the lakehouse owns the facts, Neo4j owns the meaning.
+
 ![Dual data architecture](dual-data-architecture.png)
 
 ## A note on BusinessUnit
