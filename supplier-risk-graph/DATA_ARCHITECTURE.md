@@ -1,6 +1,6 @@
 # Data Architecture
 
-The demo uses a dual data architecture. The Databricks lakehouse owns the data / instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge / semantic layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
+The demo uses a dual data architecture. The Databricks lakehouse owns the instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
 
 ![Dual data architecture](dual-data-architecture.png)
 
@@ -39,7 +39,7 @@ RETURN label, n;
 
 ## Neo4j Nodes
 
-### Data / instance layer (mirror of the lakehouse)
+### Instance layer (mirror of the lakehouse)
 
 Because the instance CSVs are the single source for both sides, the mirror nodes also carry the foreign-key columns as properties (`Invoice.customerId`, `Payment.invoiceId`, `RevenueEntry.businessUnitId`, `ComplianceFinding.customerId`, `Customer.businessUnitId`). They are redundant with the instance-layer relationships below, which is what the demo's Cypher traverses.
 
@@ -62,11 +62,11 @@ OPTIONAL MATCH (c)-[:HAS_FINDING]->(f:ComplianceFinding)
 RETURN c, bu, i, p, f LIMIT 25;
 ```
 
-### Knowledge / semantic layer (graph only)
+### Knowledge layer (graph only)
 
 | Label | Key properties | Business description | Notes |
 |---|---|---|---|
-| `EDMEntity` | `name, description` | A logical business entity from the Enterprise Data Model | Logical entities from the Enterprise Data Model |
+| `Entity` | `name, description` | A logical business entity in the knowledge layer | Logical entities in the knowledge layer |
 | `BusinessTerm` | `name, definition` | A named business definition the organization agrees on | Human-readable definition, for example "Platinum Customer" |
 | `BusinessRule` | `name, expression, description` | The machine-evaluable logic that backs a term | Machine-evaluable logic behind a term |
 | `Policy` | `name, type` | A governance policy that scopes entities and rules | For example KYC Policy, Procurement Policy |
@@ -76,7 +76,7 @@ RETURN c, bu, i, p, f LIMIT 25;
 Sample a few of each knowledge-layer label:
 
 ```cypher
-UNWIND ['EDMEntity', 'BusinessTerm', 'BusinessRule', 'Policy', 'Threshold', 'DataSource'] AS label
+UNWIND ['Entity', 'BusinessTerm', 'BusinessRule', 'Policy', 'Threshold', 'DataSource'] AS label
 CALL {
   WITH label
   MATCH (n) WHERE label IN labels(n)
@@ -115,11 +115,11 @@ RETURN a, r, b;
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
 | `DEFINED_BY` | `(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)` | A business term is backed by this rule | A term is backed by an explicit rule |
-| `EVALUATES` | `(:BusinessRule)-[:EVALUATES]->(:EDMEntity)` | A rule operates over this logical entity | The rule operates over EDM entities |
-| `CONSTRAINS` | `(:Policy)-[:CONSTRAINS]->(:EDMEntity)` | A policy governs this logical entity | Policy scope, the entity a policy governs |
+| `EVALUATES` | `(:BusinessRule)-[:EVALUATES]->(:Entity)` | A rule operates over this logical entity | The rule operates over entities |
+| `CONSTRAINS` | `(:Policy)-[:CONSTRAINS]->(:Entity)` | A policy governs this logical entity | Policy scope, the entity a policy governs |
 | `GOVERNS` | `(:Policy)-[:GOVERNS]->(:BusinessRule)` | A policy operationalizes this rule | The rules a policy operationalizes, an explicit edge so rules are read directly rather than inferred from a shared entity. Procurement governs the High-Risk Supplier rule, Revenue Recognition the Unreconciled Revenue rule. KYC governs no rule: it is operationalized through `ComplianceFinding` records, and the Platinum, Strategic, and Risky Customer rules are commercial and credit definitions outside its scope |
 | `APPLIES_TO` | `(:Threshold)-[:APPLIES_TO]->(:BusinessTerm)` | A threshold parameterizes this term | Threshold that parameterizes a term |
-| `MAPS_TO` | `(:EDMEntity)-[:MAPS_TO]->(:DataSource)` | A logical entity is stored in this physical source | Lineage from logical entity to physical source; `DataSource.table` points at the real UC table |
+| `MAPS_TO` | `(:Entity)-[:MAPS_TO]->(:DataSource)` | The semantic mapping: a logical entity is stored in this physical source | Lineage from logical entity to physical source; `DataSource.table` points at the real UC table |
 
 Sample a few of each knowledge-layer relationship:
 
@@ -137,7 +137,7 @@ RETURN a, r, b;
 
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
-| `REALIZED_AS` | `(:EDMEntity)-[:REALIZED_AS]->(:Customer\|:Invoice)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The demo realizes only the Customer and Invoice entities, the ones the six questions traverse: 100 Customer edges and 612 Invoice edges. |
+| `REALIZED_AS` | `(:Entity)-[:REALIZED_AS]->(:Customer\|:Invoice)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The demo realizes only the Customer and Invoice entities, the ones the six questions traverse: 100 Customer edges and 612 Invoice edges. |
 | `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with this business term | Materialized classification with provenance; written back to the `classifications` Delta table |
 
 Sample the cross-layer edges that tie the knowledge layer to instances:
@@ -152,13 +152,13 @@ CALL {
 RETURN a, r, b;
 ```
 
-The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be traced instance to business term to rule to EDM entity to data source, so Q6 can report which business definitions and data sources were used.
+The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be traced instance to business term to rule to entity to data source, so Q6 can report which business definitions and data sources were used.
 
 ## CSV Mapping
 
 Each node label and each relationship type loads from one CSV in `data/`. The seven instance node CSVs, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer and relationship CSVs stay graph-only.
 
-- Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `payments.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `edm_entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
+- Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `payments.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
 - Relationship CSVs: `has_invoice.csv`, `settled_by.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
 - Lakehouse-only CSV: `supplier_business_units.csv`, the camelCase bridge uploaded to UC but not loaded into Neo4j, where the `SUPPLIES` edge already carries the link.
 
@@ -194,19 +194,19 @@ The demo uses two graph analytics passes to extend the rule-based answers: a pla
 
 ## Lineage
 
-The `MAPS_TO` edge is data lineage: it connects a logical business entity in the Enterprise Data Model to the physical table where that data actually lives. In this demo every EDM entity points at a real Databricks Unity Catalog table:
+The `MAPS_TO` edge is the semantic mapping: the data lineage that connects a logical business entity in the knowledge layer to the physical table where that data actually lives. In this demo every entity points at a real Databricks Unity Catalog table:
 
 ```
-(:EDMEntity {name:'Customer'})-[:MAPS_TO]->(:DataSource {table:'supplier_risk.customers'})
+(:Entity {name:'Customer'})-[:MAPS_TO]->(:DataSource {table:'supplier_risk.customers'})
 ```
 
-So "Customer" as a concept in the EDM is realized in `supplier_risk.customers` on the lakehouse. The `DataSource.table` values are the actual UC table names (`supplier_risk.customers`, `.suppliers`, `.invoices`, and so on), which is why lineage points at real Databricks assets rather than placeholders. All seven instance entities have a 1:1 mapping.
+So "Customer" as a logical entity in the knowledge layer is realized in `supplier_risk.customers` on the lakehouse. The `DataSource.table` values are the actual UC table names (`supplier_risk.customers`, `.suppliers`, `.invoices`, and so on), which is why lineage points at real Databricks assets rather than placeholders. All seven instance entities have a 1:1 mapping.
 
 Lineage is one link in a longer chain that answers "where did this answer come from". A business term traces down through its rule, to the logical entity, and finally to the exact UC table backing it, which is what Q6 reports:
 
 ```
-BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> EDMEntity -MAPS_TO-> DataSource (physical table)
-                                                      EDMEntity -REALIZED_AS-> Customer/Invoice (instances)
+BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> Entity -MAPS_TO-> DataSource (physical table)
+                                                      Entity -REALIZED_AS-> Customer/Invoice (instances)
 ```
 
 ### Seeing lineage in Neo4j
@@ -214,7 +214,7 @@ BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> EDMEntity -MAPS_TO-> DataSo
 The lineage edges as a table, each logical entity and its physical source:
 
 ```cypher
-MATCH (e:EDMEntity)-[:MAPS_TO]->(ds:DataSource)
+MATCH (e:Entity)-[:MAPS_TO]->(ds:DataSource)
 RETURN e.name AS entity, ds.system AS system, ds.table AS unityCatalogTable
 ORDER BY entity;
 ```
@@ -222,21 +222,21 @@ ORDER BY entity;
 The lineage layer as a graph, for the Browser visual:
 
 ```cypher
-MATCH p = (:EDMEntity)-[:MAPS_TO]->(:DataSource)
+MATCH p = (:Entity)-[:MAPS_TO]->(:DataSource)
 RETURN p;
 ```
 
 Full end-to-end lineage, a business term down to its physical table:
 
 ```cypher
-MATCH (t:BusinessTerm)-[:DEFINED_BY]->(r:BusinessRule)-[:EVALUATES]->(e:EDMEntity)-[:MAPS_TO]->(ds:DataSource)
+MATCH (t:BusinessTerm)-[:DEFINED_BY]->(r:BusinessRule)-[:EVALUATES]->(e:Entity)-[:MAPS_TO]->(ds:DataSource)
 RETURN t.name AS term, r.name AS rule, e.name AS entity, ds.table AS sourceTable;
 ```
 
 One entity's complete picture, its physical source and its realized instances together:
 
 ```cypher
-MATCH (e:EDMEntity {name: 'Customer'})
+MATCH (e:Entity {name: 'Customer'})
 OPTIONAL MATCH (e)-[:MAPS_TO]->(ds:DataSource)
 OPTIONAL MATCH (e)-[:REALIZED_AS]->(inst)
 RETURN e, ds, inst LIMIT 25;

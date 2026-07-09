@@ -1,8 +1,0 @@
-id,name,description
-EDM-01,Customer,A party that buys goods or services from the company.
-EDM-02,Supplier,A party that provides goods or services to the company.
-EDM-03,BusinessUnit,An organizational unit that recognizes revenue and owns customer relationships.
-EDM-04,Invoice,A billing document issued to a customer with a due date and settlement status.
-EDM-05,Payment,A settlement received against an invoice.
-EDM-06,RevenueEntry,"A recognized revenue amount for a business unit in a period, reconciled or not."
-EDM-07,ComplianceFinding,An open or closed compliance issue raised against a customer.

@@ -94,7 +94,7 @@ NODE_SPECS = [
         {"amount": "float", "reconciled": "bool"},
     ),
     NodeSpec("compliance_findings.csv", "ComplianceFinding", {"openedDate": "date"}),
-    NodeSpec("edm_entities.csv", "EDMEntity"),
+    NodeSpec("entities.csv", "Entity"),
     NodeSpec("business_terms.csv", "BusinessTerm"),
     NodeSpec("business_rules.csv", "BusinessRule", {"threshold": "number"}),
     NodeSpec("policies.csv", "Policy"),
@@ -121,11 +121,11 @@ REL_SPECS = [
         {"evaluatedAt": "datetime"},
     ),
     RelSpec("defined_by.csv", "DEFINED_BY", "term_id", "BusinessTerm", "rule_id", "BusinessRule"),
-    RelSpec("evaluates.csv", "EVALUATES", "rule_id", "BusinessRule", "edm_entity_id", "EDMEntity"),
-    RelSpec("constrains.csv", "CONSTRAINS", "policy_id", "Policy", "edm_entity_id", "EDMEntity"),
+    RelSpec("evaluates.csv", "EVALUATES", "rule_id", "BusinessRule", "entity_id", "Entity"),
+    RelSpec("constrains.csv", "CONSTRAINS", "policy_id", "Policy", "entity_id", "Entity"),
     RelSpec("governs.csv", "GOVERNS", "policy_id", "Policy", "rule_id", "BusinessRule"),
     RelSpec("applies_to.csv", "APPLIES_TO", "threshold_id", "Threshold", "term_id", "BusinessTerm"),
-    RelSpec("maps_to.csv", "MAPS_TO", "edm_entity_id", "EDMEntity", "data_source_id", "DataSource"),
+    RelSpec("maps_to.csv", "MAPS_TO", "entity_id", "Entity", "data_source_id", "DataSource"),
 ]
 
 
@@ -168,10 +168,10 @@ def expand_realized_as(data_dir: Path) -> list[tuple[RelSpec, list[dict[str, Any
     """realized_as.csv targets multiple labels; split it into one spec per label."""
     by_label: dict[str, list[dict[str, Any]]] = {}
     for raw in read_csv(data_dir / "realized_as.csv"):
-        row = {"src": raw["edm_entity_id"], "dst": raw["instance_id"], "props": {}}
+        row = {"src": raw["entity_id"], "dst": raw["instance_id"], "props": {}}
         by_label.setdefault(raw["instance_label"], []).append(row)
     return [
-        (RelSpec("realized_as.csv", "REALIZED_AS", "edm_entity_id", "EDMEntity", "instance_id", label), rows)
+        (RelSpec("realized_as.csv", "REALIZED_AS", "entity_id", "Entity", "instance_id", label), rows)
         for label, rows in sorted(by_label.items())
     ]
 

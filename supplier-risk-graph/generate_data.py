@@ -71,14 +71,14 @@ BUSINESS_UNITS = [
 ]
 UNRECONCILED_BUS = ["BU-02", "BU-04"]  # Q1: planted above the materiality threshold
 
-EDM_ENTITIES = [
-    {"id": "EDM-01", "name": "Customer", "description": "A party that buys goods or services from the company."},
-    {"id": "EDM-02", "name": "Supplier", "description": "A party that provides goods or services to the company."},
-    {"id": "EDM-03", "name": "BusinessUnit", "description": "An organizational unit that recognizes revenue and owns customer relationships."},
-    {"id": "EDM-04", "name": "Invoice", "description": "A billing document issued to a customer with a due date and settlement status."},
-    {"id": "EDM-05", "name": "Payment", "description": "A settlement received against an invoice."},
-    {"id": "EDM-06", "name": "RevenueEntry", "description": "A recognized revenue amount for a business unit in a period, reconciled or not."},
-    {"id": "EDM-07", "name": "ComplianceFinding", "description": "An open or closed compliance issue raised against a customer."},
+ENTITIES = [
+    {"id": "ENT-01", "name": "Customer", "description": "A party that buys goods or services from the company."},
+    {"id": "ENT-02", "name": "Supplier", "description": "A party that provides goods or services to the company."},
+    {"id": "ENT-03", "name": "BusinessUnit", "description": "An organizational unit that recognizes revenue and owns customer relationships."},
+    {"id": "ENT-04", "name": "Invoice", "description": "A billing document issued to a customer with a due date and settlement status."},
+    {"id": "ENT-05", "name": "Payment", "description": "A settlement received against an invoice."},
+    {"id": "ENT-06", "name": "RevenueEntry", "description": "A recognized revenue amount for a business unit in a period, reconciled or not."},
+    {"id": "ENT-07", "name": "ComplianceFinding", "description": "An open or closed compliance issue raised against a customer."},
 ]
 
 BUSINESS_TERMS = [
@@ -122,24 +122,24 @@ DATA_SOURCES = [
 DEFINED_BY = [{"term_id": f"TERM-0{i}", "rule_id": f"RULE-0{i}"} for i in range(1, 6)]
 
 EVALUATES = [
-    {"rule_id": "RULE-01", "edm_entity_id": "EDM-01"},
-    {"rule_id": "RULE-02", "edm_entity_id": "EDM-01"},
-    {"rule_id": "RULE-03", "edm_entity_id": "EDM-02"},
-    {"rule_id": "RULE-04", "edm_entity_id": "EDM-01"},
-    {"rule_id": "RULE-04", "edm_entity_id": "EDM-04"},
-    {"rule_id": "RULE-05", "edm_entity_id": "EDM-06"},
-    {"rule_id": "RULE-05", "edm_entity_id": "EDM-03"},
+    {"rule_id": "RULE-01", "entity_id": "ENT-01"},
+    {"rule_id": "RULE-02", "entity_id": "ENT-01"},
+    {"rule_id": "RULE-03", "entity_id": "ENT-02"},
+    {"rule_id": "RULE-04", "entity_id": "ENT-01"},
+    {"rule_id": "RULE-04", "entity_id": "ENT-04"},
+    {"rule_id": "RULE-05", "entity_id": "ENT-06"},
+    {"rule_id": "RULE-05", "entity_id": "ENT-03"},
 ]
 
 CONSTRAINS = [
-    {"policy_id": "POL-01", "edm_entity_id": "EDM-01"},
-    {"policy_id": "POL-02", "edm_entity_id": "EDM-02"},
-    {"policy_id": "POL-03", "edm_entity_id": "EDM-06"},
+    {"policy_id": "POL-01", "entity_id": "ENT-01"},
+    {"policy_id": "POL-02", "entity_id": "ENT-02"},
+    {"policy_id": "POL-03", "entity_id": "ENT-06"},
 ]
 
 # A policy GOVERNS the business rules that operationalize it. This is an explicit
 # edge so an agent reads a policy's rules directly instead of inferring them from
-# a shared EDM entity: the KYC Policy and the Platinum, Strategic, and Risky
+# a shared entity: the KYC Policy and the Platinum, Strategic, and Risky
 # Customer rules all touch the Customer entity, but KYC does not operationalize
 # them. KYC is a compliance policy operationalized through ComplianceFinding
 # records, not a business rule, so it governs no rule here. Platinum and
@@ -156,7 +156,7 @@ APPLIES_TO = [
     {"threshold_id": "THR-03", "term_id": "TERM-04"},
 ]
 
-MAPS_TO = [{"edm_entity_id": f"EDM-0{i}", "data_source_id": f"DS-0{i}"} for i in range(1, 8)]
+MAPS_TO = [{"entity_id": f"ENT-0{i}", "data_source_id": f"DS-0{i}"} for i in range(1, 8)]
 
 
 def make_names(rng: random.Random, suffixes: list[str], count: int) -> list[str]:
@@ -686,10 +686,10 @@ def main() -> None:
     ]
 
     realized_as = [
-        {"edm_entity_id": "EDM-01", "instance_id": c["id"], "instance_label": "Customer"}
+        {"entity_id": "ENT-01", "instance_id": c["id"], "instance_label": "Customer"}
         for c in customers
     ] + [
-        {"edm_entity_id": "EDM-04", "instance_id": i["id"], "instance_label": "Invoice"}
+        {"entity_id": "ENT-04", "instance_id": i["id"], "instance_label": "Invoice"}
         for i in invoices
     ]
 
@@ -715,7 +715,7 @@ def main() -> None:
               ["id", "businessUnitId", "period", "amount", "currency", "reconciled"], revenue_entries)
     write_csv("compliance_findings.csv",
               ["id", "customerId", "type", "status", "openedDate"], findings)
-    write_csv("edm_entities.csv", ["id", "name", "description"], EDM_ENTITIES)
+    write_csv("entities.csv", ["id", "name", "description"], ENTITIES)
     write_csv("business_terms.csv", ["id", "name", "definition"], BUSINESS_TERMS)
     write_csv("business_rules.csv",
               ["id", "name", "expression", "description", "threshold"], BUSINESS_RULES)
@@ -744,12 +744,12 @@ def main() -> None:
     write_csv("classified_as.csv",
               ["entity_id", "term_id", "reason", "evaluatedAt", "ruleVersion"], classified_as)
     write_csv("defined_by.csv", ["term_id", "rule_id"], DEFINED_BY)
-    write_csv("evaluates.csv", ["rule_id", "edm_entity_id"], EVALUATES)
-    write_csv("constrains.csv", ["policy_id", "edm_entity_id"], CONSTRAINS)
+    write_csv("evaluates.csv", ["rule_id", "entity_id"], EVALUATES)
+    write_csv("constrains.csv", ["policy_id", "entity_id"], CONSTRAINS)
     write_csv("governs.csv", ["policy_id", "rule_id"], GOVERNS)
     write_csv("applies_to.csv", ["threshold_id", "term_id"], APPLIES_TO)
-    write_csv("maps_to.csv", ["edm_entity_id", "data_source_id"], MAPS_TO)
-    write_csv("realized_as.csv", ["edm_entity_id", "instance_id", "instance_label"], realized_as)
+    write_csv("maps_to.csv", ["entity_id", "data_source_id"], MAPS_TO)
+    write_csv("realized_as.csv", ["entity_id", "instance_id", "instance_label"], realized_as)
 
     ground_truth = {
         "schema_version": 1,

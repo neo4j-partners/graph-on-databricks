@@ -26,7 +26,7 @@
   <!-- ===================== LEFT: Databricks Lakehouse ===================== -->
   <rect x="30" y="100" width="520" height="580" rx="12" fill="#FFF7F5" stroke="#FF3621" stroke-width="2"/>
   <text x="290" y="132" text-anchor="middle" font-size="17" font-weight="bold" fill="#C42B12">Databricks Lakehouse</text>
-  <text x="290" y="152" text-anchor="middle" font-size="12" fill="#7A4A3F">Data / instance layer: Unity Catalog Delta tables</text>
+  <text x="290" y="152" text-anchor="middle" font-size="12" fill="#7A4A3F">Instance layer: Unity Catalog Delta tables</text>
 
   <!-- Fact tables -->
   <rect x="50" y="180" width="230" height="140" rx="8" fill="#FFFFFF" stroke="#E8998C" stroke-width="1.2"/>
@@ -66,11 +66,11 @@
   <!-- ===================== RIGHT: Neo4j ===================== -->
   <rect x="750" y="100" width="520" height="580" rx="12" fill="#F2F8FF" stroke="#018BFF" stroke-width="2"/>
   <text x="1010" y="132" text-anchor="middle" font-size="17" font-weight="bold" fill="#0166BC">Neo4j</text>
-  <text x="1010" y="152" text-anchor="middle" font-size="12" fill="#3F5A7A">Knowledge / semantic layer + instance mirror</text>
+  <text x="1010" y="152" text-anchor="middle" font-size="12" fill="#3F5A7A">Knowledge layer + instance mirror</text>
 
   <!-- Knowledge layer -->
   <rect x="770" y="175" width="480" height="220" rx="8" fill="#FFFAEC" stroke="#D4A017" stroke-width="1.4"/>
-  <text x="786" y="197" font-size="12.5" font-weight="bold" fill="#92660A">Knowledge layer (EDM + terms &amp; rules)</text>
+  <text x="786" y="197" font-size="12.5" font-weight="bold" fill="#92660A">Knowledge layer (entities + terms &amp; rules)</text>
 
   <!-- knowledge pills row 1 -->
   <rect x="786" y="212" width="124" height="32" rx="16" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.2"/>
@@ -78,7 +78,7 @@
   <rect x="950" y="212" width="124" height="32" rx="16" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.2"/>
   <text x="1012" y="232" text-anchor="middle" font-size="12" fill="#6B4E07">BusinessRule</text>
   <rect x="1114" y="212" width="118" height="32" rx="16" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.2"/>
-  <text x="1173" y="232" text-anchor="middle" font-size="12" fill="#6B4E07">EDMEntity</text>
+  <text x="1173" y="232" text-anchor="middle" font-size="12" fill="#6B4E07">Entity</text>
 
   <!-- knowledge pills row 2 -->
   <rect x="786" y="335" width="124" height="32" rx="16" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.2"/>
