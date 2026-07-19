@@ -1,20 +1,20 @@
 {
   "schema_version": 2,
   "seed": 42,
-  "as_of_date": "2026-07-01",
+  "as_of_date": "2026-07-19",
   "summary": {
-    "customers": 504,
+    "customers": 508,
     "suppliers": 156,
     "business_units": 5,
-    "invoices": 3006,
+    "invoices": 3018,
     "revenue_entries": 60,
-    "compliance_findings": 93,
-    "supply_relationships": 39,
-    "owned_by_edges": 40
+    "compliance_findings": 87,
+    "supply_relationships": 262,
+    "owned_by_edges": 110
   },
   "story1_hidden_glassworks": {
     "cascade_id": "SUP-901",
-    "cascade_risk_score": 65,
+    "cascade_risk_score": 61,
     "tier1_ids": [
       "SUP-902",
       "SUP-903",
@@ -23,73 +23,69 @@
       "SUP-906"
     ],
     "tier1_risk_scores": {
-      "SUP-902": 37,
-      "SUP-903": 18,
-      "SUP-904": 18,
-      "SUP-905": 30,
-      "SUP-906": 32
+      "SUP-902": 12,
+      "SUP-903": 22,
+      "SUP-904": 27,
+      "SUP-905": 22,
+      "SUP-906": 27
     },
     "business_unit": "BU-03",
     "last_quarter": "2026-Q2",
-    "bu03_last_quarter_revenue": 4222032.81
+    "bu03_last_quarter_revenue": 4296690.88
   },
   "story2_clean_payer": {
     "kestrel_id": "CUST-901",
     "jade_id": "CUST-904",
-    "sibling_ids": [
+    "group_ids": [
+      "CUST-901",
+      "CUST-905",
+      "CUST-907",
+      "CUST-904",
       "CUST-902",
-      "CUST-903"
+      "CUST-903",
+      "CUST-906",
+      "CUST-908"
+    ],
+    "kestrel_default_ids": [
+      "CUST-902",
+      "CUST-903",
+      "CUST-906",
+      "CUST-908"
+    ],
+    "seed_ids": [
+      "CUST-034",
+      "CUST-070",
+      "CUST-090",
+      "CUST-094",
+      "CUST-107",
+      "CUST-119",
+      "CUST-294",
+      "CUST-349",
+      "CUST-364",
+      "CUST-369",
+      "CUST-409",
+      "CUST-412",
+      "CUST-496",
+      "CUST-902",
+      "CUST-903",
+      "CUST-906",
+      "CUST-908"
     ],
     "defaulted_period": "2026-Q2",
-    "jade_open_invoice_balance": 252448.11,
-    "jade_credit_limit": 548000,
-    "jade_exposure": 800448.11
+    "jade_open_invoice_balance": 286505.31,
+    "jade_credit_limit": 800000,
+    "jade_exposure": 800000.0
   },
   "classification_cohorts": {
     "high_risk_suppliers": [
-      "SUP-005",
-      "SUP-007",
-      "SUP-008",
-      "SUP-013",
-      "SUP-019",
-      "SUP-020",
-      "SUP-021",
-      "SUP-022",
-      "SUP-032",
-      "SUP-035",
-      "SUP-036",
-      "SUP-040",
-      "SUP-041",
-      "SUP-042",
-      "SUP-043",
-      "SUP-047",
-      "SUP-054",
-      "SUP-061",
-      "SUP-062",
-      "SUP-063",
-      "SUP-064",
-      "SUP-068",
-      "SUP-079",
-      "SUP-086",
-      "SUP-087",
+      "SUP-015",
+      "SUP-031",
+      "SUP-072",
+      "SUP-073",
       "SUP-089",
-      "SUP-096",
-      "SUP-099",
+      "SUP-093",
       "SUP-100",
-      "SUP-101",
-      "SUP-107",
-      "SUP-111",
-      "SUP-115",
-      "SUP-118",
-      "SUP-127",
-      "SUP-129",
-      "SUP-131",
-      "SUP-134",
-      "SUP-139",
-      "SUP-142",
-      "SUP-146",
-      "SUP-147",
-      "SUP-150"
+      "SUP-116"
     ],
     "delinquent_customers": [
       "CUST-062",
@@ -118,8 +114,23 @@
       "CUST-904"
     ],
     "defaulted_customers": [
+      "CUST-034",
+      "CUST-070",
+      "CUST-090",
+      "CUST-094",
+      "CUST-107",
+      "CUST-119",
+      "CUST-294",
+      "CUST-349",
+      "CUST-364",
+      "CUST-369",
+      "CUST-409",
+      "CUST-412",
+      "CUST-496",
       "CUST-902",
-      "CUST-903"
+      "CUST-903",
+      "CUST-906",
+      "CUST-908"
     ]
   }
 }

@@ -662,8 +662,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "databricks-sdk", specifier = ">=0.20" },
-    { name = "graphdatascience", specifier = ">=1.12" },
-    { name = "neo4j", specifier = ">=5.28" },
+    { name = "graphdatascience", specifier = ">=1.12,<2" },
+    { name = "neo4j", specifier = ">=5.28,<7" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "python-dotenv", specifier = ">=1.1" },
 ]

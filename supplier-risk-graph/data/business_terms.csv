@@ -4,4 +4,4 @@ TERM-02,Defaulted Customer,A customer with a recorded default in the snapshot.
 TERM-03,Delinquent Customer,A customer more than 60 days late on each of its last three invoices.
 TERM-04,High-Risk Supplier,A supplier whose procurement risk score meets or exceeds the threshold.
 TERM-05,Critical Supplier,A supplier the network disproportionately depends on: the narrowest bridge on a business unit's multi-tier supply paths.
-TERM-06,Ownership Risk,"A customer inside an ownership group that contains a defaulted member, so its risk exceeds its own record."
+TERM-06,Ownership Risk,"An active customer with a clean record of its own (it carries its own invoices and is neither defaulted nor delinquent) that absorbs more failure through its ownership stakes than any other trading customer. Risk propagates from every defaulted customer in the book along OWNED_BY edges in proportion to the size of each stake, so a small holding next to a failure transmits little and a controlling chain several levels long transmits a great deal. Defaulted members and invoice-less holding companies are excluded, so the clean operating account is the headline."

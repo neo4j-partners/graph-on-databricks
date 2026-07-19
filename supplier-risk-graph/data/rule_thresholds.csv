@@ -1,0 +1,5 @@
+rule_id,threshold_id
+RULE-03,THR-02
+RULE-04,THR-01
+RULE-05,THR-03
+RULE-06,THR-04

@@ -1,24 +1,25 @@
 """Upload the supplier-risk-graph instance data to Unity Catalog as Delta tables.
 
 Two-layer demo: the lakehouse owns the data/instance layer while Neo4j owns the
-knowledge layer. This script materializes the lakehouse side. It uploads eight
+knowledge layer. This script materializes the lakehouse side. It uploads nine
 base instance CSVs — the six instance node CSVs (customers, suppliers,
 business_units, invoices, revenue_entries, compliance_findings), the
-supplier-to-business-unit bridge (supplier_business_units), and the
-supplier-to-supplier link (supply_relationships) — into a UC volume and builds
-one Delta table each with `read_files`, then reads the two graph-derived tables
-back out of Neo4j:
+supplier-to-business-unit bridge (supplier_business_units), the
+supplier-to-supplier link (supply_relationships), and the customer ownership
+stakes (owned_by) — into a UC volume and builds one Delta table each with
+`read_files`, then reads the two graph-derived tables back out of Neo4j:
 
   - `classifications`         — every CLASSIFIED_AS edge (the four column-findable
                                 terms only; the graph-native terms are never planted)
   - `business_unit_exposure`  — each business unit's aggregate supplier-risk exposure
 
-The `supply_relationships` table carries the raw supplier-to-supplier edges
-(fromSupplierId, toSupplierId), uploaded so plain Genie can see the links in the
-lakehouse; Neo4j sources the SUPPLIES edge from the same CSV. The `customers`
-table gains three columns — parentCustomerId (self-reference sourcing OWNED_BY),
-creditLimit (the Story 2 exposure figure), and defaultedPeriod (the quarter a
-sibling defaulted) — and `suppliers` gains subcategory (the supplier specialty).
+The `supply_relationships` and `owned_by` tables carry the raw edges behind the
+graph's two structural relationships, uploaded so plain Genie can see both
+networks in full; Neo4j sources SUPPLIES and OWNED_BY from the same CSVs. Neither
+network is withheld: the demo is won on questions the lakehouse cannot compute
+from those rows, not on tables it was never given. The `customers` table gains
+creditLimit (the Story 2 exposure figure) and defaultedPeriod (the quarter a
+customer defaulted), and `suppliers` gains subcategory (the supplier specialty).
 
 The two gold tables (`classifications`, `business_unit_exposure`) must never be
 added to the Genie space: they materialize the graph's answers, and re-adding
@@ -30,6 +31,17 @@ revenue_entries.businessUnitId, compliance_findings.customerId,
 customers.businessUnitId) so the lakehouse side can be joined on shared keys.
 Re-runnable: tables are CREATE OR REPLACE and the schema/volume are created
 idempotently.
+
+Once the base tables exist they get their semantic metadata (see SEMANTICS): a
+comment on every table, and a comment on the columns whose meaning cannot be read
+off the name. A bare `CREATE TABLE AS SELECT *` leaves Genie nothing but names
+and types. This is metadata about shape, not answers; the graph still owns the
+knowledge layer. `CREATE OR REPLACE TABLE` drops comments, so the step reruns on
+every upload, which also makes the whole script idempotent with no bookkeeping.
+
+Then `create_metric_view` builds `customer_risk_exposure`, which is the real fix
+for Genie multiplying customer aggregates: it declares the invoice and finding
+joins `one_to_many` so each measure aggregates at its own grain.
 
 Usage:
     uv run upload.py            # upload CSVs, build tables, pull derived tables
@@ -80,12 +92,15 @@ class TableSpec:
     stay strings. Type names match load.py's CONVERTERS so both sides agree.
     `required` names the load-bearing columns `--check` confirms are present, so
     a dropped or renamed contract column fails offline instead of at upload.
+    `inferred_types` names columns that land on the right type through inference
+    alone and cannot be hinted, verified against the built table instead.
     """
 
     csv_name: str
     table: str
     types: dict[str, str] = field(default_factory=dict)
     required: tuple[str, ...] = ()
+    inferred_types: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -98,11 +113,29 @@ class DerivedSpec:
     types: dict[str, str] = field(default_factory=dict)
 
 
-# The eight base instance CSVs that become UC tables. Type maps mirror the
+@dataclass(frozen=True)
+class TableSemantics:
+    """The semantic metadata Genie reads: a table comment and column comments.
+
+    `CREATE OR REPLACE TABLE ... AS SELECT *` leaves a table with column names
+    and types and nothing else, so Genie has to guess what a row means. The table
+    comment states the grain. Column comments are deliberately sparse: only
+    columns whose meaning cannot be read off the name get one. Databricks' Genie
+    guidance calls descriptions critical and in the same breath warns against
+    unnecessary detail, and a comment restating the column name is noise
+    competing with the comments that carry real information.
+    """
+
+    comment: str
+    columns: dict[str, str] = field(default_factory=dict)
+
+
+# The nine base instance CSVs that become UC tables. Type maps mirror the
 # matching NODE_SPECS in load.py; knowledge-layer and remaining relationship
 # CSVs stay graph-only. The six node tables plus supply_relationships are the
-# DS-01..DS-07 rows in data_sources.csv; the supplier_business_units bridge is
-# lakehouse-only and has no data_sources.csv row.
+# DS-01..DS-07 rows in data_sources.csv and owned_by is DS-08; the
+# supplier_business_units bridge is lakehouse-only and has no data_sources.csv
+# row.
 BASE_SPECS = [
     TableSpec(
         "customers.csv",
@@ -111,11 +144,11 @@ BASE_SPECS = [
             "upsellScore": "int",
             "avgDaysLate": "float",
             "overdueShare": "float",
-            # parentCustomerId and defaultedPeriod are strings (inference is fine);
-            # only creditLimit needs a hint so it lands DOUBLE, not string/int.
+            # defaultedPeriod is a string (inference is fine); only creditLimit
+            # needs a hint so it lands DOUBLE, not string/int.
             "creditLimit": "number",
         },
-        required=("parentCustomerId", "creditLimit", "defaultedPeriod"),
+        required=("creditLimit", "defaultedPeriod"),
     ),
     TableSpec("suppliers.csv", "suppliers", {"riskScore": "int"}, required=("subcategory",)),
     TableSpec("business_units.csv", "business_units"),
@@ -134,6 +167,10 @@ BASE_SPECS = [
         "revenue_entries.csv",
         "revenue_entries",
         {"amount": "float", "reconciled": "bool"},
+        # period carries YYYY-MM, which an explicit DATE schemaHint does not
+        # parse; inference resolves it to a DATE on the first of the month. The
+        # quarterly revenue figure in the demo rests on that, so assert it.
+        inferred_types={"period": "date"},
     ),
     TableSpec("compliance_findings.csv", "compliance_findings", {"openedDate": "date"}),
     # Bridge table for the many-to-many supplier-to-business-unit link, so Genie
@@ -146,6 +183,19 @@ BASE_SPECS = [
         "supply_relationships.csv",
         "supply_relationships",
         required=("fromSupplierId", "toSupplierId"),
+    ),
+    # Customer-to-customer ownership (child, parent, stake), the raw edges behind
+    # the graph's OWNED_BY relationship. Uploaded for the same reason
+    # supply_relationships is: the lakehouse-only engine is given the ownership
+    # structure and the stakes in full. It still cannot answer Story 2, because
+    # the answer is a weighted propagation over the whole book rather than
+    # anything a join or a GROUP BY produces. The demo has to be won on the
+    # question, not by withholding the table.
+    TableSpec(
+        "owned_by.csv",
+        "owned_by",
+        {"ownershipPct": "float"},
+        required=("customer_id", "parent_customer_id", "ownershipPct"),
     ),
 ]
 
@@ -174,14 +224,13 @@ CLASSIFICATIONS_SPEC = DerivedSpec(
 )
 
 # Gold table: each business unit's aggregate supplier-risk exposure, one row per
-# unit. supplierExposureScore is a precomputed Neo4j node property; if the graph
-# algorithms have not run yet the exposure column lands null, which is fine.
+# unit. The table reports supplier count, average, and max risk per unit, ordered
+# by supplier count.
 EXPOSURE_SPEC = DerivedSpec(
     table="business_unit_exposure",
     columns=[
         "business_unit_id",
         "name",
-        "supplier_exposure_score",
         "supplier_count",
         "avg_supplier_risk",
         "max_supplier_risk",
@@ -190,13 +239,11 @@ EXPOSURE_SPEC = DerivedSpec(
         "MATCH (bu:BusinessUnit) "
         "OPTIONAL MATCH (s:Supplier)-[:SUPPLIES]->(bu) "
         "RETURN bu.id AS business_unit_id, bu.name AS name, "
-        "bu.supplierExposureScore AS supplier_exposure_score, "
         "count(s) AS supplier_count, round(avg(s.riskScore), 1) AS avg_supplier_risk, "
         "max(s.riskScore) AS max_supplier_risk "
-        "ORDER BY supplier_exposure_score DESC"
+        "ORDER BY supplier_count DESC"
     ),
     types={
-        "supplier_exposure_score": "float",
         "supplier_count": "int",
         "avg_supplier_risk": "float",
         "max_supplier_risk": "int",
@@ -204,6 +251,268 @@ EXPOSURE_SPEC = DerivedSpec(
 )
 
 DERIVED_SPECS = [CLASSIFICATIONS_SPEC, EXPOSURE_SPEC]
+
+# Semantic metadata for the base tables, keyed by table name. The gold tables get
+# none: they stay out of the Genie space, so nothing reads their metadata.
+#
+# These comments state schema facts: grain, units, join paths, and what a coded
+# value means. They deliberately stop short of analysis. The demo turns on Genie
+# reading every column correctly and still missing what only the graph can see,
+# so a comment that hints at a traversal or pre-judges what a metric implies
+# would hand over the answer and break the premise.
+#
+# A column earns a comment only if its meaning cannot be read off its name. That
+# leaves three kinds: coded vocabularies (segment, status, region), units and
+# scales (EUR amounts, 0-100 scores), and grain rules. "Registered customer name"
+# is not a comment, it is the column name with extra words, and every one of
+# those dilutes the ones that matter.
+#
+# Two observed failures set the emphasis. Genie rendered euro amounts with a
+# dollar sign, so every amount and currency column says EUR outright rather than
+# leaving it a SELECT DISTINCT away. And Genie multiplied customer aggregates by
+# joining two one-to-many branches at once, so the branch tables name their
+# grain; the customer_risk_exposure metric view is the real defense there.
+SEMANTICS: dict[str, TableSemantics] = {
+    "customers": TableSemantics(
+        comment=(
+            "One row per customer. Invoices hang off this table as a one-to-many "
+            "branch; aggregate them to customer grain before joining to another "
+            "customer-grain table."
+        ),
+        columns={
+            "segment": "Commercial tier: platinum, gold, or silver.",
+            "profitabilityTrend": "Direction of account profitability: improving, stable, or declining.",
+            "churnRisk": "Qualitative churn assessment: low, medium, or high.",
+            "avgDaysLate": "Mean days late across the customer's paid invoices. 0.0 means a clean payment record.",
+            "overdueShare": "Fraction of the customer's invoices currently overdue, 0.0 to 1.0.",
+            "creditLimit": "Total committed credit facility in EUR.",
+            "defaultedPeriod": (
+                "Quarter in which the customer recorded a default, format YYYY-Qn. "
+                "Null for customers that have never defaulted."
+            ),
+        },
+    ),
+    "suppliers": TableSemantics(
+        comment=(
+            "One row per supplier. Has no business unit column: a supplier serves "
+            "many units and a unit uses many suppliers, so scope any supplier "
+            "question to a region or unit through the supplier_business_units "
+            "bridge."
+        ),
+        columns={
+            "category": "Procurement category: ingredients, packaging, logistics, equipment, or services.",
+            "subcategory": (
+                "Specialty within the category, for example glass bottles, raw "
+                "glass, malt, freight."
+            ),
+            "riskScore": "Procurement risk score, 0-100, higher is riskier.",
+        },
+    ),
+    "business_units": TableSemantics(
+        comment="One row per business unit. The regional dimension for suppliers, customers, and revenue.",
+        columns={
+            "region": (
+                "Region code: AMER is the Americas, EMEA is Europe, Middle East and "
+                "Africa, APAC is Asia Pacific."
+            ),
+        },
+    ),
+    "invoices": TableSemantics(
+        comment=(
+            "One row per invoice, many per customer. Aggregate to customer grain "
+            "before joining to another customer-grain table."
+        ),
+        columns={
+            "amount": "Invoice amount in EUR.",
+            "currency": "ISO 4217 currency code. Every amount in this dataset is EUR; render amounts with the euro symbol.",
+            "daysLate": "Days between dueDate and payment. 0 means paid on time.",
+            "status": "Lifecycle state: paid, open, or overdue. Only open and overdue rows are live exposure.",
+        },
+    ),
+    "revenue_entries": TableSemantics(
+        comment="One row per business unit per accounting period.",
+        columns={
+            "period": (
+                "Accounting month, stored as a DATE on the first of the month. "
+                "Derive quarters with YEAR and QUARTER."
+            ),
+            "amount": "Recognized revenue in EUR.",
+            "currency": "ISO 4217 currency code. Every amount in this dataset is EUR; render amounts with the euro symbol.",
+        },
+    ),
+    "compliance_findings": TableSemantics(
+        comment="One row per compliance finding, many per customer.",
+        columns={
+            "type": "Finding category: KYC, AML, or sanctions.",
+            "status": "Finding state: open or closed. Only open findings are outstanding risk.",
+        },
+    ),
+    "supplier_business_units": TableSemantics(
+        comment=(
+            "Many-to-many bridge mapping which suppliers serve which business "
+            "units. This is the join path from suppliers to business_units, "
+            "which share no column: route through this table to scope any supplier "
+            "question to a region or unit. One row per supplier-unit pair."
+        ),
+    ),
+    "supply_relationships": TableSemantics(
+        comment=(
+            "One row per supplier-to-supplier supply link. The supplier in "
+            "fromSupplierId supplies the supplier in toSupplierId; both sides join "
+            "to suppliers.id. A supplier can appear on either side, or on both."
+        ),
+    ),
+    "owned_by": TableSemantics(
+        comment=(
+            "One row per ownership stake between customers. The customer in "
+            "customer_id is owned by the customer in parent_customer_id, and "
+            "ownershipPct is the fraction held, from 0 to 1. Both sides join to "
+            "customers.id. A customer can have more than one owner, so this is "
+            "not a single parent column, and ownership chains run several levels "
+            "deep."
+        ),
+    ),
+}
+
+
+# The metric view over customer risk exposure. `customers` has two independent
+# one-to-many branches hanging off it, invoices and compliance_findings, and
+# joining both in one pass multiplies each by the other's row count: a customer's
+# open exposure comes back multiplied by its finding count, and its finding count
+# multiplied by its invoice count. Genie did exactly this against the raw tables
+# and reported both wrong. `cardinality: one_to_many` makes each measure aggregate
+# at its own source grain, so the fanout stops being a thing a query can express
+# rather than a thing a comment warns about.
+#
+# No worked example is given here on purpose. The dataset regenerates from today's
+# date, so any customer named with concrete figures goes stale on the next run.
+# To check the fanout by hand, pick a customer off the live data that has BOTH a
+# nonzero open exposure and two or more open compliance findings — both branches
+# have to be non-empty or there is nothing to multiply — then compare the metric
+# view's open_exposure_amount and open_finding_count against the same two figures
+# computed one branch at a time. Against the raw tables the single-pass join
+# returns each measure scaled by the other branch's row count; through the metric
+# view the two agree.
+#
+# __SCHEMA__ is replaced with the backtick-quoted catalog.schema at build time.
+# Plain str.format is unusable here because the YAML `format:` blocks contain
+# literal braces. The token is underscore-delimited so the replace cannot collide
+# with the prose in the comment and synonym fields below.
+METRIC_VIEW_NAME = "customer_risk_exposure"
+
+SCHEMA_TOKEN = "__SCHEMA__"
+
+METRIC_VIEW_YAML = """
+version: 1.1
+comment: "Per-customer risk and exposure. One row per customer. Invoice and compliance measures aggregate at their own grain, so combining them never fans out."
+source: '__SCHEMA__.`customers`'
+
+joins:
+  - name: business_unit
+    source: '__SCHEMA__.`business_units`'
+    'on': source.businessUnitId = business_unit.id
+    rely:
+      at_most_one_match: true
+  - name: invoices
+    source: '__SCHEMA__.`invoices`'
+    'on': invoices.customerId = source.id
+    cardinality: one_to_many
+  - name: findings
+    source: '__SCHEMA__.`compliance_findings`'
+    'on': findings.customerId = source.id
+    cardinality: one_to_many
+
+fields:
+  - name: customer_name
+    expr: source.name
+    display_name: "Customer"
+    synonyms: ['customer', 'client', 'account name']
+  - name: customer_id
+    expr: source.id
+  - name: segment
+    expr: source.segment
+    display_name: "Segment"
+    synonyms: ['tier', 'customer segment']
+  - name: churn_risk
+    expr: source.churnRisk
+    display_name: "Churn Risk"
+    synonyms: ['attrition risk', 'churn']
+  - name: profitability_trend
+    expr: source.profitabilityTrend
+    display_name: "Profitability Trend"
+  - name: defaulted_period
+    expr: source.defaultedPeriod
+    display_name: "Defaulted Period"
+  - name: business_unit_name
+    expr: business_unit.name
+    display_name: "Business Unit"
+    synonyms: ['BU', 'unit']
+  - name: region
+    expr: business_unit.region
+    display_name: "Region"
+    synonyms: ['geo', 'territory']
+  - name: upsell_score
+    expr: source.upsellScore
+    display_name: "Upsell Score"
+  - name: avg_days_late
+    expr: source.avgDaysLate
+    display_name: "Avg Days Late"
+  - name: overdue_share
+    expr: source.overdueShare
+    display_name: "Overdue Share"
+
+measures:
+  - name: customer_count
+    expr: COUNT(1)
+    display_name: "Customers"
+    synonyms: ['number of customers', 'customer count']
+  - name: open_exposure_amount
+    expr: COALESCE(SUM(CASE WHEN invoices.status <> 'paid' THEN invoices.amount END), 0)
+    display_name: "Open Exposure (EUR)"
+    comment: "Amount on invoices not yet paid (status open or overdue). Excludes paid invoices."
+    synonyms: ['open exposure', 'outstanding balance', 'unpaid amount', 'amount at risk']
+    format: {type: currency, currency_code: EUR, decimal_places: {type: exact, places: 2}}
+  - name: overdue_amount
+    expr: COALESCE(SUM(CASE WHEN invoices.status = 'overdue' THEN invoices.amount END), 0)
+    display_name: "Overdue Amount (EUR)"
+    comment: "Amount on invoices with status overdue."
+    synonyms: ['overdue', 'past due amount', 'arrears']
+    format: {type: currency, currency_code: EUR, decimal_places: {type: exact, places: 2}}
+  - name: open_invoice_count
+    expr: COUNT(CASE WHEN invoices.status <> 'paid' THEN invoices.id END)
+    display_name: "Open Invoices"
+    comment: "Count of invoices not yet paid (open plus overdue)."
+    synonyms: ['unpaid invoices', 'outstanding invoices']
+  - name: overdue_invoice_count
+    expr: COUNT(CASE WHEN invoices.status = 'overdue' THEN invoices.id END)
+    display_name: "Overdue Invoices"
+  - name: invoice_count
+    expr: COUNT(invoices.id)
+    display_name: "Total Invoices"
+  - name: total_invoiced_amount
+    expr: COALESCE(SUM(invoices.amount), 0)
+    display_name: "Total Invoiced (EUR)"
+    comment: "All invoiced amount regardless of status."
+    synonyms: ['total invoiced', 'gross billings', 'total billed']
+    format: {type: currency, currency_code: EUR, decimal_places: {type: exact, places: 2}}
+  - name: open_finding_count
+    expr: COUNT(CASE WHEN findings.status = 'open' THEN findings.id END)
+    display_name: "Open Compliance Findings"
+    comment: "Compliance findings with status open. Independent of invoice grain."
+    synonyms: ['open findings', 'unresolved findings', 'compliance issues']
+  - name: finding_count
+    expr: COUNT(findings.id)
+    display_name: "Total Compliance Findings"
+  - name: credit_limit
+    expr: COALESCE(SUM(source.creditLimit), 0)
+    display_name: "Credit Limit (EUR)"
+    format: {type: currency, currency_code: EUR, decimal_places: {type: exact, places: 2}}
+  - name: credit_utilization
+    expr: COALESCE(SUM(CASE WHEN invoices.status <> 'paid' THEN invoices.amount END), 0) / NULLIF(SUM(source.creditLimit), 0)
+    display_name: "Credit Utilization"
+    comment: "Open exposure divided by credit limit. Ratio of two independently-grained aggregates."
+    format: {type: percentage, decimal_places: {type: exact, places: 1}}
+"""
 
 
 @dataclass(frozen=True)
@@ -320,7 +629,13 @@ def ensure_schema_and_volume(w: Any, cfg: Config) -> None:
 
 
 def create_table(w: Any, cfg: Config, table: str, filename: str, hints: str | None) -> None:
-    """Build a Delta table from a CSV already uploaded to the volume."""
+    """Build a Delta table from a CSV already uploaded to the volume.
+
+    `read_files` always appends a `_rescued_data` column for values that did not
+    match the inferred schema. It is null on every row here, but Genie reads it as
+    a real column and the space had prompt matching switched on for it, so drop it
+    rather than ship a column whose only effect is noise in the schema.
+    """
     options = ["format => 'csv'", "header => true", "inferColumnTypes => true"]
     if hints:
         options.append(f"schemaHints => '{hints}'")
@@ -328,12 +643,76 @@ def create_table(w: Any, cfg: Config, table: str, filename: str, hints: str | No
         w,
         cfg,
         f"CREATE OR REPLACE TABLE {fqn(cfg, table)} AS "
-        f"SELECT * FROM read_files('{volume_path(cfg, filename)}', {', '.join(options)})",
+        f"SELECT * EXCEPT (_rescued_data) "
+        f"FROM read_files('{volume_path(cfg, filename)}', {', '.join(options)})",
     )
 
 
 def upload_csv(w: Any, cfg: Config, filename: str, contents: bytes) -> None:
     w.files.upload(volume_path(cfg, filename), io.BytesIO(contents), overwrite=True)
+
+
+def sql_string(value: str) -> str:
+    """Render a Python string as a single-quoted SQL string literal.
+
+    Backslash is an escape character inside Spark SQL string literals, so it has
+    to be doubled before the quotes are, or a comment containing one would either
+    swallow the next character or fail to parse.
+    """
+    return "'" + value.replace("\\", "\\\\").replace("'", "''") + "'"
+
+
+def apply_comments(w: Any, cfg: Config, table: str, semantics: TableSemantics) -> None:
+    target = fqn(cfg, table)
+    run_sql(w, cfg, f"COMMENT ON TABLE {target} IS {sql_string(semantics.comment)}")
+    for column, comment in semantics.columns.items():
+        run_sql(
+            w,
+            cfg,
+            f"ALTER TABLE {target} ALTER COLUMN `{column}` "
+            f"COMMENT {sql_string(comment)}",
+        )
+
+
+def apply_semantics(w: Any, cfg: Config) -> None:
+    """Attach the table and column comments to the base tables.
+
+    Runs after upload_base_tables because CREATE OR REPLACE TABLE drops comments,
+    so they have to be reapplied on every run.
+
+    There are deliberately no primary or foreign key constraints here. They were
+    tried, as the hypothesized fix for Genie multiplying customer aggregates
+    across two one-to-many branches, and the customer_risk_exposure metric view
+    turned out to be what actually fixes that, structurally. Databricks' Genie
+    guidance ranks descriptions, metric views, and example SQL as the levers that
+    matter and does not mention constraints at all, so declaring 8 primary and 9
+    foreign keys was 44 statements of unvalidated ceremony on a 4,289-row demo.
+    """
+    print("Applying semantic metadata:")
+    for spec in BASE_SPECS:
+        semantics = SEMANTICS[spec.table]
+        apply_comments(w, cfg, spec.table, semantics)
+        print(
+            f"  {spec.table}: table comment, {len(semantics.columns)} column comments"
+        )
+
+
+def create_metric_view(w: Any, cfg: Config) -> None:
+    """Build the customer-exposure metric view over the freshly loaded tables.
+
+    Runs after apply_semantics for the same reason that step exists: the base
+    tables are CREATE OR REPLACE, so anything defined on top of them has to be
+    rebuilt each run.
+    """
+    schema = f"`{cfg.catalog}`.`{cfg.schema}`"
+    yaml = METRIC_VIEW_YAML.replace(SCHEMA_TOKEN, schema)
+    run_sql(
+        w,
+        cfg,
+        f"CREATE OR REPLACE VIEW {fqn(cfg, METRIC_VIEW_NAME)} "
+        f"WITH METRICS LANGUAGE YAML AS $${yaml}$$",
+    )
+    print(f"Built metric view {METRIC_VIEW_NAME} (fanout-free customer exposure).")
 
 
 def upload_base_tables(w: Any, cfg: Config, data_dir: Path) -> list[tuple[str, int]]:
@@ -346,6 +725,41 @@ def upload_base_tables(w: Any, cfg: Config, data_dir: Path) -> list[tuple[str, i
         results.append((spec.table, rows))
         print(f"  {spec.table}: {rows} rows")
     return results
+
+
+def verify_inferred_types(w: Any, cfg: Config) -> None:
+    """Confirm the columns that rely on type inference landed on the right type.
+
+    `schemaHints` is the fix wherever it works, and `types` uses it. It does not
+    work for revenue_entries.period: the CSV carries YYYY-MM, an explicit DATE
+    hint does not parse that, and the DATE the column becomes is inference's
+    doing. Story 1's quarterly revenue figure depends on it, and a silent drift
+    to STRING would surface as a wrong number on stage rather than an error here.
+    """
+    expected = [
+        (spec.table, column, SPARK_TYPES[kind].lower())
+        for spec in BASE_SPECS
+        for column, kind in spec.inferred_types.items()
+    ]
+    if not expected:
+        return
+    for table, column, kind in expected:
+        response = run_sql(
+            w,
+            cfg,
+            "SELECT full_data_type FROM "
+            f"`{cfg.catalog}`.information_schema.columns "
+            f"WHERE table_schema = {sql_string(cfg.schema)} "
+            f"AND table_name = {sql_string(table)} "
+            f"AND column_name = {sql_string(column)}",
+        )
+        rows = response.result.data_array or []
+        actual = rows[0][0].lower() if rows else "absent"
+        if actual != kind:
+            raise RuntimeError(
+                f"{table}.{column}: inference produced {actual}, expected {kind}"
+            )
+    print(f"Verified {len(expected)} inferred column type(s).")
 
 
 def read_graph_rows(cfg: Config, cypher: str) -> list[dict[str, Any]]:
@@ -367,9 +781,23 @@ def upload_derived_table(w: Any, cfg: Config, spec: DerivedSpec) -> int:
     return count
 
 
+def check_semantics(spec: TableSpec, header: set[str]) -> None:
+    """Offline: confirm this table's comments still match its CSV.
+
+    Comments are written by column name, so a renamed or dropped column would
+    otherwise fail mid-upload as a SQL error. There is no converse check that
+    every column carries a comment: most deliberately do not.
+    """
+    semantics = SEMANTICS.get(spec.table)
+    if semantics is None:
+        sys.exit(f"{spec.table}: no SEMANTICS entry; add one before uploading.")
+    if ghosts := sorted(set(semantics.columns) - header):
+        sys.exit(f"{spec.table}: comments name absent column(s) {', '.join(ghosts)}")
+
+
 def check(data_dir: Path) -> None:
-    """Offline: confirm the base CSVs read, carry their load-bearing columns, and
-    report the row counts."""
+    """Offline: confirm the base CSVs read, carry their load-bearing columns and
+    matching comments, and report the row counts."""
     print(f"Validating base CSVs in {data_dir}:")
     total = 0
     for spec in BASE_SPECS:
@@ -378,10 +806,11 @@ def check(data_dir: Path) -> None:
             sys.exit(f"Missing CSV: {path}")
         rows = read_csv(path)
         header = set(rows[0]) if rows else set()
-        expected = set(spec.types) | set(spec.required)
+        expected = set(spec.types) | set(spec.required) | set(spec.inferred_types)
         missing = sorted(expected - header)
         if missing:
             sys.exit(f"{spec.csv_name}: missing column(s) {', '.join(missing)}")
+        check_semantics(spec, header)
         total += len(rows)
         print(f"  {spec.table}: {len(rows)} rows ({spec.csv_name})")
     print(f"Check passed: {len(BASE_SPECS)} base tables, {total} rows ready to upload.")
@@ -422,6 +851,9 @@ def main() -> None:
 
     ensure_schema_and_volume(w, cfg)
     base_results = upload_base_tables(w, cfg, args.data_dir)
+    verify_inferred_types(w, cfg)
+    apply_semantics(w, cfg)
+    create_metric_view(w, cfg)
 
     print("Materializing gold tables from Neo4j:")
     derived_results = [(spec.table, upload_derived_table(w, cfg, spec)) for spec in DERIVED_SPECS]

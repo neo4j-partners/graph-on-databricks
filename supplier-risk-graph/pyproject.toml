@@ -4,9 +4,19 @@ version = "0.1.0"
 description = "Synthetic dataset generator and Neo4j loader for the supplier-risk-graph demo: a knowledge layer plus instance data spanning Neo4j and the lakehouse."
 requires-python = ">=3.12"
 dependencies = [
-    "neo4j>=5.28",
+    # graphdatascience is upper-bounded because its server compatibility is a
+    # matrix, not a floor: 1.x documents support for a bounded GDS range, and a
+    # resolver free to walk forward can land on a client that silently disagrees
+    # with the server about procedure signatures. gds.py places THR-03 and THR-04
+    # off those procedures' output, so a client the server does not match is a
+    # wrong number rather than an error. 2.0 is excluded because the client's
+    # major version is where the API breaks; gds.py is written against the v1
+    # gds.run_cypher surface. neo4j is bounded for the same reason one step down:
+    # graphdatascience 1.x declares driver < 7, so allowing 7 would resolve a
+    # combination the client never claimed to support.
+    "neo4j>=5.28,<7",
     "python-dotenv>=1.1",
-    "graphdatascience>=1.12",
+    "graphdatascience>=1.12,<2",
     "pandas>=2.0",
     "databricks-sdk>=0.20",
 ]

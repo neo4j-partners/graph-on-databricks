@@ -10,19 +10,26 @@ loading, so it must be dedicated to this demo.
 The instance layer carries two same-graph edges beyond the customer/supplier/
 business-unit fan-out: supplier-to-supplier SUPPLIES (from supply_relationships.csv,
 Cascade feeding the tier-1 bottle suppliers) and customer-to-customer OWNED_BY
-(derived from the customers.parentCustomerId column, the Kestrel ownership
-family). classified_as.csv now targets
+(loaded from owned_by.csv with its ownership stake, the Kestrel ownership
+group). classified_as.csv now targets
 both Customer and Supplier, so it is split on its entity_label column into one
 CLASSIFIED_AS spec per label, the same way realized_as.csv is split on
 instance_label; the four column-findable terms (Strategic Account, Defaulted
 Customer, Delinquent Customer, High-Risk Supplier) all ride in that one file.
 
 The two graph-native terms, Critical Supplier and Ownership Risk, are never
-written as edges here or anywhere: they are resolved live at demo time from the
-betweenness and PageRank node properties that gds.py (Phase 2) precomputes. The
-knowledge layer is rebuilt around the two stories and includes the new
-SupplyRelationship entity, which is just another row in entities.csv and needs
-no special handling.
+written as CLASSIFIED_AS edges here or anywhere: they are resolved live at demo
+time from the betweenness and PageRank node properties that gds.py (Phase 2)
+precomputes. They do carry a SCORED_BY edge to a GraphMetric node naming that
+property formally, which binds the term to its implementation without
+materializing a classification. The knowledge layer is rebuilt around the two
+stories and includes the new SupplyRelationship entity, which is just another
+row in entities.csv and needs no special handling.
+
+Everything else in the knowledge layer runs outbound from the BusinessTerm, so a
+model doing schema discovery can walk from a term to the rule, the threshold
+value (USES_THRESHOLD), the graph metric that implements it (SCORED_BY), the euro
+measure (MEASURED_BY), the entities, and the physical Unity Catalog tables.
 
 Usage:
     uv run load.py            # wipe the database and load data/
@@ -120,6 +127,8 @@ NODE_SPECS = [
     NodeSpec("entities.csv", "Entity"),
     NodeSpec("business_terms.csv", "BusinessTerm"),
     NodeSpec("business_rules.csv", "BusinessRule", {"threshold": "number"}),
+    NodeSpec("measures.csv", "Measure"),
+    NodeSpec("graph_metrics.csv", "GraphMetric"),
     NodeSpec("policies.csv", "Policy"),
     NodeSpec("thresholds.csv", "Threshold", {"value": "number"}),
     NodeSpec("data_sources.csv", "DataSource"),
@@ -135,15 +144,33 @@ REL_SPECS = [
     # SUP-901 supplies SUP-902, so the edge points fromSupplierId -> toSupplierId.
     RelSpec("supply_relationships.csv", "SUPPLIES", "fromSupplierId", "Supplier", "toSupplierId", "Supplier"),
     RelSpec("has_finding.csv", "HAS_FINDING", "customer_id", "Customer", "finding_id", "ComplianceFinding"),
-    # Customer-to-customer OWNED_BY is derived from the customers.parentCustomerId
-    # column by expand_owned_by(), not a separate CSV, so the column is the single
-    # source for both the graph edge and the lakehouse link plain Genie reads.
+    # Customer-to-customer OWNED_BY, child -> parent, carrying the ownership
+    # stake. A subsidiary can have more than one owner, so this is its own CSV
+    # rather than a column on the customer row. ownershipPct is what makes the
+    # Story 2 propagation weighted: influence follows the size of the stake, not
+    # the number of hops. The same file backs the lakehouse table plain Genie
+    # reads, so the raw ownership is not hidden from it.
+    RelSpec("owned_by.csv", "OWNED_BY", "customer_id", "Customer", "parent_customer_id", "Customer",
+            {"ownershipPct": "float"}),
     # classified_as.csv targets both Customer and Supplier, so it is not a static
     # spec: expand_classified_as() splits it on its entity_label column, one
     # CLASSIFIED_AS spec per label. The two graph-native terms (Critical Supplier,
     # Ownership Risk) are never planted as edges; they are resolved live at demo
     # time from the gds.py node properties.
     RelSpec("defined_by.csv", "DEFINED_BY", "term_id", "BusinessTerm", "rule_id", "BusinessRule"),
+    # Measure->BusinessRule DEFINED_BY: same rel type as the BusinessTerm->BusinessRule
+    # edge above, different endpoints and a second source file, so the measure reaches
+    # its rule with no new vocabulary. Each spec loads its own CSV independently, so
+    # neither file overwrites the other's edges.
+    RelSpec("measure_defined_by.csv", "DEFINED_BY", "measure_id", "Measure", "rule_id", "BusinessRule"),
+    # The three edges below close the discovery asymmetry left by APPLIES_TO, which
+    # runs Threshold->BusinessTerm and so is invisible to a traversal walking outbound
+    # from a term. MEASURED_BY leads to the euro measure, SCORED_BY to the precomputed
+    # GDS node property that resolves a graph-native term, and USES_THRESHOLD gives the
+    # rule a forward path to the cutoff value it is standing on.
+    RelSpec("measured_by.csv", "MEASURED_BY", "term_id", "BusinessTerm", "measure_id", "Measure"),
+    RelSpec("scored_by.csv", "SCORED_BY", "term_id", "BusinessTerm", "metric_id", "GraphMetric"),
+    RelSpec("rule_thresholds.csv", "USES_THRESHOLD", "rule_id", "BusinessRule", "threshold_id", "Threshold"),
     RelSpec("evaluates.csv", "EVALUATES", "rule_id", "BusinessRule", "entity_id", "Entity"),
     RelSpec("constrains.csv", "CONSTRAINS", "policy_id", "Policy", "entity_id", "Entity"),
     RelSpec("governs.csv", "GOVERNS", "policy_id", "Policy", "rule_id", "BusinessRule"),
@@ -185,23 +212,6 @@ def read_rel_rows(data_dir: Path, spec: RelSpec) -> list[dict[str, Any]]:
         }
         rows.append({"src": raw[spec.src_col], "dst": raw[spec.dst_col], "props": props})
     return rows
-
-
-def expand_owned_by(data_dir: Path) -> list[tuple[RelSpec, list[dict[str, Any]]]]:
-    """Derive OWNED_BY edges from the customers.parentCustomerId column.
-
-    A customer with a non-empty parentCustomerId is owned by that parent, so the
-    edge points child -> parent. The column is the single source for both this
-    graph edge and the raw ownership link the lakehouse exposes to plain Genie;
-    there is no separate owned_by.csv.
-    """
-    rows = [
-        {"src": raw["id"], "dst": raw["parentCustomerId"], "props": {}}
-        for raw in read_csv(data_dir / "customers.csv")
-        if raw["parentCustomerId"]
-    ]
-    spec = RelSpec("customers.csv", "OWNED_BY", "id", "Customer", "parentCustomerId", "Customer")
-    return [(spec, rows)]
 
 
 def expand_realized_as(data_dir: Path) -> list[tuple[RelSpec, list[dict[str, Any]]]]:
@@ -258,7 +268,17 @@ def check_integrity(
     node_rows: dict[str, list[dict[str, Any]]],
     rel_data: list[tuple[RelSpec, list[dict[str, Any]]]],
 ) -> list[str]:
-    """Verify every relationship endpoint id exists in its node CSV."""
+    """Verify every relationship endpoint resolves and no endpoint pair repeats.
+
+    load_rels issues CREATE, not MERGE, so a repeated (src, dst) pair in a CSV
+    becomes a second parallel edge rather than being folded into the first. That
+    is silent everywhere except the two weighted networks the demo turns on: a
+    duplicated owned_by.csv row doubles a stake in the PageRank propagation that
+    THR-04 is placed from, and a duplicated supply_relationships.csv row shifts
+    the betweenness distribution behind THR-03. Neither shows up as a load error,
+    and both move a threshold the stories are asserted against, so the pairs are
+    checked here rather than trusted.
+    """
     ids = {label: {row["id"] for row in rows} for label, rows in node_rows.items()}
     errors = []
     for spec, rows in rel_data:
@@ -266,11 +286,22 @@ def check_integrity(
         if unknown:
             errors.append(f"{spec.csv_name}: unknown node label(s) {', '.join(unknown)}")
             continue
+        seen: set[tuple[str, str]] = set()
+        duplicates: set[tuple[str, str]] = set()
         for row in rows:
             if row["src"] not in ids[spec.src_label]:
                 errors.append(f"{spec.csv_name}: unknown {spec.src_label} id {row['src']}")
             if row["dst"] not in ids[spec.dst_label]:
                 errors.append(f"{spec.csv_name}: unknown {spec.dst_label} id {row['dst']}")
+            pair = (row["src"], row["dst"])
+            if pair in seen:
+                duplicates.add(pair)
+            seen.add(pair)
+        for src, dst in sorted(duplicates):
+            errors.append(
+                f"{spec.csv_name}: duplicate {spec.rel_type} edge "
+                f"{spec.src_label} {src} -> {spec.dst_label} {dst}"
+            )
     return errors
 
 
@@ -281,7 +312,7 @@ def batches(rows: list[dict[str, Any]]) -> Iterator[list[dict[str, Any]]]:
 
 def wipe(session: Session) -> None:
     result = session.run(
-        "MATCH (n) CALL { WITH n DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS"
+        "MATCH (n) CALL (n) { DETACH DELETE n } IN TRANSACTIONS OF 10000 ROWS"
     )
     deleted = result.consume().counters.nodes_deleted
     print(f"Wiped database ({deleted} nodes deleted).")
@@ -348,7 +379,6 @@ def main() -> None:
     }
     rel_data = (
         [(spec, read_rel_rows(args.data_dir, spec)) for spec in REL_SPECS]
-        + expand_owned_by(args.data_dir)
         + expand_realized_as(args.data_dir)
         + expand_classified_as(args.data_dir)
     )

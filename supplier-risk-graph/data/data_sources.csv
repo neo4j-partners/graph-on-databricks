@@ -6,3 +6,4 @@ DS-04,invoices,Databricks Unity Catalog,supplier_risk.invoices
 DS-05,revenue_entries,Databricks Unity Catalog,supplier_risk.revenue_entries
 DS-06,compliance_findings,Databricks Unity Catalog,supplier_risk.compliance_findings
 DS-07,supply_relationships,Databricks Unity Catalog,supplier_risk.supply_relationships
+DS-08,owned_by,Databricks Unity Catalog,supplier_risk.owned_by
