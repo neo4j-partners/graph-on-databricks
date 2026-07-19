@@ -54,10 +54,13 @@ to score one product against another are out. The room should leave thinking abo
 question, not about which vendor lost. A result that has to be sold as a gotcha will make the room
 defend the tool it already owns instead of evaluating the argument.
 
-**Reliability is a separate question and is not settled.** A wrong answer observed once is Claim B,
-vivid and not guaranteed, and section 2 governs it unchanged. Before any beat leans on the
-convergence result, it gets asked enough times to know whether the answer is stable. Until then no
-beat may depend on it, and the beat that carries it must still work if Genie answers the other way.
+**Reliability is a separate question and stays Claim B even when a probe run is clean.** A wrong
+answer is Claim B whether it is observed once or many times, vivid and not guaranteed, and section 2
+governs it unchanged. The convergence result has now been asked five times in five fresh
+conversations and stayed at one hop every time, so it is Claim B that has been probed rather than
+Claim B that is untested, but it is Claim B still. A clean run is not a guarantee about the next run.
+No beat may depend on it, and the beat that carries it must still work if Genie answers the other
+way.
 
 **What keeps the claim true.** It holds by construction only while no authored artifact is visible
 to Genie alone. The governed vocabulary, meaning the term names, the rule names, and the `TERM-`,
@@ -135,17 +138,32 @@ sequence in this demo, and a second one next to them is what made the script har
 | **Explanation** | Pattern matching | Why? Every Americas glass supplier converges on Cascade. |
 
 **The honest caveat, said out loud:** once someone knows to start from the tier-1 suppliers,
-"which supplier feeds all of these" is a single join, and Genie alone can get there. The graph-native
+"which supplier feeds all of these" is a single join, and Genie alone will write it. The graph-native
 step is the one before it, knowing which suppliers to ask about. **Invite that question on stage
 rather than hoping nobody asks it.**
 
-**What the re-probe changed about that caveat.** It was written when Cascade sat one hop from the
-bottle makers, and it recorded that Genie wrote a correct convergence query on the first try. With
-the processor tier in between, Genie alone answers the invited question from one hop up, which lands
-on the processors rather than on the furnace, while the graph answers from the full commodity-carrying
-chain. The caveat's underlying point stands unchanged, that convergence is cheap in SQL once you know
-where to start, but "confirmed, not theoretical" no longer describes the live build and has been
-removed. Section 1 governs the narration, and Beat 3 must work whichever way Genie alone answers.
+**What the re-probe observed, and how many times.** The caveat was written while Cascade sat one hop
+from the bottle makers, and it recorded that Genie alone wrote a correct convergence query on the
+first try. That record no longer describes the live build. With the processor tier in between, the
+invited convergence question was asked in five fresh conversations and Genie alone wrote a different
+query every time: a boolean CASE, a filter that returned zero rows, a ranked list carrying a
+supplies-all flag, and a listing of overlaps greater than one. Every one of the five stayed at a
+single hop, so every one of them landed on the processors rather than on the furnace, and all five
+concluded that no common upstream supplier exists. The graph, traversing the commodity-carrying
+chain, returns yes and names the supplier.
+
+**How that classifies, under section 2.** The load-bearing half is Claim A and it held: no run cited
+a governed business definition, because there is none in the lakehouse to cite. The stability of the
+conclusion is Claim B. The query was generative while the answer was not, which is the strongest
+shape this evidence could take, and it is still five asks against one build rather than a guarantee.
+So no beat may depend on Genie alone answering that way, and Beat 3 has to play unchanged if the
+next ask comes back the other way. Section 1 governs the narration: describe the mechanism, that
+Genie looks one level deep by default and could likely be prompted deeper, and never the verdict.
+
+The caveat's underlying point survives all of this intact. Convergence is cheap in SQL once you know
+where to start, and knowing where to start is what the graph contributes. What was removed is
+"confirmed, not theoretical," which asserted a reliable behaviour that the re-probe does not
+support.
 
 ---
 
@@ -209,8 +227,23 @@ What is our single biggest point of failure in our supply base?
 ```
 
 **The danger words are "depend on" and "common upstream."** Not "point of failure," which is safe
-and was probed. Beat 1 must never drift toward dependency phrasing, because that hands Genie alone the
-convergence query directly.
+and was probed. Beat 1 must never drift toward dependency phrasing.
+
+**The original reason for that rule is superseded, and the rule stays for a better one.** It was
+written to stop Beat 1 handing Genie alone the convergence query directly, on the belief that
+dependency phrasing would produce the answer Beat 3 exists to reveal. The re-probe found otherwise.
+Asked directly what the Americas glass bottle suppliers depend on, Genie alone wrote one hop and
+returned the container glass processors, with Cascade absent from the result set, and no question in
+the re-probe produced a recursive CTE, six questions for six. On this topology, dependency phrasing
+does not reach the furnace.
+
+The rule survives because Beat 1's job is to ask a diversification question and let the
+ungroundedness show. Dependency phrasing changes the subject to Beat 3's question, and the arc
+collapses whichever way Genie alone answers it: reach the furnace and Beat 3 has no discovery left to
+make, miss it and the room watches the same question asked twice. That reason is structural and holds
+on every run, where the old one was a Claim B observation wearing a rule's clothing. It is also why
+the rule does not get relaxed if a later probe shows Genie going deeper. The one-hop ceiling is
+something we have observed repeatedly, not something we are owed.
 
 **Beat 4, to the lakehouse:** recognized revenue per business unit for the most recent full quarter.
 Exact wording pinned during the re-probe phase.
@@ -247,10 +280,13 @@ comment that describes what a Critical Supplier is without using the words passe
 breaks the demo. The editorial rule in `upload.py` stays as the human review for that, and the two
 are not interchangeable.
 
-**The actual last line of defense is the one-hop ceiling.** Across four probed questions, Genie
-never wrote a recursive CTE and never walked past one hop, including on a question phrased with
-"depend on." Whether that holds once Cascade sits two tiers back is the single most important
-thing to learn from the re-probe phase.
+**The actual last line of defense is the one-hop ceiling.** The re-probe phase asked ten questions
+across six phrasings against the rebuilt data, where Cascade sits two tiers back behind the
+container glass processors, and Genie alone never wrote a recursive CTE and never walked past one
+hop, including on questions phrased with "depend on" and "upstream." The dependency question now
+returns the processors and Cascade never appears. This is a repeated observation and not a
+guarantee, so it is read the way section 1 reads the convergence result: probed, clean so far, and
+not something a beat may lean on as if the next ask were bound by it.
 
 **Read from the output, never asserted:** Cascade's betweenness rank, the shape of the betweenness
 distribution, and which supplier a degree count names. The rank correlation between betweenness and
@@ -372,9 +408,15 @@ Nothing here is decided by argument. Each closes with a transcript or a build ou
 
 | Item | Closes in | How |
 |---|---|---|
-| Whether Genie recurses once Cascade is two tiers back | The re-probe phase | All four questions re-asked |
 | Beat 4's exact question wording | The re-probe phase | Asked verbatim, confirmed not steered |
 | The Story 1 beat script | The re-probe phase | Written from betweenness output, never before |
+
+**Closed 2026-07-19, whether Genie recurses once Cascade is two tiers back.** Recorded in
+`probe-run-a-v3.md`. Ten questions across six phrasings against the rebuilt data, with Cascade two
+tiers back behind the container glass processors. No recursive CTE anywhere and no walk past one
+hop, including on "depend on" and "upstream" phrasings. The dependency question returns the
+processors and Cascade never appears. Closed as evidence for the one-hop ceiling as Claim B, not as
+a guarantee about future asks.
 
 **Closed 2026-07-19, the spread of Genie alone answers to Beat 1.** Five fresh conversations, recorded in
 `probe-run-a.md`. Four distinct queries, verdicts spanning "not diversified" to "highly

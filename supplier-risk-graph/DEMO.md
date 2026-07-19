@@ -4,7 +4,9 @@ This walkthrough assumes the one-time setup in the [`README.md`](README.md) is d
 
 > **Data freshness.** The dataset is a forward-looking snapshot taken from the date it was generated. `generate_data.py` defaults `--as-of` to today, and Story 2 depends on Jade's invoices still reading as open and on time. Regenerate the data and rerun the pipeline shortly before any demo.
 >
-> **This script quotes no figures.** Every number comes back from Genie live and the presenter reads it off the screen. Amounts, scores, cutoffs, and ranks all move when the data is regenerated, so a number typed into a slide is a number that will eventually be wrong in front of an audience. What this script does state are the structural claims: which relationships hold, which paths carry a commodity, and which entity clears a governed threshold. The generator asserts those on every run, so if one breaks you find out before you walk in. It does not state who ranks first, because rank is read from the output and never asserted.
+> **The seed does not change.** Regenerating keeps `SEED = 42` and refreshes only the as-of date, so names, ids, supply topology, and every rank stay identical build to build. Do not edit `SEED` in `generate_data.py`: that is a reseed, not a refresh, and it can move Fairview's rank and Cascade's cohort membership, which are what Beat 3 rests on. The README carries the same warning.
+>
+> **This script quotes no figures.** Every number comes back from Genie live and the presenter reads it off the screen. The date-relative figures move with the as-of date each time the data is regenerated, and the seed-fixed ones like scores, cutoffs, and ranks are read live on principle rather than transcribed, so a number typed into a slide is a number that will eventually be wrong in front of an audience. What this script does state are the structural claims: which relationships hold, which paths carry a commodity, and which entity clears a governed threshold. The generator asserts those on every run, so if one breaks you find out before you walk in. It does not state who ranks first, because rank is read from the output and never asserted.
 
 ## Graph terms used in this walkthrough
 
@@ -124,6 +126,7 @@ Genie + Graph, and the three steps appear in this order, each with its own visib
 - **Explanation.** It walks the commodity-carrying glass chain into the Americas and shows the tier-1 bottle makers converging on their shared upstream source.
 - **The result:** Cascade Glassworks clears the Supply Concentration Threshold, and so do other suppliers, because the threshold catches a cohort. What singles Cascade out is the definition and the commodity scoping applied together: it is the cohort member sitting on the Americas' commodity-carrying glass paths. **The finding does not come from topping a ranking, and the presenter should not describe it as one.** Other furnaces in the cohort are genuinely critical elsewhere on their own merits.
 - **Why no score sort finds it:** Cascade's own risk score sits below the High-Risk threshold and plenty of suppliers score higher, so no risk-score filter surfaces it.
+- **Ask for the governed term by name, and do not apologize for it.** Beat 3 says "Critical Supplier" out loud rather than describing the idea in loose business language. That is the demonstration, not a shortcut around it. Critical Supplier is a term in the ontology with an authored definition, a rule, and a threshold behind it, so asking for it by name is what having a governed vocabulary is for. It is also the sharpest possible contrast: Genie alone cannot answer the question at all, because no column and no classification of that name exists on its side. Describing the term instead of naming it routes the request to whichever governed term sounds closest, which in practice is High-Risk Supplier, and that returns a defensible answer to a different question.
 - **Carry the criticality side-by-side.** Ask the second frozen question of both engines: "What is our single biggest point of failure in our supply base?" This is safe to ask precisely because no beat depends on Genie alone answering any particular way. The re-probe asked it of Genie alone and recorded what came back in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md): read that for staging, ask it live, and script neither side.
 
 > **TODO, Genie + Graph.** Beat 3's narrative gets written from what Genie + Graph actually returns against the rebuilt data, which has not been probed yet. Genie alone's side of the re-probe is recorded and closed; Genie + Graph's is not. Two open points belong to that work: whether the three steps land as three distinct visible outputs on screen, and how to present the result if the returned cohort carries more than one supplier on the Americas' glass chain. Both are settled by transcript, not by argument.
@@ -138,7 +141,7 @@ Convergence is cheap in SQL once you know where to start. "Which supplier feeds 
 
 - **Never frame this as Genie being wrong or beaten.** `CONTRACT.md` sections 1 and 8 ban it outright, and a result sold as a gotcha makes the room defend the tool it already owns instead of evaluating the argument.
 - **The beat has to work whichever way Genie alone answers.** The re-probe asked this question repeatedly in fresh conversations and the answer held every time while the SQL varied, which is the strongest form that evidence can take and still only one build. It enters as claim B and stays there. If Genie alone converges on the furnace on the day, nothing breaks: the graph still resolved the definition, the commodity scoping, and the tier that made the finding actionable, and the presenter says so.
-- **Repeat it after any regenerate** before leaning on it, because the processor tier's fan-out moves with the seed. The record is in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md).
+- **Re-probe after a model update, not after a routine regenerate,** before leaning on it: `make demo` keeps seed 42, so the processor tier's fan-out is identical build to build and only editing `SEED` would move it. What drifts is the model's default reflex. The record is in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md).
 
 ### Beat 4, the exposure
 
@@ -258,17 +261,17 @@ Cut Jade's committed facility down toward the balance already drawn, using the t
 - **Beat 5 stays open on purpose.** Handing the room a live decision with a euro figure attached converts the contrast into urgency, and it costs nothing to build.
 - **Genie + Graph's answers read like actions.** It composes its reason from the path itself and closes with the recommended action, something a risk officer acts on rather than provenance trivia.
 
-## The fairness rebuttal: show the GDS run once
+## The fairness rebuttal: both engines get every table
 
 - **The question the room asks:** whether plain Genie was denied the scores.
-- **The show:** run `gds.py` once on stage, about 30 seconds.
+- **Do not run GDS on stage.** It ran during setup and the walkthrough reads properties that already exist. The rebuttal is an answer, not a demonstration, and nothing here needs proving by re-running it.
 - **The rebuttal:** both engines get every table, including the raw supply links and the ownership stakes. What plain Genie will not do is invent an all-pairs shortest-path computation or an iterative weighted propagation, unprompted, from a business question. Both are expressible in SQL; neither is something a BI tool reaches for, and both are one line of GDS.
 - **Do not say BI cannot compute these at all.** It is not true, a Databricks audience knows it is not true, and the demo does not need it. The claim that holds is the one above.
-- **If challenged, invite the shortcut.** Offer the room the obvious aggregates live and let Genie run them. Counting connections over `supply_relationships` does not name Cascade: the build asserts it and the re-probe read it back live, where the question returned an equipment vendor. Ranking customers by distance to a default, or by defaults per ownership group, does not return Jade. The shortcuts are available, they run, and they return a different name.
+- **If challenged, invite the shortcut.** Offer the room the obvious aggregates live and let Genie run them. Counting connections over `supply_relationships` does not name Cascade: the build asserts it, and the re-probe read it back live where the top result was a different supplier. Ranking customers by distance to a default, or by defaults per ownership group, does not return Jade. The shortcuts are available, they run, and they return a different name.
 
 Three facts behind the rebuttal:
 
-- **The scores are precomputed.** `Supplier.betweenness` and `Customer.pagerank` are written as Neo4j node properties at setup and never recomputed during the walkthrough. The `gds.py` run above is a rebuttal aside, not part of either story.
+- **The scores are precomputed.** `Supplier.betweenness` and `Customer.pagerank` are written as Neo4j node properties by `gds.py` at setup and never recomputed during the walkthrough. Contract section 8 bans running GDS live on stage and there is no exception for the rebuttal.
 - **Neither property is ever synced to Delta.** Writing them into a gold table would recreate the write-back leakage this demo removes, and the lakehouse-only engine would tie again.
 - **The Supply Concentration Threshold is a hand-set percentile, fixed before the run,** and it catches a cohort rather than a single supplier. Say so if the room asks whether the cutoff was chosen to make the answer come out. The Ownership Contagion Threshold for Story 2 is still read off its score distribution.
 
@@ -290,7 +293,9 @@ The knowledge layer answers questions that span definitions, which the fact side
 - **Provenance.** "Show the full lineage behind Jade's Strategic Account label." Genie + Graph walks instance to term to rule to entity to the physical tables, returning the Strategic Account term, the reason recorded on the edge, the Strategic Account Rule, the Customer entity, and the tables it maps to. Customer carries two sources, `supplier_risk.customers` and `supplier_risk.owned_by`, so the walk returns both. That is the honest answer: the ownership stakes are part of what the Customer entity is made of.
 - **Queryable glossary.** The knowledge layer is the catalog. List every governed term and its definition, which threshold parameterizes which term, or which policy owns which rule.
 
-The two graph-native terms, Critical Supplier and Ownership Risk, are never pre-planted as `CLASSIFIED_AS` edges. Genie + Graph resolves each from its definition and applies it live using the precomputed betweenness and PageRank properties, so those labels never exist as a materializable row and can never leak into a gold table.
+Critical Supplier is written as `CLASSIFIED_AS` edges by `gds.py` at setup, once the betweenness scores exist and the governed threshold has resolved. In production that labelling would be a background job; here it runs as part of the build. The cohort is derived from the threshold and never enumerated by hand, so no supplier is named into it. Those edges do export to the `classifications` gold table, which is precisely why that table is never attached to the Genie space: the ban at the space boundary is what stops the lakehouse-only engine reading the graph's conclusion straight out of a column.
+
+Ownership Risk carries no `CLASSIFIED_AS` edges and Genie + Graph resolves it live from the precomputed PageRank. That asymmetry between the two graph-native terms is a known defect rather than a design, and it belongs to Story 2's work.
 
 ## Pre-flight check
 

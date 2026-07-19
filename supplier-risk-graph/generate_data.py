@@ -42,6 +42,16 @@ from datetime import date, timedelta
 from pathlib import Path
 
 SEED = 42
+# The seed is load-bearing and must not be changed. Every name, id, supply-graph
+# edge, and resulting betweenness rank is derived from it, so the whole of Story 1
+# is a fact of this exact seed: Fairview as the container-glass processor the
+# Americas bottle makers share, Cascade as the single furnace behind it, and the
+# Critical Supplier cohort they both sit in. Running make demo regenerates with
+# this seed and only refreshes the as-of date below, which is safe and expected.
+# Editing this number is a reseed, not a refresh: it moves the topology and can
+# move who ranks where, which is a story-level change to be re-probed under
+# proposals/CONTRACT.md, never a knob to turn.
+#
 # Snapshot ("as of") date. Defaults to today so a freshly generated dataset is
 # always current; override with --as-of YYYY-MM-DD for a reproducible build. Only
 # date arithmetic depends on it, never an RNG draw, so moving it shifts every

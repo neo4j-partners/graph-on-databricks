@@ -359,6 +359,22 @@ because Story 2 is out of scope, so changing it is a redesign of Story 2, which 
 
 ## Re-probe, after the rebuild
 
+### The probe harness, and why it logs
+
+Probes run against the MAS endpoint (Run B) through `probe_audited.py` in the session scratchpad. One
+question per invocation, each in a fresh conversation:
+
+    rtk proxy uv run probe_audited.py "the question" --label A1 --max-turns 30
+
+It drives the MCP approval loop, auto-approving every Neo4j call, and writes an append-only JSONL
+audit log at `<label>.jsonl` flushed after every API round trip. The flush is the point. The earlier
+script printed only after the loop finished, so a run killed mid-loop wrote nothing, which is exactly
+how one re-probe was lost. With the audit log a killed run still leaves everything up to its last
+completed call on disk, untruncated, while stdout mirrors each turn as it happens. Deep traversals
+run past the old cap of twelve turns, so raise `--max-turns` for any question that walks the full
+commodity chain. The script is scratchpad tooling and is recreated per session rather than living in
+the repo.
+
 ### Run A re-probed, six questions, and the ceiling held
 
 Run against the re-synced space with `make guard` clean on every surface first. Each question in its
@@ -439,6 +455,51 @@ narrates the mechanism rather than the verdict per `CONTRACT.md` section 1.
       rather than optional: ask "what is our single biggest point of failure in our supply base?" of
       both runs. It is safe to ask precisely because no beat depends on Run A answering any
       particular way. Record both, script neither.
+
+### The commodity-root re-probe: a wording that lands Cascade
+
+A commodity-root re-probe was run against Run B, the MAS serving endpoint, to find a natural business
+question that makes the graph name Cascade Glassworks (SUP-901) as the answer reliably, rather than
+stopping at the container-glass processor tier above it. The reason this needed settling: an earlier
+re-probe found that questions scoped to the Americas glass bottle suppliers, or to which Critical
+Supplier is upstream, stop one hop up at the processors and name the processor Fairview Container
+Works (SUP-907). Ranked by betweenness, Cascade is the lowest member of the Critical Supplier cohort,
+so no "which is most critical" or "what converges" phrasing selects it. Something had to point the
+question at Cascade without pointing it past Cascade.
+
+The probe used the audited harness with the approval cap raised past the old limit. Three wordings,
+several fresh runs each, one question per fresh conversation.
+
+- Wording A, "Trace the raw glass supply for our Americas bottle production back to its source, which
+  supplier is at the bottom of that chain," wandered into deep raw-material queries or listed Cascade
+  among several furnaces. No clean run where Cascade was the single stated answer.
+- Wording B, "Every container-glass processor that serves our Americas bottle makers buys its raw
+  glass from somewhere. Is there a single upstream supplier they all depend on for it," named Cascade
+  Glassworks every run as the single upstream source that all the Americas container-glass processors
+  depend on for raw glass, and cited SUP-901 explicitly on some of those runs. Most of the runs
+  reached the answer with shallow queries rather than deep variable-length traversals, so on stage it
+  costs only a handful of live approvals.
+- Wording C, "Which supplier is the ultimate source of the raw glass behind our Americas glass
+  bottles," overshot below Cascade into the feedstock, naming a raw-material supplier once and a
+  different furnace once. No clean hit.
+
+The lesson, which the stalled agent's own note corroborated: any "source," "bottom," or "ultimate"
+framing keeps pulling the stated answer below Cascade into the feedstock tier of cullet, silica sand
+and soda ash. Scoping the question to the processors' shared upstream dependency lands on Cascade and
+stops there. That is why wording B works and A and C do not.
+
+The answers were graph traversals returning the structural sole-source relationship, not a figure
+that could have come from a Delta table, so there is no leakage. One run stalled with an empty log
+and was killed. The completed runs survived only because the audited harness flushes to disk per
+turn, which is the reason that harness was built.
+
+The decision this settles: wording B becomes Beat 3's question that lands on Cascade, and Cascade
+stays the protagonist. Re-landing the beat on Fairview is not needed. This also closes the "Open for
+the re-probe to settle" item in the chord-ratio build subsection above, which asked whether two glass
+suppliers on the Americas chain weakens Story 1: the scoping question returns the single upstream, so
+Beat 3's punchline is one name, Cascade, even though the cohort contains two glass suppliers on that
+chain. The landing wording for Beat 3 is settled here; the checklist item to write the five beats
+stays open, because that work is not done.
 
 ## Docs, last
 

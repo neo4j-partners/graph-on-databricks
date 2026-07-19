@@ -367,14 +367,44 @@ def run_sql(w: Any, cfg: Config, statement: str) -> list[list[Any]]:
 
 
 def check_unity_catalog(
-    w: Any, cfg: Config, names: list[str], commodities: dict[str, set[str]]
+    w: Any,
+    cfg: Config,
+    names: list[str],
+    commodities: dict[str, set[str]],
+    attached: list[str],
 ) -> list[Leak]:
-    """Table names, column names, and both kinds of comment.
+    """Table names, column names, both kinds of comment, and row values.
 
     Read back from information_schema rather than from upload.py's SEMANTICS
     dict on purpose. Twice in this project's history a change recorded as
     applied was absent from the live workspace, so what matters is what the
     workspace holds, not what the repo intended to send it.
+
+    information_schema exposes names and comments but never row values, so a
+    governed term name sitting as a plain row value under a bland column name
+    passes the metadata scan silently. classifications.term holds four governed
+    term names as row values right now, doing exactly its job, and the same
+    shape becomes a leak the moment it reaches a column of a table Run A can
+    read. So the row values of attached tables are scanned too.
+
+    Two constraints on that row scan are load-bearing. First, only tables
+    actually attached to the Genie space are scanned, taken from `attached`, the
+    same data_sources list banned_tables reads. classifications deliberately
+    holds governed term names as row values and is never attached, so scanning
+    the whole schema would fail the build forever for a table doing exactly its
+    job. Second, only scan_vocabulary runs over row values, never
+    scan_commodity_grouping. A single commodity member appearing as a row value
+    is instance data and fine per scan_commodity_grouping's own docstring:
+    suppliers.subcategory legitimately holds six members of the glass grouping,
+    and the commodity scan would fire on that column instantly and permanently.
+    A governed name as a row value is a leak by the same logic that makes it one
+    in a comment, so the vocabulary scan is the scan that belongs over row
+    values and the commodity scan is the one that does not.
+
+    This buys literal governed-name matching on row values and nothing wider. A
+    free-text column that describes a graph finding in words the guard does not
+    know stays uncatchable here, the same honest boundary the module docstring
+    draws for comments.
     """
     leaks: list[Leak] = []
 
@@ -391,16 +421,46 @@ def check_unity_catalog(
     columns = run_sql(
         w,
         cfg,
-        f"SELECT table_name, column_name, comment "
+        f"SELECT table_name, column_name, data_type, comment "
         f"FROM `{cfg.catalog}`.information_schema.columns "
         f"WHERE table_schema = '{cfg.schema}'",
     )
-    for table_name, column_name, comment in columns:
+    attached_names = {
+        identifier.split(".")[-1].strip("`") for identifier in attached
+    }
+    string_columns: dict[str, list[str]] = {}
+    for table_name, column_name, data_type, comment in columns:
         where = f"{table_name}.{column_name}"
         leaks += scan(column_name, "column name", where, names, commodities)
         leaks += scan(comment, "column comment", where, names, commodities)
+        # STRING is the only textual type in this schema, and row values only
+        # carry a governed name when they are text. A column on an attached
+        # table is the only place a row value is a surface Run A can read.
+        if data_type == "STRING" and table_name in attached_names:
+            string_columns.setdefault(table_name, []).append(column_name)
 
-    print(f"  Unity Catalog: {len(tables)} tables, {len(columns)} columns scanned")
+    scanned_columns = 0
+    for table_name, column_list in string_columns.items():
+        for column_name in column_list:
+            scanned_columns += 1
+            # SELECT DISTINCT because a governed name leaks whether it appears
+            # in one row or in thousands, and the distinct set of a categorical
+            # column is small. Pulling full tables would buy nothing.
+            rows = run_sql(
+                w,
+                cfg,
+                f"SELECT DISTINCT `{column_name}` "
+                f"FROM `{cfg.catalog}`.`{cfg.schema}`.`{table_name}` "
+                f"WHERE `{column_name}` IS NOT NULL",
+            )
+            where = f"{table_name}.{column_name}"
+            for row in rows:
+                leaks += scan_vocabulary(row[0], "row value", where, names)
+
+    print(
+        f"  Unity Catalog: {len(tables)} tables, {len(columns)} columns, and "
+        f"{scanned_columns} string columns of attached tables scanned"
+    )
     return leaks
 
 
@@ -414,19 +474,23 @@ def check_unity_catalog(
 BANNED_TABLES = frozenset({"classifications", "business_unit_exposure"})
 
 
-def banned_tables(serialized_space: str, location: str) -> list[Leak]:
-    """The gold tables, which must not be data sources of the Genie space.
+def genie_table_sources(serialized_space: str, location: str) -> list[str]:
+    """Every table identifier the Genie space declares as a data source.
 
-    Read from the space's declared data_sources rather than by searching the
-    blob for the table names. A substring search would fire on any example SQL
-    or instruction that merely says the word "classifications", which is a false
-    positive that costs the guard its credibility, and it would miss nothing
-    real: a table Genie can query is a table the space lists here.
+    The single place that reads data_sources out of the serialized space, so the
+    banned-table check and the row-value scan in check_unity_catalog agree on
+    exactly which tables are attached instead of each deriving the list its own
+    way and drifting apart. Read from the space's declared data_sources rather
+    than by searching the blob for table names: a substring search would fire on
+    any example SQL or instruction that merely says the word "classifications",
+    a false positive that costs the guard its credibility, and it would miss
+    nothing real, since a table Genie can query is a table the space lists here.
 
     The parse failing is treated the same way an empty serialized_space is,
     because it has the same consequence. A guard that shrugs at a shape it does
     not recognize and reports clean is worse than no guard, since someone read
-    the clean line and believed it.
+    the clean line and believed it. Both callers rely on this list, so a failure
+    to parse it must stop the run rather than let either check proceed blind.
     """
     import json
 
@@ -436,13 +500,24 @@ def banned_tables(serialized_space: str, location: str) -> list[Leak]:
     except (ValueError, KeyError, TypeError) as error:
         sys.exit(
             f"Genie space {location} serialized definition did not parse as a "
-            f"table list ({error}). The guard cannot tell whether the banned "
-            "gold tables are attached, so it is not reporting clean. If the "
-            "space export format changed, fix banned_tables to match it."
+            f"table list ({error}). The guard cannot tell which tables are "
+            "attached, so it can check neither the banned gold tables nor the "
+            "row values of attached tables, and it is not reporting clean. If "
+            "the space export format changed, fix genie_table_sources to match."
         )
+    return [str(source.get("identifier", "")) for source in sources]
+
+
+def banned_tables(sources: list[str], location: str) -> list[Leak]:
+    """The gold tables, which must not be data sources of the Genie space.
+
+    Takes the attached identifiers parsed by genie_table_sources rather than the
+    raw blob, so it and the row-value scan read one list. The two gold tables
+    materialize the graph's answers, so a space that lists either as a source
+    lets Run A read the finding straight out of a column.
+    """
     leaks: list[Leak] = []
-    for source in sources:
-        identifier = str(source.get("identifier", ""))
+    for identifier in sources:
         if identifier.split(".")[-1].strip("`") in BANNED_TABLES:
             leaks.append(
                 Leak(
@@ -456,27 +531,20 @@ def banned_tables(serialized_space: str, location: str) -> list[Leak]:
     return leaks
 
 
-def check_genie_space(
-    w: Any, cfg: Config, names: list[str], commodities: dict[str, set[str]]
-) -> list[Leak]:
-    """The space title, description, and its full serialized definition.
-
-    serialized_space carries the text instructions, the column configs, and the
-    example SQLs in one blob. Scanning it whole rather than field by field is
-    deliberate: the guard should not need updating every time the space gains a
-    new kind of authored text.
+def fetch_genie_space(w: Any, cfg: Config) -> Any:
+    """Fetch the Story 1 space with its serialized definition, or refuse to run.
 
     include_serialized_space must be passed explicitly. Without it the API omits
     the field entirely and the guard scans an empty string, which reports clean
     while checking nothing. That is the silent-no-op failure the Story 2
-    landmine asserts exist to catch, so the emptiness check below is not
-    defensive clutter: it is the difference between this function passing and
-    this function meaning something.
+    landmine asserts exist to catch, so the emptiness check here is not
+    defensive clutter: it is the difference between the live run passing and the
+    live run meaning something.
 
-    banned_tables runs from the same fetch. It is a different failure from a
-    vocabulary leak, but it fails the same claim and it is checked against the
-    same surface at the same moment, so paying for a second round trip to keep
-    the two in separate scripts would buy nothing.
+    The fetch is a function of its own so main can pull the space once and hand
+    it to both the Unity Catalog check, which needs the attached-table list out
+    of it, and check_genie_space, which scans its text. Paying for a second
+    round trip to keep those apart would buy nothing.
     """
     space = w.genie.get_space(cfg.genie_space_id, include_serialized_space=True)
     if not space.serialized_space:
@@ -486,6 +554,28 @@ def check_genie_space(
             "this run proves nothing about the surface that matters most. "
             "Refusing to report clean."
         )
+    return space
+
+
+def check_genie_space(
+    space: Any,
+    sources: list[str],
+    cfg: Config,
+    names: list[str],
+    commodities: dict[str, set[str]],
+) -> list[Leak]:
+    """The space title, description, and its full serialized definition.
+
+    serialized_space carries the text instructions, the column configs, and the
+    example SQLs in one blob. Scanning it whole rather than field by field is
+    deliberate: the guard should not need updating every time the space gains a
+    new kind of authored text.
+
+    banned_tables runs from the same fetch and the same parsed source list. It
+    is a different failure from a vocabulary leak, but it fails the same claim
+    and it is checked against the same surface at the same moment, so paying for
+    a second round trip to keep the two in separate scripts would buy nothing.
+    """
     leaks: list[Leak] = []
     where = f"space {cfg.genie_space_id}"
     leaks += scan(space.title, "genie title", where, names, commodities)
@@ -493,7 +583,7 @@ def check_genie_space(
     leaks += scan(
         space.serialized_space, "genie definition", where, names, commodities
     )
-    leaks += banned_tables(space.serialized_space, where)
+    leaks += banned_tables(sources, where)
     size = len(space.serialized_space or "")
     print(
         f"  Genie space:   '{space.title}', {size} chars of definition scanned, "
@@ -596,9 +686,14 @@ def main() -> int:
     else:
         w = WorkspaceClient(host=cfg.host, token=cfg.token)
 
+    space = fetch_genie_space(w, cfg)
+    sources = genie_table_sources(
+        space.serialized_space, f"space {cfg.genie_space_id}"
+    )
+
     leaks = check_authored_comments(names, commodities)
-    leaks += check_unity_catalog(w, cfg, names, commodities)
-    leaks += check_genie_space(w, cfg, names, commodities)
+    leaks += check_unity_catalog(w, cfg, names, commodities, sources)
+    leaks += check_genie_space(space, sources, cfg, names, commodities)
     return report(leaks, "live")
 
 
