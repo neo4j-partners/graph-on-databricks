@@ -17,14 +17,24 @@ CLASSIFIED_AS spec per label, the same way realized_as.csv is split on
 instance_label; the four column-findable terms (Strategic Account, Defaulted
 Customer, Delinquent Customer, High-Risk Supplier) all ride in that one file.
 
-The two graph-native terms, Critical Supplier and Ownership Risk, are never
-written as CLASSIFIED_AS edges here or anywhere: they are resolved live at demo
-time from the betweenness and PageRank node properties that gds.py (Phase 2)
-precomputes. They do carry a SCORED_BY edge to a GraphMetric node naming that
-property formally, which binds the term to its implementation without
-materializing a classification. The knowledge layer is rebuilt around the two
-stories and includes the new SupplyRelationship entity, which is just another
-row in entities.csv and needs no special handling.
+The two graph-native terms are not written here, because their cohorts do not
+exist until gds.py has scored the network. Critical Supplier is labelled by
+`write_critical_supplier_labels` in gds.py once the THR-03 cutoff resolves,
+which simulates the scheduled batch job a production deployment would run.
+Ownership Risk still carries no CLASSIFIED_AS edges at all.
+
+That asymmetry is a known defect rather than a design, and the re-probe found
+it: an agent doing schema discovery learns the classification pattern from the
+terms that have edges, applies it to a term that has none, gets zero rows, and
+truthfully reports that the system does not classify them. Story 2's Beat 3 is
+exposed to exactly that failure until Ownership Risk is labelled the same way.
+
+Both terms carry a SCORED_BY edge to a GraphMetric node naming the property
+formally, which binds the term to its implementation. That binding is still
+correct and is not what failed: nothing walked to it, because the agent's first
+query returned an empty result rather than an error. The knowledge layer is
+rebuilt around the two stories and includes the new SupplyRelationship entity,
+which is just another row in entities.csv and needs no special handling.
 
 Everything else in the knowledge layer runs outbound from the BusinessTerm, so a
 model doing schema discovery can walk from a term to the rule, the threshold

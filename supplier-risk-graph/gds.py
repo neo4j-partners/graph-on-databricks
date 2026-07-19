@@ -83,7 +83,11 @@ from graphdatascience import GraphDataScience
 # THR-03's governed input. It is imported rather than restated so there is one
 # place it can be changed and one commit that shows when it was fixed. The
 # generator is import-safe: everything below its main guard is data.
-from generate_data import SUPPLY_CONCENTRATION_PERCENTILE
+from generate_data import (
+    EVALUATED_AT,
+    RULE_VERSION,
+    SUPPLY_CONCENTRATION_PERCENTILE,
+)
 
 HERE = Path(__file__).parent
 
@@ -330,6 +334,79 @@ def write_betweenness(gds: GraphDataScience, scores: list[Score]) -> None:
             f"supplier in the projection must exist under MATCH (s:Supplier {{id}})."
         )
     print(f"  wrote betweenness to {written} Supplier nodes")
+
+
+def write_critical_supplier_labels(gds: GraphDataScience, conc: Cohort) -> None:
+    """Materialize CLASSIFIED_AS edges from the THR-03 cohort to TERM-05.
+
+    This simulates what a production deployment does on a schedule: a batch GDS
+    job scores the supply network, compares each score against the governed
+    threshold, and writes the classification back so downstream systems can read
+    a label instead of recomputing centrality per question. Nobody runs Brandes
+    at query time when a risk officer asks who is critical.
+
+    Until now the two graph-native terms carried no CLASSIFIED_AS edges at all,
+    on the reasoning that they are resolved live from the score properties and
+    bound to their implementation through SCORED_BY. That reasoning is sound and
+    the re-probe still killed it. Four terms in the graph are findable by
+    classification edge and two are not, so an agent doing schema discovery
+    learns the pattern from the majority, applies it to Critical Supplier, gets
+    zero rows, and truthfully reports that the system does not classify critical
+    suppliers. The definition, the rule, and the threshold were all present and
+    reachable. Nothing walked to them, because nothing needed to until the query
+    came back empty, and by then the agent had its answer.
+
+    **The cohort is derived and never enumerated.** Membership comes from the
+    resolved cutoff, so the edges are an output of the run in exactly the way
+    the cutoff is. A literal list of supplier ids here would convert this from a
+    materialized computation into the plant CONTRACT.md section 8 bans, and it
+    would be the same betrayal whether or not the ids happened to be right.
+
+    **On the Delta write-back, which looks like leakage and is not.** These
+    edges do flow into the `classifications` gold table, because
+    CLASSIFICATIONS_SPEC in `upload.py` selects every CLASSIFIED_AS edge. That
+    is the intended alternative surfacing pattern and not an oversight. The
+    protection is that the gold tables are never attached to the Genie space,
+    which `banned_tables` in `guard.py` enforces against the space's declared
+    data sources on every run. Do not add a term filter to CLASSIFICATIONS_SPEC
+    to "fix" this: the filter would restore the empty-result failure above while
+    looking like a safety improvement.
+    """
+    reason = (
+        f"supply betweenness at or above the {conc.percentile}th percentile "
+        f"cutoff of {conc.value}"
+    )
+    result = gds.run_cypher(
+        """
+        MATCH (t:BusinessTerm {name: $term})
+        UNWIND $ids AS sid
+        MATCH (s:Supplier {id: sid})
+        MERGE (s)-[r:CLASSIFIED_AS]->(t)
+        SET r.reason = $reason,
+            r.evaluatedAt = datetime($evaluatedAt),
+            r.ruleVersion = $ruleVersion
+        RETURN count(r) AS written
+        """,
+        params={
+            "term": CRITICAL_SUPPLIER_TERM,
+            "ids": [s.node_id for s in conc.members],
+            "reason": reason,
+            "evaluatedAt": EVALUATED_AT,
+            "ruleVersion": RULE_VERSION,
+        },
+    )
+    written = int(result["written"].iloc[0])
+    if written != len(conc.members):
+        sys.exit(
+            f"Critical Supplier labelling wrote {written} of "
+            f"{len(conc.members)} CLASSIFIED_AS edges. Every cohort member must "
+            f"exist as a Supplier node and '{CRITICAL_SUPPLIER_TERM}' must exist "
+            f"as a BusinessTerm, or Beat 3 resolves to an empty result."
+        )
+    print(
+        f"  labelled {written} supplier(s) as '{CRITICAL_SUPPLIER_TERM}' "
+        f"(CLASSIFIED_AS, cohort resolved from the {conc.percentile}th percentile)"
+    )
 
 
 def check_seed_ids(gds: GraphDataScience, protags: Protagonists) -> None:
@@ -1005,6 +1082,7 @@ def main() -> None:
         assert_betweenness(betweenness, conc, protags)
         report_degree_overlap(gds, betweenness, protags)
         write_betweenness(gds, betweenness)
+        write_critical_supplier_labels(gds, conc)
 
         pagerank = compute_pagerank(gds, protags)
         trading = trading_customers(gds)

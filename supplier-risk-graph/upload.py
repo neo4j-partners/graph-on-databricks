@@ -199,11 +199,22 @@ BASE_SPECS = [
     ),
 ]
 
-# Gold table: the CLASSIFIED_AS edges written back from the graph. In the
-# rebuilt demo only the four column-findable terms are planted as edges, each
-# carrying rule provenance (reason, evaluatedAt, ruleVersion). The two
-# graph-native terms (Critical Supplier, Ownership Risk) are resolved live and
-# never planted, so they never materialize here.
+# Gold table: the CLASSIFIED_AS edges written back from the graph. The four
+# column-findable terms are planted by the generator, each carrying rule
+# provenance (reason, evaluatedAt, ruleVersion). Critical Supplier is written by
+# `write_critical_supplier_labels` in `gds.py` after the cutoff resolves, which
+# is why it cannot be planted with the others: its cohort does not exist until
+# the scores do.
+#
+# **Do not add a term filter here.** Critical Supplier rows in this table look
+# like write-back leakage and are not. The gold tables are never attached to the
+# Genie space, which `banned_tables` in `guard.py` enforces against the space's
+# declared data sources on every run, so the lakehouse-only engine cannot read
+# them. Filtering the term out instead would return the graph to the state where
+# an agent asking which suppliers are critical gets zero rows and truthfully
+# answers that the system does not classify them. That failure is recorded in
+# the re-probe worklog. Ownership Risk still carries no edges and still
+# materializes nowhere, so Story 2 has the failure this filter would recreate.
 CLASSIFICATIONS_SPEC = DerivedSpec(
     table="classifications",
     columns=[
