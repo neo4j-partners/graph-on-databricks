@@ -6,7 +6,7 @@ before working in it.
 ## supplier-risk-graph
 
 `supplier-risk-graph/CLAUDE.md` is required reading before proposing anything about that demo, and
-`supplier-risk-graph/worklog/CONTRACT.md` is the authority for its narrative, questions, beats, and
+`supplier-risk-graph/proposals/CONTRACT.md` is the authority for its narrative, questions, beats, and
 data topology.
 
 The point that gets misread most often, repeated here so it is visible from the repo root: the demo

@@ -2,8 +2,8 @@
 
 ## Read this before proposing anything about the demo
 
-`worklog/CONTRACT.md` is the authority for Story 1. Read it before suggesting a change to the
-demo's narrative, questions, beats, data topology, or knowledge layer. `worklog/simplified-plan.md`
+`proposals/CONTRACT.md` is the authority for Story 1. Read it before suggesting a change to the
+demo's narrative, questions, beats, data topology, or knowledge layer. `proposals/simplified-plan.md`
 is the working detail behind it. Where they disagree, the contract wins.
 
 ## The core point, which is misread constantly
@@ -56,5 +56,5 @@ SEMANTICS dict, `assert_betweenness` in `gds.py`. Line numbers in the worklog we
 day and sent a reader to the wrong place.
 
 **No demo artifact contains a value that a reseed would change.** The generator is RNG-driven and
-Genie Agent is stochastic. See the reseed-invariance section in `worklog/CONTRACT.md`. Enforcement
+Genie Agent is stochastic. See the reseed-invariance section in `proposals/CONTRACT.md`. Enforcement
 is editorial: re-read what you changed before committing.

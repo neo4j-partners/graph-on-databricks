@@ -107,7 +107,8 @@ LATE_DAYS_THRESHOLD = 60  # days
 # how it was derived.
 #
 # It does not move. If the protagonist fails to clear it, the topology is what
-# gets fixed, under the two-iteration stopping rule in CONTRACT.md section 7.
+# gets fixed, under the two-iteration stopping rule in proposals/CONTRACT.md
+# section 7.
 # Widening it until something clears is the failure mode this comment exists to
 # prevent.
 #
