@@ -261,8 +261,19 @@ on every run, where the old one was a Claim B observation wearing a rule's cloth
 the rule does not get relaxed if a later probe shows Genie going deeper. The one-hop ceiling is
 something we have observed repeatedly, not something we are owed.
 
-**Beat 4, to the lakehouse:** recognized revenue per business unit for the most recent full quarter.
-Exact wording pinned during the re-probe phase.
+**Beat 4, to Genie + Graph:**
+
+```
+What is our business exposure to Cascade Glassworks?
+```
+
+Probed live and confirmed on this build, transcript in the worklog as `Genie One - Cascade business
+exposure.pdf`. The supervisor resolved it through the Supply Exposure measure rather than reading
+"exposure" as supplier spend: it read the Critical Supplier classification and its governed
+threshold, walked the commodity-carrying chain to the Americas bottle makers, identified the one
+exposed business unit, and sent the arithmetic to Genie. The figure Genie computes underneath is
+recognized revenue per business unit for the most recent full quarter, over the instance tables. One
+build and one model, so re-probe after a model update, not after a routine regenerate.
 
 ---
 
@@ -424,8 +435,14 @@ Nothing here is decided by argument. Each closes with a transcript or a build ou
 
 | Item | Closes in | How |
 |---|---|---|
-| Beat 4's exact question wording | The re-probe phase | Asked verbatim, confirmed not steered |
 | The Story 1 beat script | The re-probe phase | Written from betweenness output, never before |
+
+**Closed 2026-07-19, Beat 4's exact question wording.** The top-level Beat 4 ask is "What is our
+business exposure to Cascade Glassworks?", put to Genie + Graph and confirmed live, transcript in the
+worklog as `Genie One - Cascade business exposure.pdf`. The supervisor resolved it through the Supply
+Exposure measure to the one exposed business unit's recognized revenue, reading "exposure" as revenue
+at risk rather than supplier spend. Section 6 carries the frozen wording. One build and one model, so
+re-probe after a model update.
 
 **Closed 2026-07-19, whether Genie recurses once Cascade is two tiers back.** Recorded in
 `probe-run-a-v3.md`. Ten questions across six phrasings against the rebuilt data, with Cascade two

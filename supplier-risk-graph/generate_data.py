@@ -168,8 +168,8 @@ MIN_INTERMEDIATE_FRACTION = 0.30
 # check_supply_structure measures this as the longest directed shortest-path
 # chain rather than the longest path, which is NP-hard. See supply_depth() for
 # why that substitution is safe in the direction a floor cares about. There is
-# no probe cap: the earlier MAX_PROBE_TIERS existed only to bound a
-# backtracking walk, and the measure that replaced it terminates on its own.
+# no probe cap: the measure terminates on its own, unlike the earlier
+# backtracking walk that needed one to bound it.
 MIN_SUPPLY_TIERS = 4
 
 # THR-03, the Supply Concentration Threshold, as the governed parameter rather

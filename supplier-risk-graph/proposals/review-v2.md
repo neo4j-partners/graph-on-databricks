@@ -23,12 +23,20 @@ then reconciliations and pre-flight.
 
 `concentration_cutoff` in `gds.py` resolves the nearest-rank percentile, rounds that cutoff to two
 decimals, and then selects the clearing cohort with a `>=` comparison against scores that carry four
-decimals. Cascade sits on the cohort boundary, last in the clearing cohort on the recorded builds,
-which is exactly the position the mismatch acts on. So a regenerate can push the rounded cutoff above
-Cascade's own unrounded score and make `assert_betweenness` fail on arithmetic rather than on
-topology. That failure prints the CONTRACT section 7 message telling the operator to fix the topology
-and spend an iteration, which is the wrong diagnosis and the expensive one. It is reachable from a
-demo-day regenerate, not only from the build loop.
+decimals. Whichever supplier defines the percentile sits on that boundary, so the round can drop it
+from its own cohort (round up) or admit suppliers below the percentile (round down). A regenerate can
+also push the rounded cutoff above a boundary supplier's unrounded score and make `assert_betweenness`
+fail on arithmetic rather than on topology, which prints the CONTRACT section 7 message telling the
+operator to fix the topology and spend an iteration, the wrong and expensive diagnosis. It is
+reachable from a demo-day regenerate, not only from the build loop.
+
+**Measured on the current build (recorded in `worklog/thr03-rounding.md`).** The round went up
+(846.3482 to 846.35). The percentile is defined by SUP-910 Redstone Glassworks, not by Cascade, and
+that supplier dropped out of its own cohort, so the cohort was 8 where the unrounded selection gives
+9. Cascade cleared with roughly 33 points of headroom (rank 8 of 169) and was never on the arithmetic
+boundary on this build, so the earlier framing that Cascade itself was at even odds of failing was an
+overstatement: the defect's real effect here was a mis-sized cohort that dropped the percentile
+definer.
 
 ### ELI5
 
@@ -48,6 +56,11 @@ node, to `thresholds.csv`, and to the display. Re-run and confirm the cohort is 
 re-probe findings still hold if it moved. Per REBUILD.md, a build failing `assert_betweenness` for this
 reason has not spent a topology iteration, so keep that distinction visible when it fires.
 
+**APPROVED. Applied.** Raw numbers recorded in `worklog/thr03-rounding.md`. `concentration_cutoff`
+now selects against the unrounded score and rounds only the written and displayed value;
+`assert_betweenness` now tests cohort membership. The pipeline was not re-run (the tree is dirty and
+a regenerate is destructive), so the fix is inert until the next controlled `make demo`, on which the
+cohort becomes 9 and adds SUP-910. Re-read the re-probe cohort answers on that run.
 ---
 
 ## 2. **Dirty working tree before a destructive rebuild**
@@ -89,6 +102,20 @@ old sheet is misled.
 Update the `classifications` row to match the code: Critical Supplier now carries edges, written by
 `gds.py` from the governed threshold as a stand-in for a production batch job, and Ownership Risk alone
 is resolved live and carries none.
+
+**On hold, broader than described, and coupled to finding 4.** The stale claim is not confined to the
+`classifications` table row. DATA_ARCHITECTURE.md states in several places, most sharply in its
+"Classifications" section, that "the two graph-native terms are resolved live, never pre-planted" and
+that this "guarantees the two graph-native labels never exist as a materializable row anywhere, so
+they can never leak into a gold table." Critical Supplier now does materialize as a row in the
+`classifications` gold table, so that safety guarantee is no longer structural. It has moved from
+"cannot materialize" to "materializes but is held out of the space by `banned_tables`." That is a
+weaker guarantee than the doc claims, and finding 4 was ruled "accept, clarify section 8" before this
+was visible. Holding the doc edit until finding 4 is reconfirmed with the fuller picture, because if
+the write-back is instead backed out, the old wording becomes correct and no doc change is needed.
+
+
+**APPROVED**
 
 ---
 
@@ -153,6 +180,8 @@ no such map drawn yet, only the building floor plan.
 
 Create the Story 1 topology diagram: the regional clusters, the processor tier, Cascade as a narrow
 waist two tiers back, and the independent glassworks feeding the other business units.
+
+**APPROVED**
 
 ---
 
@@ -233,6 +262,11 @@ rulebook. It is a real and useful sentence, it is just not filed where the sign 
 Either add this invited-caveat question to CONTRACT section 6, since it is the one section 4 tells the
 presenter to invite, or soften DEMO.md's wording from "the frozen phrasing" to "the invited phrasing."
 
+**Applied (soften DEMO wording).** DEMO.md now calls it "the invited phrasing" and points to CONTRACT
+section 4, noting it is distinct from the three questions frozen in section 6. CONTRACT untouched.
+
+**APPROVED**
+
 ---
 
 ## 11. **REBUILD.md "Docs, last" checkboxes are stale**
@@ -252,6 +286,14 @@ tick the box. A couple of chores really are still open, so do not tick everythin
 Reconcile the checkboxes against the actual doc contents, keeping the project rule that "done" must name
 the check that proves it. The re-sync and the read-back stay open until verified against the live
 system.
+
+**Applied.** Two of the "Docs, last" boxes were already ticked (the one-winner deletion and the
+README/DATA_ARCHITECTURE rewrite). The DEMO.md beats-rewrite box is now ticked, verified by sweep, with
+its two open TODO markers called out as re-probe deliverables. The transcript-PDF box is annotated that
+the v1/v2 move is done and only the v3 export remains. The Story 1 diagram and the live Genie re-sync
+boxes stay open.
+
+**APPROVED**
 
 ---
 
@@ -289,6 +331,11 @@ slightly confusing to the next person.
 
 Optional cleanup. Leave the comment if it earns its keep as history, or trim the reference.
 
+**Applied.** The comment in `generate_data.py` above `MIN_SUPPLY_TIERS` now explains why there is no
+probe cap without naming the dead constant. `MAX_PROBE_TIERS` no longer appears anywhere in the file.
+
+**APPROVED**
+
 ---
 
 ## 14. **REBUILD.md self-teardown pending**
@@ -306,3 +353,5 @@ remember the note asked to be thrown away later.
 
 When the remaining findings close, move the pre-flight section into DEMO.md and delete REBUILD.md, per
 its own instruction.
+
+**DO NOT DELETE**

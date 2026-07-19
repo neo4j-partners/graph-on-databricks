@@ -544,9 +544,12 @@ stays open, because that work is not done.
 
 ## Docs, last
 
-- [ ] `DEMO.md`: rewrite the Story 1 beats. Beat 2 becomes a live repeated ask. Beat 3 shows the legs
-      definition-first. Rewrite Beat 4 around the five-unit comparison and add the bottles causal
-      argument. Delete the honesty caveat about the number not being attributable to Cascade, which
+- [x] **`DEMO.md`: the Story 1 beats are rewritten, verified 2026-07-19 by sweep.** Beat 2 is a live
+      repeated ask, Beat 3 shows the legs definition-first, and Beat 4 is built around the five-unit
+      comparison with the bottles causal argument. The two open TODO markers left in the beats are
+      re-probe deliverables, the Beat 3 transcript and the Beat 4 wording, not doc-writing. For the
+      record, what the rewrite had to cover: delete the honesty caveat about the number not being
+      attributable to Cascade, which
       was true of the unscoped measure and is not true of this one. Delete every "expected Run A
       answer" and do not reintroduce it in another form. Remove quoted counts and scores. It quotes
       the old TERM-05 "narrowest bridge" phrasing twice, including once as the finding Beat 3 lands
@@ -591,7 +594,8 @@ stays open, because that work is not done.
       `customer_risk_exposure` metric view, and the "the metric view is the only place finding counts
       are available" wording must go. Verify against the live workspace, not against a worklog: twice
       here a change recorded as applied was absent from the deployed system.
-- [ ] **The transcript PDFs.** Move the v1 and v2 sets to `worklog/archive/transcripts/`. Every
+- [ ] **The transcript PDFs.** The v1 and v2 sets are already moved to `worklog/archive/transcripts/`;
+      what remains open is exporting the v3 set. Every
       transcript from both stories is stale after the regenerate by definition, so the v3 set
       captured in the re-probe replaces them and is not compared against v2. Stamp each new
       transcript with the seed and the as-of date, both read from the top level of

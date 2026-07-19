@@ -1,75 +1,90 @@
 # Demo walkthrough
 
-This walkthrough assumes the one-time setup in the [`README.md`](README.md) is done: the data is generated, Neo4j is loaded, the GDS analytics have run, the Unity Catalog tables are uploaded, and the Genie space is created with the two gold tables kept out of it and every instance table in it, `compliance_findings` and `owned_by` included.
+The speaker's script for the two-story demo. One-time setup (data generation, Neo4j load, GDS,
+Unity Catalog upload, and the Genie space) is covered in the setup section at the end.
 
-> **Data freshness.** The dataset is a forward-looking snapshot taken from the date it was generated. `generate_data.py` defaults `--as-of` to today, and Story 2 depends on Jade's invoices still reading as open and on time. Regenerate the data and rerun the pipeline shortly before any demo.
->
-> **The seed does not change.** Regenerating keeps `SEED = 42` and refreshes only the as-of date, so names, ids, supply topology, and every rank stay identical build to build. Do not edit `SEED` in `generate_data.py`: that is a reseed, not a refresh, and it can move Fairview's rank and Cascade's cohort membership, which are what Beat 3 rests on. The README carries the same warning.
->
-> **This script quotes no figures.** Every number comes back from Genie live and the presenter reads it off the screen. The date-relative figures move with the as-of date each time the data is regenerated, and the seed-fixed ones like scores, cutoffs, and ranks are read live on principle rather than transcribed, so a number typed into a slide is a number that will eventually be wrong in front of an audience. What this script does state are the structural claims: which relationships hold, which paths carry a commodity, and which entity clears a governed threshold. The generator asserts those on every run, so if one breaks you find out before you walk in. It does not state who ranks first, because rank is read from the output and never asserted.
-
-## Graph terms used in this walkthrough
-
-| Term | Meaning |
-|---|---|
-| Betweenness | A score for how often a node sits on the paths between other nodes; a high score marks a bottleneck or bridge |
-| PageRank (personalized) | A score for how much influence flows to a node from a chosen set of starting nodes, spreading along relationships |
-| Contagion | Risk spreading across relationships, so a clean node inherits risk from the nodes it is connected to |
+**Before every demo:** regenerate the data and rerun the pipeline. The dataset is a forward-looking
+snapshot from its generation date, and Story 2 depends on the invoices reading as open and on time.
+Regenerating keeps `SEED = 42` and refreshes only the as-of date, so names, ids, topology, and every
+rank stay identical. Never edit `SEED`: that is a reseed, not a refresh, and it moves the ranks the
+demo rests on.
 
 ## What the demo proves
 
-Two engines answer the same question over the same data:
+Two engines answer the same question over the same data.
 
-- **Genie alone**, the lakehouse-only engine. A Databricks Genie space, the Genie Agent product, scoped to the `supplier_risk` schema. It reads the raw instance tables and the `customer_risk_exposure` metric view over them, and nothing else. The metric view holds no conclusions, only aggregates of columns already in those tables.
-- **Genie + Graph.** That same Genie space under a supervisor, the Genie One product, which can also call a read-only Neo4j MCP server over the knowledge graph.
+- **Genie alone:** a Databricks Genie space scoped to the `supplier_risk` schema. It reads the raw
+  instance tables and the `customer_risk_exposure` metric view, nothing else.
+- **Genie + Graph:** that same space under a supervisor that can also call a read-only Neo4j
+  knowledge graph.
 
-**Those are the two names used everywhere below.** Say them on stage as well: they carry the contrast in the name itself, which a room follows without being told. The product names appear once, here, and then never again. The worklog and the probe records call the two engines Run A and Run B, which is what this walkthrough called them until 2026-07-19: those files are historical records and are left as written.
+Say those two names on stage. The contrast is in the name itself, so the room follows it without
+being told.
 
-**What is numbered and what is named.** Beats are numbered, one to five, and they are the only numbered sequence in this walkthrough. Everything else has a name: the two engines above, and the three steps of Beat 3, which are Definition, Discovery, and Explanation.
+Each story puts one natural question to both engines:
 
-The demo runs two stories:
+- **Ungrounded:** Genie alone reads every column correctly and returns a plausible, defensible answer
+  anchored to nothing, because no lakehouse artifact defines the question's terms.
+- **Grounded:** Genie + Graph resolves the governed definition from the graph, walks the connections,
+  and returns an answer a risk committee can act on because it cites an authored definition.
 
-- **The setup:** each story puts one natural question to both engines.
-- **Ungrounded:** the lakehouse-only engine reads every column correctly and returns a plausible, defensible answer that is anchored to nothing, because no lakehouse artifact says what the question's terms mean.
-- **Grounded:** Genie + Graph resolves the governed definition from the graph, walks the connections, and returns an answer a risk committee can act on because it cites an authored definition.
+Beats are numbered one to five and are the only numbered sequence. Everything else is named: the two
+engines above, and the three steps of Beat 3, which are Definition, Discovery, and Explanation.
 
-### The honesty framing
+## The honesty framing
 
-**The demo is ungrounded versus grounded. It is not wrong versus right.** Genie alone is a frontier LLM over tables. Ask it a business question and it returns an answer grounded in nothing but column names, and the axis it picks is generative rather than reproducible. Genie + Graph returns an answer grounded in an authored definition, so it is the same answer every time.
+**The demo is ungrounded versus grounded. It is not wrong versus right.** Genie alone is a frontier
+LLM over tables; the axis it picks is generative, not reproducible. Genie + Graph's answer is
+grounded in an authored definition, so it is the same answer every time.
 
-**Genie alone can return an answer that is false at full depth, and that is a legitimate finding rather than something to soften.** The re-probe found one: asked whether the Americas glass bottle suppliers share a common upstream supplier, Genie alone looks one hop up and answers from what it finds there, while the graph traverses the commodity-scoped chain and answers the other way. `CONTRACT.md` section 1 is the authority for how that is handled, and the line it draws is that an **emerged** wrong answer is evidence while an **engineered** one is a plant. Predicting an answer and then shaping data so the prediction fails stays banned outright.
+Genie alone **can** return an answer that is false at full depth, and that is a legitimate finding.
+Narrate the mechanism, never the verdict: Genie looks one level deep by default. It could likely be
+prompted deeper, and saying so costs nothing, because default behavior is what an analyst gets. Never
+frame a beat as Genie being wrong, bad, or beaten. The room should leave thinking about depth of
+question, not about which vendor lost.
 
-**On stage, narrate the mechanism and never the verdict.** The truthful and sufficient sentence is that Genie looks one level deep by default. It is not incapable of going deeper and could likely be prompted to, and saying so costs the demo nothing, because default behaviour is what a procurement analyst actually gets. "Genie is wrong," "Genie is bad," and any framing that invites the room to score one product against another are out. The room should leave thinking about depth of question, not about which vendor lost.
+Two claims, different strength, kept separate on stage:
 
-Two claims, different strength, and they must stay separate on stage:
+- **Load-bearing, cannot fail:** no answer from Genie alone cites a governed business definition,
+  because none exists in the lakehouse. True on every run.
+- **Vivid, not guaranteed:** Genie alone's answers vary across runs. Show it live, never depend on it.
 
-- **Load-bearing, cannot fail:** no answer from Genie alone cites a governed business definition, because none exists in the lakehouse. True by construction, on every run.
-- **Vivid, not guaranteed:** the answers Genie alone gives vary across runs. Show it live, never depend on it. If three asks agree, narrate the ungroundedness and move on.
+**Do not predict what Genie will answer, in this file or on stage.** No beat carries a scripted answer
+for Genie alone.
 
-Never claim SQL cannot express these traversals. A Databricks audience knows recursive CTEs exist. The defensible claims are narrower and true:
+Never claim SQL cannot express these traversals; a Databricks audience knows recursive CTEs exist.
+The defensible claims are narrower and true:
 
-*Betweenness is a graph score for how often a node sits on the paths between other nodes; a high score marks a bottleneck. PageRank is a graph score for how much influence flows to a node from a chosen set of starting nodes.*
+- No lakehouse column defines what "single point of failure" or "same ownership group" means. The
+  definition lives in the graph.
+- Supplier betweenness and weighted ownership PageRank are graph computations no column carries. Both
+  are expressible in SQL, but no BI tool writes them unprompted, and their cutoffs are governed values
+  in the graph.
 
-- No lakehouse column governs what "single point of failure" or "same ownership group" means. The definition lives in the graph.
-- The two graph-native signals, supplier betweenness and weighted ownership PageRank, are graph computations no column carries and no aggregate reproduces. Both are expressible in SQL and neither is anything a BI tool writes unprompted. Their governing cutoffs are governed values in the graph, never a column a BI tool could sort on.
-- **Do not predict what Genie will answer, in this file or on stage.** No Story 1 beat contains a scripted answer for Genie alone, and none may be reintroduced in another form. Story 2's beats still carry the older scripted framing and are out of scope for the current rebuild, so read them as history rather than as a licence to script Story 1.
+## The five-beat arc
 
-### The five-beat arc
-
-Both stories run the same five beats, so the audience learns the rhythm on story 1 and feels it confirm on story 2:
+Both stories run the same five beats, so the room learns the rhythm on Story 1 and feels it confirm
+on Story 2:
 
 1. **The ask:** one natural question, put to both engines.
-2. **Ungrounded:** the lakehouse-only engine answers from the columns, correctly, with nothing governing what the answer means.
-3. **Grounded:** Genie + Graph resolves the definition, applies it, and explains the structure behind the result.
+2. **Ungrounded:** Genie alone answers from the columns, correctly, with nothing governing what the
+   answer means.
+3. **Grounded:** Genie + Graph resolves the definition, applies it, and explains the structure behind
+   the result.
 4. **The exposure:** the grounded finding gets a euro figure, computed from the same lakehouse data.
-5. **The decision:** the recommended action, handed to the room as a live choice.
+5. **The fix:** the action the finding points to, shown on screen rather than handed to the room as a
+   choice.
 
-- **Nothing here is pasted.** Both engines write their own queries. The presenter types a question and the engine generates the SQL or Cypher, so this script gives questions and talking points, not queries.
-- **The names line up on both sides.** Graph properties and the instance tables both use camelCase. See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the full label, relationship, and property model.
+Nothing is pasted. Both engines write their own queries; the presenter types a question. Graph
+properties and instance tables both use camelCase.
 
 ## Story 1: the hidden glassworks
 
-Supplier concentration risk hiding in the sub-tier. One business unit's tier-1 bottle suppliers are separately qualified and separately contracted, so its supply base looks diversified. All of them buy their glass, through a sub-tier of glass processors, from the same furnace. If that furnace stops, that unit cannot bottle its product. The other business units draw their glass from independent furnaces and keep shipping. Procurement knows its tier-1 suppliers. It does not know who they buy from.
+Supplier concentration risk hiding in the sub-tier. One business unit's tier-1 bottle suppliers are
+separately qualified and separately contracted, so its supply base looks diversified. All of them buy
+their glass, through a sub-tier of glass processors, from the same furnace. If that furnace stops,
+that unit cannot bottle its product. The other units draw their glass from independent furnaces and
+keep shipping. Procurement knows its tier-1 suppliers. It does not know who they buy from.
 
 ```text
  tier              the Americas chain                 the other units' chains
@@ -95,85 +110,142 @@ Supplier concentration risk hiding in the sub-tier. One business unit's tier-1 b
              while the other units' glass arrives through furnaces that do not
 ```
 
-The background network is not a two-cluster graph joined at Cascade. It is several regional clusters with inter-cluster bridges carrying freight, equipment, and ingredients, never glass, so Cascade is not a cut vertex: remove it and the network stays in one component. Cascade earns its position by spanning the feedstock and processor tiers, not by being the only way across the graph.
+Cascade is not a cut vertex: the background network has inter-cluster bridges carrying freight,
+equipment, and ingredients but never glass, so removing Cascade leaves the network in one component.
+Cascade earns its position by spanning the feedstock and processor tiers, not by being the only way
+across the graph.
 
 ### Beat 1, the ask
 
-Asked verbatim, of both engines. `CONTRACT.md` section 6 is the authority for this wording and changing it means changing that file.
+Asked verbatim, of both engines:
 
 > "How diversified is our glass bottle supply for the Americas?"
 
-- **The ambiguity is the demonstration, not a bug to fix.** "Diversified" can mean units per supplier or sources per unit. Nothing in the lakehouse says which axis is correct. Do not reword the question to force the intended axis.
-- **The danger words are "depend on" and "common upstream."** Beat 1 must never drift toward dependency phrasing, because that hands Genie alone the convergence query directly. "Point of failure" is safe and was probed.
+- **The ambiguity is the demonstration, not a bug to fix.** "Diversified" can mean units per supplier
+  or sources per unit. Nothing in the lakehouse says which axis is correct. Do not reword the question
+  to force the intended axis.
+- **Avoid "depend on" and "common upstream" here.** They hand Genie alone the convergence query
+  directly. "Point of failure" is safe.
 
 ### Beat 2, ungrounded
 
-Genie alone, and there is no script here on purpose.
+Genie alone, no script.
 
-- **Ask it three times, live, in fresh conversations.** Three rather than two, because two asks can land on the same axis and show no spread.
-- **Read out what comes back and note that nothing in it references a governed definition.** That is the load-bearing observation and it holds on every run.
-- **If the three answers differ, narrate the spread. If they agree, narrate the ungroundedness.** Both land. Do not ask a fourth to manufacture a disagreement.
-- **Every table is in the space,** including `supply_relationships` and `supplier_business_units`. Nothing is withheld from Genie alone. The gap is grounding, not access.
-
-- **What the re-probe recorded is in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md), and it is staging background rather than a script.** Read it to know what the beat feels like to run: which tables Genie alone reaches for, that it answers from one hop, and that it invents its reading of "diversified" on the spot. Do not carry any of it onto a slide and do not expect the same axis twice. The observation that lands is the one that holds on every run, that nothing in the answer references a governed definition.
+- **Ask it three times, live, in fresh conversations.** Two asks can land on the same axis and show no
+  spread.
+- **Read out what comes back and note that nothing references a governed definition.** That is the
+  load-bearing observation and it holds on every run.
+- **If the three answers differ, narrate the spread. If they agree, narrate the ungroundedness.** Both
+  land. Do not ask a fourth to manufacture a disagreement.
+- **Every table is in the space,** including `supply_relationships` and `supplier_business_units`. The
+  gap is grounding, not access.
 
 ### Beat 3, grounded
 
-Genie + Graph, and the three steps appear in this order, each with its own visible output.
+Genie + Graph, three steps in order, each with its own visible output.
 
-- **Definition.** Genie + Graph resolves what a Critical Supplier means from the graph: a supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it, and one that need not sell to that business unit directly. The Supply Concentration Threshold parameterizes it. The lakehouse has no answer to that question at all.
-- **Discovery.** It reads the precomputed supply betweenness and applies the governed threshold, which returns a cohort of suppliers rather than a single name.
-- **Explanation.** It walks the commodity-carrying glass chain and shows that the Americas container-glass processors all draw their raw glass from one upstream furnace. The verbatim question that lands this, asked of Genie + Graph, is frozen in `CONTRACT.md` section 6: it asks whether the container-glass processors serving the Americas bottle makers share a single upstream supplier for their raw glass. Genie + Graph names Cascade Glassworks. The scoping is deliberate: ask about the bottle makers' shared upstream and the answer stops one hop up on the processor tier, and ask for the "source" or "bottom" of the chain and it slides below the furnace into the feedstock.
-- **The result:** Cascade Glassworks clears the Supply Concentration Threshold, and so do other suppliers, because the threshold catches a cohort. What singles Cascade out is the definition and the commodity scoping applied together: it is the cohort member sitting on the Americas' commodity-carrying glass paths. **The finding does not come from topping a ranking, and the presenter should not describe it as one.** Other furnaces in the cohort are genuinely critical elsewhere on their own merits.
-- **Why no score sort finds it:** Cascade's own risk score sits below the High-Risk threshold and plenty of suppliers score higher, so no risk-score filter surfaces it.
-- **Ask for the governed term by name, and do not apologize for it.** Beat 3 says "Critical Supplier" out loud rather than describing the idea in loose business language. That is the demonstration, not a shortcut around it. Critical Supplier is a term in the ontology with an authored definition, a rule, and a threshold behind it, so asking for it by name is what having a governed vocabulary is for. It is also the sharpest possible contrast: Genie alone cannot answer the question at all, because no column and no classification of that name exists on its side. Describing the term instead of naming it routes the request to whichever governed term sounds closest, which in practice is High-Risk Supplier, and that returns a defensible answer to a different question.
-- **Carry the criticality side-by-side.** Ask the second frozen question of both engines: "What is our single biggest point of failure in our supply base?" This is safe to ask precisely because no beat depends on Genie alone answering any particular way. The re-probe asked it of Genie alone and recorded what came back in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md): read that for staging, ask it live, and script neither side.
+- **Definition.** It resolves what a Critical Supplier means from the graph: a supplier that a
+  disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run
+  through, leaving few alternatives around it, and one that need not sell to that unit directly. The
+  Supply Concentration Threshold parameterizes it. The lakehouse has no answer to that question at all.
+- **Discovery.** It reads the precomputed supply betweenness and applies the governed threshold, which
+  returns a cohort of suppliers rather than a single name.
+- **Explanation.** It walks the commodity-carrying glass chain and shows that the Americas
+  container-glass processors all draw their raw glass from one upstream furnace, Cascade Glassworks.
 
-> **TODO, Genie + Graph.** Genie + Graph has now been probed and Beat 3's landing wording is settled: the convergence question in `CONTRACT.md` section 6 named Cascade on every run of the commodity-root re-probe. What remains is to capture the Genie + Graph transcript and confirm the three steps land as three distinct visible outputs on screen rather than reading as one. That is settled by transcript, not by argument.
+The result: Cascade clears the Supply Concentration Threshold, and so do other suppliers, because the
+threshold catches a cohort. What singles Cascade out is the definition and the commodity scoping
+applied together. **The finding does not come from topping a ranking, so do not describe it as one.**
+Cascade's own risk score sits below the High-Risk threshold, so no risk-score filter surfaces it.
 
-### The convergence caveat, said out loud
+- **Ask for the governed term by name.** Say "Critical Supplier" rather than describing the idea in
+  loose business language. It is a term in the ontology with an authored definition, a rule, and a
+  threshold. Genie alone cannot answer at all, because no column of that name exists on its side.
+  Describing the term instead routes the request to whichever governed term sounds closest, usually
+  High-Risk Supplier, which answers a different question.
+- **Carry the criticality side by side.** Also ask both engines: "What is our single biggest point of
+  failure in our supply base?" Safe to ask, because no beat depends on Genie alone answering any
+  particular way. Ask it live and script neither side.
 
-Convergence is cheap in SQL once you know where to start. "Which supplier feeds all of these" is a short query against the tier-1 bottle makers, and nothing about it is beyond Genie alone. The graph-native step is the one before it, knowing which suppliers to ask about at all.
+### The convergence caveat
 
-**Invite that question rather than hoping nobody asks it.** The frozen phrasing is "do all our Americas glass bottle suppliers share a common upstream supplier?"
+Convergence is cheap in SQL once you know where to start. "Which supplier feeds all of these" is a
+short query against the tier-1 bottle makers, well within Genie alone. The graph-native step is the
+one before it: knowing which suppliers to ask about at all.
 
-**What the question now reaches, and how to narrate it.** With a processor tier between Cascade and the bottle makers, one hop up from the bottle makers lands on the processors rather than on the furnace, so the convergence query Genie alone writes answers about the tier it can see. The graph, walking the commodity-carrying chain to full depth, answers about the tier below that. The sentence to say is the mechanism: Genie looks one level deep by default, it is not incapable of going deeper, and it could likely be prompted to. That is true, sufficient, and costs the demo nothing, because default behaviour is what an analyst actually gets.
+Invite that question rather than hoping nobody asks it. The frozen phrasing is "do all our Americas
+glass bottle suppliers share a common upstream supplier?" With a processor tier between Cascade and
+the bottle makers, one hop up lands on the processors, not the furnace, so the convergence query Genie
+alone writes answers about the tier it can see. The graph, walking the commodity-carrying chain to
+full depth, answers about the tier below. Narrate the mechanism: Genie looks one level deep by default
+and could likely be prompted deeper.
 
-- **Never frame this as Genie being wrong or beaten.** `CONTRACT.md` sections 1 and 8 ban it outright, and a result sold as a gotcha makes the room defend the tool it already owns instead of evaluating the argument.
-- **The beat has to work whichever way Genie alone answers.** The re-probe asked this question repeatedly in fresh conversations and the answer held every time while the SQL varied, which is the strongest form that evidence can take and still only one build. It enters as claim B and stays there. If Genie alone converges on the furnace on the day, nothing breaks: the graph still resolved the definition, the commodity scoping, and the tier that made the finding actionable, and the presenter says so.
-- **Re-probe after a model update, not after a routine regenerate,** before leaning on it: `make demo` keeps seed 42, so the processor tier's fan-out is identical build to build and only editing `SEED` would move it. What drifts is the model's default reflex. The record is in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md).
+The beat works whichever way Genie alone answers. If it converges on the furnace on the day, nothing
+breaks: the graph still resolved the definition, the commodity scoping, and the tier that made the
+finding actionable.
 
 ### Beat 4, the exposure
 
-- **What beat 3 handed over:** an entity, Cascade Glassworks, not a number. The graph has no euros in it.
-- **How Genie + Graph gets to a number:** it follows `MEASURED_BY` from the Critical Supplier term to the Supply Exposure measure, reads the Supply Exposure Rule, and lands on the `RevenueEntry` and `BusinessUnit` entities and the tables they map to. That is what tells it which question to ask next, and about which business unit.
-- **What the measure actually says:** the recognized revenue that stops when a Critical Supplier stops, for the most recent full quarter, for every business unit whose supply of the commodity at risk runs wholly through that supplier. A path that does not carry the commodity creates no dependency and is excluded. Scoped that way, the measure returns one business unit and no other, and the build asserts it.
-- **The follow-on question, put to Genie:** recognized revenue per business unit for the most recent full quarter, over the instance tables. No graph query produces the figure. Read it off the screen.
+Asked of Genie + Graph:
 
-> **TODO, re-probe.** The exact wording of the Beat 4 question is pinned during the re-probe phase, asked verbatim and confirmed not steered. `CONTRACT.md` section 6 records it as open.
+> "What is our business exposure to Cascade Glassworks?"
 
-- **Say the causal step out loud:** you cannot ship a bottled product without bottles. If the furnace stops, that unit's revenue stops rather than degrades, while the other units keep shipping. That is why the comparison across business units is the argument and a single number on its own is not.
-- **The kicker, presenter framing rather than a data answer:** what you pay Cascade is a rounding error in procurement spend. The exposure is the revenue that stops when they do, not what you pay them. The dataset carries no supplier spend column, so no engine computes this line: it is said, not queried.
-- **Why this is the honesty beat:** the lakehouse had the money the whole time and could always add it up. What it lacked was a reason to ask about this unit rather than about anything else, because no column says which unit's glass supply runs wholly through one furnace. The graph supplies the entity and the governed measure; Genie supplies the arithmetic.
+Genie alone cannot answer it, because no lakehouse column connects Cascade to a business unit's
+revenue.
 
-### Beat 5, the decision
+- **What Beat 3 handed over:** an entity, Cascade Glassworks, not a number. The graph holds no euros.
+- **How Genie + Graph gets to a number:** it follows `MEASURED_BY` from the Critical Supplier term to
+  the Supply Exposure measure, reads the Supply Exposure Rule, and lands on the `RevenueEntry` and
+  `BusinessUnit` tables. That turns "exposure to Cascade" into a revenue question about one unit.
+- **What the measure says:** the recognized revenue that stops when a Critical Supplier stops, for the
+  most recent full quarter, for every business unit whose supply of the commodity at risk runs wholly
+  through that supplier. A path that does not carry the commodity is excluded. The measure returns one
+  unit and no other.
+- **The arithmetic, sent to Genie:** recognized revenue per business unit for the most recent full
+  quarter, so the exposed unit's figure sits next to the units that keep shipping. Read it off the
+  screen.
+- **Why the revenue stops, not just dips:** you cannot ship a bottled product without bottles. If the
+  furnace stops, that unit's revenue stops rather than degrades, while the other units keep shipping.
+  The comparison across units is the argument; a single number is not.
+- **The kicker, presenter framing:** what you pay Cascade is a rounding error. The exposure is the
+  revenue that stops when they do. The dataset carries no supplier-spend column, so this line is said,
+  not queried.
+- **Why this is the honesty beat:** the lakehouse had the money the whole time. What it lacked was a
+  reason to ask about this unit, because no column says whose glass supply runs wholly through one
+  furnace. The graph supplies the entity and the governed measure; Genie supplies the arithmetic.
 
-Hand the room the live choice: qualify a second glass source for the exposed unit, against the figure beat 4 just returned.
+### Beat 5, the fix
 
-The point that makes it a decision rather than a slide is that a second source is not automatically a fix. **A second supplier whose own glass also traces back to Cascade changes nothing,** because the commodity-carrying paths still converge on the same furnace. Sourcing decisions made on the tier-1 view cannot tell the two cases apart, and the governed definition can. The rough cost of a second source is presenter framing, not a data answer. Genie + Graph's data answer ends at the finding and the exposure.
+The fix is a second glass source for the exposed unit, and Genie + Graph can show whether a given
+candidate actually is one. Ask it to walk the candidate's chain: a supplier drawing raw glass from an
+independent furnace breaks the dependency, and one that routes back to Cascade does not.
+
+**A second supplier whose own glass also traces back to Cascade changes nothing,** because the
+commodity-carrying paths still converge on the same furnace. Sourcing decisions made on the tier-1
+view cannot tell the two cases apart; the governed definition can. The cost of a second source is
+presenter framing, not a data answer.
 
 ### Graph mechanics
 
-*A traversal walks the graph relationship by relationship; a variable-length traversal keeps walking through any number of hops. GDS is Neo4j Graph Data Science, the library that computes graph algorithms such as betweenness.*
-
-- **The traversal:** a variable-length traversal walks the multi-tier chain. `SUPPLIES` points from a supplier toward what it feeds, so the path runs `(Cascade)-[:SUPPLIES]->(processor)-[:SUPPLIES]->(bottle maker)-[:SUPPLIES]->(Americas)`. Cascade never appears one hop from a business unit.
-- **The commodity test:** a path counts only when every supplier on it trades in a glass subcategory. The generator's `COMMODITY_SUBCATEGORIES` dict defines what that means, and the feedstock, raw glass, and processor tiers are all inside its `glass` entry. Without that test, the inter-cluster bridges would make the exposure measure leak into units that are not exposed.
-- **The GDS piece:** `gds.betweenness`, precomputed by `gds.py` as a `betweenness` property on every Supplier node, over an undirected projection of the supplier-to-supplier network.
-- **The cutoff:** the Supply Concentration Threshold is a hand-set percentile of supply betweenness, fixed and committed before the run rather than derived from the scores afterwards. The build asserts that Cascade **clears** it and that the clearing cohort has more than one member. That is cohort membership, not rank. A threshold exactly one entity clears is a post-hoc threshold no matter how it was arrived at, and `CONTRACT.md` section 8 bans it.
+- **The traversal:** a variable-length traversal walks the multi-tier chain. `SUPPLIES` points from a
+  supplier toward what it feeds:
+  `(Cascade)-[:SUPPLIES]->(processor)-[:SUPPLIES]->(bottle maker)-[:SUPPLIES]->(Americas)`. Cascade
+  never appears one hop from a business unit.
+- **The commodity test:** a path counts only when every supplier on it trades in a glass subcategory.
+  Without it, the non-glass bridges would leak the exposure measure into units that are not exposed.
+- **The GDS piece:** supplier betweenness, a graph score for how often a node sits on the paths between
+  others, precomputed as a node property over an undirected projection of the supplier network.
+- **The cutoff:** the Supply Concentration Threshold is a hand-set percentile of supply betweenness,
+  fixed before the run. Cascade clears it and the clearing cohort has more than one member. That is
+  cohort membership, not rank.
 
 ## Story 2: the clean payer in a bad group
 
-Group credit exposure hiding in the ownership structure. A customer pays every bill on time and is assessed standalone, the way credit control assesses every account. Nothing near it looks alarming either. But the group that controls it also controls four companies that went bankrupt, two levels further down, and it holds all of them outright. A lender would call these a group of connected clients and aggregate the exposure. The account-level rating cannot.
+Group credit exposure hiding in the ownership structure. A customer pays every bill on time and is
+assessed standalone, the way credit control assesses every account. Nothing near it looks alarming.
+But the group that controls it also controls four companies that went bankrupt, two levels further
+down, and it holds all of them outright. A lender would call these a group of connected clients and
+aggregate the exposure. The account-level rating cannot.
 
 ```text
                      Kestrel Holdings
@@ -191,20 +263,30 @@ Group credit exposure hiding in the ownership structure. A customer pays every b
  Graph sees: four failures arriving through controlling stakes
 ```
 
-Nothing is one hop away, which is the point. Customers across the book defaulted, and plenty of clean accounts sit directly next to one. Those accounts hold only a few percent of the company that failed. Jade holds nothing directly and is owned 85% by a group that owns its failures outright, so far more damage reaches Jade than reaches anyone standing closer.
+Nothing is one hop away, which is the point. Clean accounts sit directly next to defaults across the
+book, but they hold only a few percent of the company that failed. Jade holds nothing directly and is
+owned 85% by a group that owns its failures outright, so far more damage reaches Jade than reaches
+anyone standing closer.
 
-### Say this in the room: it is pipes, not distance
+### Pipes, not distance
 
 If you explain one thing in Story 2, explain this. It is the whole reason the graph is required.
 
-The instinct everyone has is that risk is about **distance**: who is standing closest to the fire. That instinct is what SQL is good at, and it is wrong here.
+The instinct everyone has is that risk is about **distance**: who is standing closest to the fire.
+That instinct is what SQL is good at, and it is wrong here.
 
-Ownership is not a distance, it is a **pipe**. Owning 90% of a company is a wide pipe, and almost everything that happens to it flows through to you. Owning 3% is a straw. So the right question is not "how close are you to a failure" but "how many pipes lead from failures to you, and how wide is each one."
+Ownership is not a distance, it is a **pipe**. Owning 90% of a company is a wide pipe, and almost
+everything that happens to it flows through to you. Owning 3% is a straw. So the question is not "how
+close are you to a failure" but "how many pipes lead from failures to you, and how wide is each one."
 
-- The accounts standing right next to a bankruptcy hold only a few percent of it. Straws. Almost nothing arrives.
-- Jade is three levels away from four bankruptcies, but every pipe on the path is 65% to 90% wide. Four failures arrive largely intact.
+- Accounts standing right next to a bankruptcy hold only a few percent of it. Straws. Almost nothing
+  arrives.
+- Jade is three levels from four bankruptcies, but every pipe on the path is 65% to 90% wide. Four
+  failures arrive largely intact.
 
-Distance says Jade is fine. Pipes say Jade is the most exposed trading account on the book. Adding up flow through a web of pipes, where damage arrives by several routes at once, is exactly what the graph algorithm does in one line and what a join cannot express.
+Distance says Jade is fine. Pipes say Jade is the most exposed trading account on the book. Adding up
+flow through a web of pipes, where damage arrives by several routes at once, is what the graph
+algorithm does in one line and what a join cannot express.
 
 ### Beat 1, the ask
 
@@ -214,141 +296,196 @@ Put to both engines:
 
 ### Beat 2, the miss
 
-- **What it does:** goes to the `customer_risk_exposure` metric view and ranks customers by `credit_utilization` and `overdue_amount`, taking the top ten. A clean, sensible query: it picks the two columns that most directly express credit strain and orders by them.
-- **What it does not do:** `avgDaysLate` and `churnRisk` never enter the query at all. The engine reads the exposure measures correctly and never has a reason to reach past them.
-- **Who is missing:** Jade Beverage Distribution is nowhere in the ten.
-- **Why:** every column it reads is clean. Jade carries no overdue balance at all, so `overdue_amount` is zero, and it draws a modest share of a large committed facility, so `credit_utilization` sits nowhere near the top of the book. Widen the ranking to lateness or churn and Jade is still clean: 0.0 average days late, 0.0 overdue share, low churn risk. A correct read of every column, and it misses the account credit review should worry about most.
-- **If the room asks about the ownership table:** it is in the Genie space, stakes and all, so push the question. Ask which customers are near a default, and the lakehouse answers correctly and still misses Jade, because the accounts nearest a default are the ones holding a few percent of it. Ask which ownership group holds the most defaults and it returns a different group, not Kestrel's. Both are right, both are the wrong account.
+- **What it does:** goes to the `customer_risk_exposure` metric view, ranks customers by
+  `credit_utilization` and `overdue_amount`, and takes the top ten. A clean, sensible query.
+- **What it does not do:** `avgDaysLate` and `churnRisk` never enter the query. It reads the exposure
+  measures correctly and has no reason to reach past them.
+- **Who is missing:** Jade Beverage Distribution.
+- **Why:** every column it reads is clean. Jade carries no overdue balance, so `overdue_amount` is
+  zero, and it draws a modest share of a large committed facility, so `credit_utilization` sits nowhere
+  near the top. Widen the ranking to lateness or churn and Jade is still clean. A correct read of every
+  column that misses the account credit review should worry about most.
+- **If the room asks about the ownership table:** it is in the space, stakes and all. Ask which
+  customers are near a default and the lakehouse still misses Jade, because the nearest accounts hold a
+  few percent of it. Ask which ownership group holds the most defaults and it returns a different
+  group, not Kestrel's. Both right, both the wrong account.
 
 ### Beat 3, the flag
 
-*Contagion is risk spreading across relationships, so a clean node inherits risk from the nodes it is connected to.*
-
-- **The governed definition:** Genie + Graph resolves what Ownership Risk means from the graph: "an active customer with a clean record of its own, no default and never delinquent, that absorbs more failure through its ownership stakes than any other trading customer," parameterized by the Ownership Contagion Threshold, a weighted PageRank cutoff.
-- **How it filters:** it excludes the defaulted customers and the invoice-less holding companies, then returns the clean operating customers whose stake-weighted propagated risk clears the cutoff, with the ownership chain as the stated reason.
-- **The result:** Jade Beverage Distribution comes back, a platinum account owned 85% by Kestrel Holdings, which owns Harbour Group and Tern Capital outright, and those two own the four companies that defaulted in the most recent quarter. Jade scores clearly ahead of the next trading customer, a gap wide enough that the cutoff sits between them with room to spare, even though Jade itself never missed a payment and nothing within two hops of it has failed.
-- **Why nobody else clears it:** the accounts sitting directly beside a default hold only a few percent of it, so almost nothing propagates to them. Kestrel's stakes are 65% to 90% at every level, so four failures arrive at Jade largely intact. The cutoff sits between Jade and the field.
-- **If someone asks why Kestrel or Harbour is not the answer:** they score higher, and they are correctly excluded. Kestrel, Harbour Group, and Tern Capital are holding companies. They stand between Jade and the failures, so more risk lands on them, but they buy nothing and carry no invoices, so there is no receivable to act on and no facility to cut. The governed definition of Ownership Risk says "an active customer" for exactly this reason, and having invoices is how the graph decides that. The question the demo answers is which **trading** account is most exposed, and that is Jade.
+- **The governed definition:** Genie + Graph resolves what Ownership Risk means from the graph: "an
+  active customer with a clean record of its own, no default and never delinquent, that absorbs more
+  failure through its ownership stakes than any other trading customer," parameterized by the Ownership
+  Contagion Threshold, a weighted PageRank cutoff.
+- **How it filters:** it excludes the defaulted customers and the invoice-less holding companies, then
+  returns the clean operating customers whose stake-weighted propagated risk clears the cutoff, with
+  the ownership chain as the stated reason.
+- **The result:** Jade Beverage Distribution, a platinum account owned 85% by Kestrel Holdings, which
+  owns Harbour Group and Tern Capital outright, and those two own the four companies that defaulted in
+  the most recent quarter. Jade scores clearly ahead of the next trading customer, a gap wide enough
+  that the cutoff sits between them with room to spare, even though Jade never missed a payment and
+  nothing within two hops of it has failed.
+- **Why nobody else clears it:** accounts sitting directly beside a default hold only a few percent of
+  it. Kestrel's stakes are 65% to 90% at every level, so four failures arrive at Jade largely intact.
+- **If someone asks why not Kestrel or Harbour:** they score higher and are correctly excluded. They
+  are holding companies: they buy nothing and carry no invoices, so there is no receivable to act on
+  and no facility to cut. The definition says "an active customer" for exactly this reason. The demo
+  answers which trading account is most exposed, and that is Jade.
 
 ### Beat 4, the exposure
 
-- **What beat 3 handed over:** an entity, Jade Beverage Distribution, not a number.
-- **How Genie + Graph gets to a number:** it follows `MEASURED_BY` from the Ownership Risk term to the Credit Exposure measure, reads the Credit Exposure Rule, and lands on the `Invoice` and `Customer` entities and the tables they map to. That is what tells it which question to ask next, and about which customer.
+- **What Beat 3 handed over:** an entity, Jade Beverage Distribution, not a number.
+- **How Genie + Graph gets to a number:** it follows `MEASURED_BY` from the Ownership Risk term to the
+  Credit Exposure measure, reads the Credit Exposure Rule, and lands on the `Invoice` and `Customer`
+  tables.
 - **The follow-on question, put to Genie:**
 
-> "What is Jade Beverage Distribution's committed credit facility, and how much of it is drawn as open invoice balance?"
+> "What is Jade Beverage Distribution's committed credit facility, and how much of it is drawn as open
+> invoice balance?"
 
-- **The figure:** a committed facility, of which a smaller amount is drawn across the open invoices. Both numbers come back from plain Genie over the instance tables. Read them off the screen. The exposure is the whole facility, not the drawn portion, because all of it is committed and can be drawn.
-- **Why this is the honesty beat:** the credit line and the open invoices were sitting in the lakehouse the whole time. Nothing in those columns says Jade is the account to ask about, because Jade's own record is spotless.
-- **Why it lands:** Jade is also a Strategic Account, so the line lands hard: the biggest clean customer on the book is the one absorbing the most failure in it, and nothing in its own record or its immediate neighbourhood says so.
+- **The figure:** a committed facility, of which a smaller amount is drawn across the open invoices.
+  Both come back from plain Genie over the instance tables. Read them off the screen. The exposure is
+  the whole facility, not the drawn portion, because all of it is committed and can be drawn.
+- **Why this is the honesty beat:** the credit line and the open invoices were in the lakehouse the
+  whole time. Nothing in those columns flags Jade, because Jade's own record is spotless.
+- **Why it lands:** Jade is also a Strategic Account, so the biggest clean customer on the book is the
+  one absorbing the most failure in it.
 
-### Beat 5, the decision
+### Beat 5, the fix
 
-Cut Jade's committed facility down toward the balance already drawn, using the two figures beat 4 just returned, and require prepayment on new orders, so the enterprise stops carrying the full committed exposure on the account absorbing more of the book's failure than any other.
+The fix is to cut Jade's committed facility down toward the balance already drawn, using the two
+figures Beat 4 returned, and to require prepayment on new orders, so the enterprise stops carrying the
+full committed exposure on the account absorbing more of the book's failure than any other.
 
 ### Graph mechanics
 
-*Personalized PageRank scores how much influence flows to each node from a chosen set of starting nodes, spreading along relationships. Weighting it means influence splits by the size of each stake rather than evenly.*
-
-- **The algorithm:** weighted personalized `gds.pageRank`, seeded on every defaulted customer in the book and propagated over the `OWNED_BY` edges with `ownershipPct` as the relationship weight, precomputed by `gds.py` as a `pagerank` property on every Customer node.
-- **The flow:** failure flows out of every default in proportion to who holds it. Through Kestrel's 65% to 90% stakes it arrives at Jade nearly intact, three levels up and back down. Through a filler's few-percent stake it effectively stops.
-- **Why the weight is the whole story:** unweighted, this collapses back into a hop count and the nearest account wins, which is a query anyone can write. Weighted, the answer depends on the product of stakes along every route and the sum over all routes, which is what the iteration computes and what no join reproduces.
-- **The cutoff:** the Ownership Contagion Threshold is set from the score distribution so Jade clears it and no other trading customer does.
+- **The algorithm:** weighted personalized PageRank, seeded on every defaulted customer and propagated
+  over the `OWNED_BY` edges with `ownershipPct` as the relationship weight, precomputed as a node
+  property on every Customer.
+- **The flow:** failure flows out of every default in proportion to who holds it. Through Kestrel's 65%
+  to 90% stakes it arrives at Jade nearly intact, three levels up and back down. Through a filler's
+  few-percent stake it effectively stops.
+- **Why the weight is the whole story:** unweighted, this collapses into a hop count and the nearest
+  account wins, a query anyone can write. Weighted, the answer depends on the product of stakes along
+  every route and the sum over all routes, which no join reproduces.
+- **The cutoff:** the Ownership Contagion Threshold is set from the score distribution so Jade clears
+  it and no other trading customer does.
 
 ## Why the arc works
 
-- **The grounding gap is the proof.** No prediction, no proof by clock. The lakehouse-only engine reading every column correctly and still having nothing to anchor the answer to is the whole argument, demonstrated live, twice.
-- **Beat 5 stays open on purpose.** Handing the room a live decision with a euro figure attached converts the contrast into urgency, and it costs nothing to build.
-- **Genie + Graph's answers read like actions.** It composes its reason from the path itself and closes with the recommended action, something a risk officer acts on rather than provenance trivia.
+- **The grounding gap is the proof.** The lakehouse-only engine reading every column correctly and
+  still having nothing to anchor the answer to is the whole argument, demonstrated live, twice.
+- **Beat 5 shows the fix.** Attaching a concrete action to the euro figure converts the contrast into
+  something a risk officer acts on rather than an abstract point.
+- **Genie + Graph's answers read like actions.** It composes its reason from the path itself and closes
+  with the recommended action, something a risk officer acts on.
 
 ## The fairness rebuttal: both engines get every table
 
-- **The question the room asks:** whether plain Genie was denied the scores.
-- **Do not run GDS on stage.** It ran during setup and the walkthrough reads properties that already exist. The rebuttal is an answer, not a demonstration, and nothing here needs proving by re-running it.
-- **The rebuttal:** both engines get every table, including the raw supply links and the ownership stakes. What plain Genie will not do is invent an all-pairs shortest-path computation or an iterative weighted propagation, unprompted, from a business question. Both are expressible in SQL; neither is something a BI tool reaches for, and both are one line of GDS.
-- **Do not say BI cannot compute these at all.** It is not true, a Databricks audience knows it is not true, and the demo does not need it. The claim that holds is the one above.
-- **If challenged, invite the shortcut.** Offer the room the obvious aggregates live and let Genie run them. Counting connections over `supply_relationships` does not name Cascade: the build asserts it, and the re-probe read it back live where the top result was a different supplier. Ranking customers by distance to a default, or by defaults per ownership group, does not return Jade. The shortcuts are available, they run, and they return a different name.
+The room will ask whether plain Genie was denied the scores. The rebuttal is an answer, not a
+demonstration.
 
-Three facts behind the rebuttal:
+- **Both engines get every table,** including the raw supply links and the ownership stakes. What plain
+  Genie will not do is invent an all-pairs shortest-path computation or an iterative weighted
+  propagation, unprompted, from a business question. Both are expressible in SQL; neither is what a BI
+  tool reaches for; both are one line of GDS.
+- **Do not say BI cannot compute these at all.** It can, and a Databricks audience knows it. The claim
+  that holds is the one above.
+- **If challenged, invite the shortcut.** Counting connections over `supply_relationships` does not
+  name Cascade. Ranking customers by distance to a default, or by defaults per ownership group, does
+  not return Jade. The shortcuts run, and they return a different name.
+- **The scores are precomputed graph properties and never synced to Delta.** Writing them into a gold
+  table would recreate the write-back leakage this demo removes. Do not run GDS on stage.
 
-- **The scores are precomputed.** `Supplier.betweenness` and `Customer.pagerank` are written as Neo4j node properties by `gds.py` at setup and never recomputed during the walkthrough. Contract section 8 bans running GDS live on stage and there is no exception for the rebuttal.
-- **Neither property is ever synced to Delta.** Writing them into a gold table would recreate the write-back leakage this demo removes, and the lakehouse-only engine would tie again.
-- **The Supply Concentration Threshold is a hand-set percentile, fixed before the run,** and it catches a cohort rather than a single supplier. Say so if the room asks whether the cutoff was chosen to make the answer come out. The Ownership Contagion Threshold for Story 2 is still read off its score distribution.
+## Warm-up and other questions
 
-## The background contrast: governed definitions the columns can carry
-
-The two stories are the payoff. The four column-findable terms make the contrast honest by showing what the lakehouse-only engine can govern, so the gap is clearly the two it cannot. Use one as a warm-up if the room needs it.
-
-- **The warm-up question:** ask both engines "Which suppliers are high-risk?"
-- **The lakehouse answer:** it has the `riskScore` column but no governed threshold, so it guesses a cutoff, often a top-N or a round number, and can miscount.
-- **The Genie + Graph answer:** it reads the governed threshold off the rule and returns every supplier at or above 70, the governed cutoff, consistent no matter who asks.
-- **Why it matters:** this is the honest baseline. With a column and a governed number, BI can close most of the gap; the two stories are exactly the cases where there is no such column.
-
-## What else Genie + Graph can answer
-
-The knowledge layer answers questions that span definitions, which the fact side finds awkward or cannot express.
-
-- **Impact analysis.** "If we lower the Late Payment Threshold to 45 days, which terms, rules, and tables change?" A traversal from `Threshold` through `APPLIES_TO`, `DEFINED_BY`, and `EVALUATES` to the affected entities and their Unity Catalog tables.
-- **Policy scope.** "Which policies govern customer data?" Follow `CONSTRAINS` from each `Policy` to its `Entity`. The Credit Risk Policy and the Compliance (KYC) Policy both constrain the Customer entity.
-- **Provenance.** "Show the full lineage behind Jade's Strategic Account label." Genie + Graph walks instance to term to rule to entity to the physical tables, returning the Strategic Account term, the reason recorded on the edge, the Strategic Account Rule, the Customer entity, and the tables it maps to. Customer carries two sources, `supplier_risk.customers` and `supplier_risk.owned_by`, so the walk returns both. That is the honest answer: the ownership stakes are part of what the Customer entity is made of.
-- **Queryable glossary.** The knowledge layer is the catalog. List every governed term and its definition, which threshold parameterizes which term, or which policy owns which rule.
-
-Critical Supplier is written as `CLASSIFIED_AS` edges by `gds.py` at setup, once the betweenness scores exist and the governed threshold has resolved. In production that labelling would be a background job; here it runs as part of the build. The cohort is derived from the threshold and never enumerated by hand, so no supplier is named into it. Those edges do export to the `classifications` gold table, which is precisely why that table is never attached to the Genie space: the ban at the space boundary is what stops the lakehouse-only engine reading the graph's conclusion straight out of a column.
-
-Ownership Risk carries no `CLASSIFIED_AS` edges and Genie + Graph resolves it live from the precomputed PageRank. That asymmetry between the two graph-native terms is a known defect rather than a design, and it belongs to Story 2's work.
+- **Warm-up, if the room needs it:** ask both engines "Which suppliers are high-risk?" Genie alone has
+  the `riskScore` column but no governed threshold, so it guesses a cutoff and can miscount. Genie +
+  Graph reads the governed threshold off the rule and returns every supplier at or above it, consistent
+  no matter who asks. This is the honest baseline: with a column and a governed number, BI can close
+  most of the gap, and the two stories are exactly the cases where there is no such column.
+- **Genie + Graph also answers questions that span definitions:** impact analysis ("if we lower the
+  Late Payment Threshold to 45 days, which terms, rules, and tables change?"), policy scope ("which
+  policies govern customer data?"), provenance ("show the full lineage behind Jade's Strategic Account
+  label"), and a queryable glossary of every governed term, threshold, and rule.
 
 ## Pre-flight check
 
-You do not need to verify figures. Every number comes back from Genie live, and whatever it returns is right for that build. What you need is confidence that the two stories still have their shape, because if one breaks the demo silently stops making its point.
+You do not need to verify figures. Every number comes back from Genie live. What you need is
+confidence that the two stories still have their shape, because if one breaks the demo silently stops
+making its point.
 
-- **`make demo`** rebuilds everything. The generator asserts both story shapes on every run, so a clean run with no `AssertionError` is the check.
-- **`make expected`** prints the figures this build actually produced, generated from `data/ground_truth.json` on the spot. Read it once before you go on and treat it as the answer key, not anything typed into this file.
-- **`make check`** validates the CSVs offline and touches neither Neo4j nor Unity Catalog.
+- **`make demo`** rebuilds everything. The generator asserts both story shapes, so a clean run with no
+  `AssertionError` is the check.
+- **`make expected`** prints the figures this build produced. Read it once as the answer key.
+- **`make check`** validates the CSVs offline.
 
-### The two checks that run on the day, every day
+Three checks that run on every demo day, after everything else has passed:
 
-These are not build checks and a clean build says nothing about either. Both guard against drift between the build and the room, so they run last, after everything else has passed, and they run on every demo day rather than once.
-
-- **The vocabulary guard, standalone against the live Genie space, via `make guard`.** The space is hand-synced and can change after a build. This is the check that protects the load-bearing claim, which is why it runs last rather than only first.
-- **Today's quarter still matches the quarter the build was shaped around.** Read it off the "Last full quarter" row that `make expected` renders out of the `story1_hidden_glassworks` block. The as-of date is the build date, so a calendar quarter rolling between the build and the demo silently changes what "the most recent full quarter" means in Beat 4, and no build-time assert can catch it. The fix when it fails is a regenerate, which is one `make demo`.
+- **`make guard`** runs the vocabulary guard against the live Genie space, which is hand-synced and can
+  drift after a build. It protects the load-bearing claim, so it runs last.
+- **Confirm today's quarter still matches the quarter the build was shaped around.** Read the "Last
+  full quarter" row from `make expected`. A calendar quarter rolling between build and demo silently
+  changes what "the most recent full quarter" means in Beat 4. The fix is a regenerate.
+- **Re-probe the live questions after any model update or regenerate.** Genie's default reflex drifts
+  with model updates even though the data does not move.
 
 The two shapes the generator asserts:
 
-- **Story 1.** One business unit's glass suppliers all trace to Cascade through commodity-carrying paths and every other unit has at least one glass supplier that does not; the commodity-scoped exposure measure returns that one unit and no other; Cascade clears the Supply Concentration Threshold and the clearing cohort has more than one member; Cascade is not the top-degree supplier and has no rows in `supplier_business_units`, so no region-scoped supplier query returns it; the network is one connected component and is not a forest. **Cascade's betweenness rank is read from the output and never asserted.** Reading it is how drift gets noticed; asserting it is how data gets fitted to the story.
-- **Story 2.** Jade ranks first among trading customers on stake-weighted PageRank, far enough ahead that the cutoff sits between it and the field. Jade sits three hops from the nearest default while other clean accounts sit one hop away, and another ownership group holds more defaults than Kestrel's.
+- **Story 1.** One unit's glass suppliers all trace to Cascade through commodity-carrying paths and
+  every other unit has at least one that does not; the commodity-scoped exposure measure returns that
+  one unit; Cascade clears the Supply Concentration Threshold with a cohort of more than one member;
+  Cascade is not the top-degree supplier; the network is one connected component. Cascade's betweenness
+  rank is read from the output, never asserted.
+- **Story 2.** Jade tops weighted PageRank among trading customers, far enough ahead that the cutoff
+  sits between it and the field; Jade sits three hops from the nearest default while other clean
+  accounts sit one hop away; another ownership group holds more defaults than Kestrel's.
 
-Both of those are the demo. Everything else on screen is arithmetic Genie does live.
+### Four changes that quietly break the demo
 
-### Three things that will quietly break this demo
+All four look like harmless cleanups and all four destroy the answer rather than degrade it.
 
-All three look like harmless cleanups. All three destroy the answer rather than degrade it, so none of them announces itself on stage.
-
-- **Do not drop the trading-customer filter.** `gds.py` ranks only customers that carry invoices and are neither defaulted nor delinquent. The three holding companies score higher than Jade because they sit between it and the failures, so removing the filter makes the demo's answer a paperwork company with no receivable, no facility, and no decision to hand the room. The filter is the governed definition ("an active customer"), not a convenience.
-- **Do not lower the PageRank iteration limit.** The ownership structure is deep and the stakes are lopsided, so the scores take many times the GDS default of 20 iterations to settle. Cut the limit and the contagion cutoff gets read off numbers that are still moving. The convergence check in `gds.py` fails the build loudly if this happens; leave it in place.
-- **Do not "fix" the UNDIRECTED graph projections.** Both projections in `gds.py` erase edge direction, and both stories depend on it. Jade is reached only by travelling up to the shared parent and back down, so under a directed projection Jade scores zero and Story 2 disappears entirely. Cascade's score likewise depends on direction being ignored, because its feedstock fan-in only contributes on an undirected projection. Making the projection match the edge semantics looks like a correctness fix and is a story-ending change.
-
-A fourth, subtler one, if the generator is ever retuned: **the gap between Kestrel's controlling stakes and the filler minority stakes is what makes accumulation beat proximity.** Flatten those two ranges towards each other and the account nearest a default wins again, which is a query anyone can write in SQL, and the demo loses its point. `FILLER_STAKE_RANGE` in `generate_data.py` carries the same warning.
+- **Do not drop the trading-customer filter.** GDS ranks only customers that carry invoices and are
+  neither defaulted nor delinquent. The holding companies score higher than Jade, so removing the
+  filter makes the answer a paperwork company with no receivable and no decision. The filter is the
+  governed definition ("an active customer"), not a convenience.
+- **Do not lower the PageRank iteration limit.** The ownership structure is deep and the stakes are
+  lopsided, so the scores take many times the GDS default to settle. The convergence check fails the
+  build loudly if this happens; leave it in place.
+- **Do not "fix" the UNDIRECTED graph projections.** Both stories depend on erased edge direction. Jade
+  is reached only by travelling up to the shared parent and back down, so a directed projection scores
+  it zero and Story 2 disappears.
+- **Do not flatten the gap between Kestrel's controlling stakes and the filler minority stakes.** The
+  gap is what makes accumulation beat proximity. Flatten it and the nearest account wins again, which
+  anyone can write in SQL.
 
 ### The fanout check
 
-This one is about the lakehouse engine rather than the data, so it is not a figure you can read off a file.
+Genie once answered a combined exposure-and-findings question by joining the two one-to-many branches
+off `customers` in a single pass, so each branch multiplied the other and both numbers came back
+inflated.
 
-- **The failure it guards against:** Genie once answered a combined exposure-and-findings question by joining the two one-to-many branches off `customers` in a single pass, so each branch multiplied the other and both numbers came back inflated by the other's row count.
-- **Guard one:** the space instructions require each one-to-many branch off `customers`, invoices and `compliance_findings` alike, to be aggregated to customer grain in its own subquery before joining, or the metric view read instead. `compliance_findings` is in the space per the fairness rule, both engines get every table, so the protection is grain discipline rather than the raw table's absence.
-- **Guard two:** the `customer_risk_exposure` metric view declares each join `one_to_many`, so every measure aggregates at its own grain. It is the safe path to a finding count, and the instructions steer finding counts to it.
-- **How to run the check:** pick a customer with both open invoices and open findings, confirm the true figures against `data/invoices.csv` and `data/compliance_findings.csv`, then ask the space for that customer's open exposure and open findings together. Pick from the current data rather than reusing a name from a previous run, because which customers carry open findings is date-derived.
-- **How to read the result:** correct figures confirm both guards. Figures that are exact multiples of the true ones mean Genie joined the two one-to-many branches in a single pass without aggregating each to grain first, and the Story 2 miss will read as a broken BI tool rather than a blind one.
+- **How to run it:** pick a customer with both open invoices and open findings, confirm the true
+  figures, then ask the space for that customer's open exposure and open findings together. Pick from
+  the current data, since which customers carry open findings is date-derived.
+- **How to read it:** correct figures confirm the guards. Figures that are exact multiples of the true
+  ones mean Genie joined the two branches without aggregating each to grain first, and the Story 2 miss
+  will read as a broken BI tool rather than a blind one.
 
-## Genie space and MCP setup
+## Setup: Genie space and MCP server
 
-For the one-time setup that creates the Genie space and confirms which tables are kept out of it, see [`README.md`](README.md). The two blocks below are the descriptions the supervisor reads to route between the two engines.
+The one-time setup that creates the Genie space and loads the graph is covered in the project README.
+The blocks below are the authored text that setup depends on.
 
-### What to put in the MCP server description
+**Guardrail: the two gold tables never enter the Genie space.** `classifications` and
+`business_unit_exposure` materialize the graph's conclusions into Delta. Adding them re-introduces
+write-back leakage, where the lakehouse-only engine reads the graph's answer straight from a column and
+ties. Kept in the space are every instance table (`compliance_findings` and `owned_by` included) plus
+the `customer_risk_exposure` metric view.
 
-Paste the block below into the server or tool `description` field and adjust names to match your deployment.
+### MCP server description
 
-- **Why it is written this way:** the supervisor decides when to call the graph from this description alone, so it spells out the graph's job and the behavior expected of it.
-- **Why the schema is absent:** the server has schema discovery, and resolving definitions live from the graph is the point of the demo.
+Paste into the server or tool `description` field and adjust names to match your deployment. The
+supervisor decides when to call the graph from this description alone.
 
 ```text
 This server exposes a Neo4j knowledge graph for the supplier and customer risk
@@ -388,11 +525,13 @@ Conventions:
   string interpolation.
 ```
 
-### What to put in the Genie space description and instructions
+### Genie space description and instructions
 
-The space has two separate authored fields and they take different text. **Description** is the short blurb under the space title, on the About tab. **Instructions** is its own tab and holds the block below. Setting one and not the other is the failure mode: Genie ships an auto-generated description the moment a space is created, and that generated text stays until it is overwritten by hand.
+Two separate authored fields. **Description** is the short blurb on the About tab. **Instructions** is
+its own tab. Genie ships auto-generated text for both the moment a space is created, so both must be
+overwritten by hand and checked against these blocks after any build.
 
-**Replace the generated description.** A newly created space describes itself with capability marketing, along the lines of "enables assessment of supplier risk and financial health" followed by Capabilities and Limitations lists. That text is not neutral, it was not authored against the vocabulary rules, and it drifts back if the space is recreated. Overwrite it with:
+**Description.** Replace the generated capability marketing with:
 
 ```text
 Answers questions over the supplier and customer data in Unity Catalog schema
@@ -400,11 +539,11 @@ supplier_risk, for a global beverage producer. It reports rows, counts, totals,
 and rankings from the instance tables and the customer_risk_exposure metric view.
 ```
 
-Nothing more. No capability list, no limitations list, no statement of what the space is good at. A capabilities list is a hint sheet: it tells the model which questions it is expected to be able to answer, and the demo turns on the model reaching its own conclusions about what it can see.
+Nothing more. A capabilities list tells the model which questions it is expected to answer, and the
+demo turns on the model reaching its own conclusions about what it can see.
 
-- **Keep the space neutral.** It carries facts about the data, not routing rules. The same block serves beats 1 and 2 standalone and under Genie + Graph, so it must never tell the space which questions to refuse. Routing lives in the supervisor's Genie-tool description, given right after the block.
-- **The table set it assumes:** the instance tables, `compliance_findings` and `owned_by` among them, plus the `customer_risk_exposure` metric view. Kept out are only the two gold tables, `classifications` and `business_unit_exposure`, because they materialize the graph's conclusions. Findings reach the space both as the raw `compliance_findings` table and as the metric view's `open_finding_count` measure, so a two-branch fanout is guarded by the metric view's grain declaration and the instruction to aggregate each branch, rather than made structurally impossible.
-- **Schema facts only:** grain, units, join paths, and what a coded value means. No analytical conclusions. The demo turns on Genie reading every column correctly and still missing what only the graph can see, so an instruction that hints at a multi-tier traversal or pre-judges what a metric implies would hand over the answer. `upload.py` applies the same rule to the comments it writes into Unity Catalog.
+**Instructions.** Schema facts only: grain, units, join paths, and what a coded value means. No
+analytical conclusions, and never a beat's own question word, which would prime the axis Genie picks.
 
 ```text
 This Genie space answers questions over the supplier and customer risk data in
@@ -443,122 +582,10 @@ Conventions:
   live exposure. Compliance finding status values are open and closed.
 ```
 
-**Do not name the question's own vocabulary in the instructions.** The scoping bullet above says rank, count, or aggregate rather than naming the thing Beat 1 asks about. Repeating a beat's question word inside the instructions primes the axis Genie picks, and `CONTRACT.md` section 4 makes Beat 1's ambiguity the demonstration rather than a bug to fix. The instructions may say how to scope, how to join, and what a column means. They may not say what to conclude, and a question word carried across from a beat is halfway to a conclusion.
+The instructions field drifts, so read it back from the live space and compare it line by line against
+this block after every build.
 
-**Check the deployed text against this block, not against a worklog.** The instructions field drifts: a deployed space has been found carrying an older, shorter variant missing the currency rendering rule, the `supplier_business_units` bridge rule, the `revenue_entries.period` rule, and the status value lists. Read the field back from the live space and compare it line by line.
-
-**Supervisor routing (Genie + Graph only).** When Genie runs under the Genie + Graph supervisor, the routing lives in the supervisor's description of the Genie tool, not in the neutral space above. Set that tool description to: Genie owns facts, counts, totals, and rankings over the instance tables; route anything that needs a business-term definition, a relationship judgment, or classification provenance to the graph tool instead.
-
-> **Guardrail.** The two gold tables, `classifications` and `business_unit_exposure`, are produced by the pipeline but must never be added to the Genie space. They materialize the graph's answers into Delta, and adding them re-introduces write-back leakage: the lakehouse-only engine would read the graph's conclusions straight from a column and tie, which is the exact failure this demo is built to expose.
-
-## Generating a dashboard with Neo4j AI
-
-Neo4j's "Create with AI" dashboard generator builds a dashboard from a prompt and the database schema. Naming the exact labels, relationships, and camelCase property names gets far closer than a generic "show me risk" prompt.
-
-### Dashboard description
-
-Paste this into the **Dashboard description** box:
-
-```text
-Build a supplier and customer risk dashboard for a global beverage producer that
-sells to Customers, buys from Suppliers, and rolls both up into internal
-BusinessUnits. Suppliers feed each other and the business units via SUPPLIES;
-customers own each other via OWNED_BY.
-
-Include:
-- A KPI row: total customers, total suppliers, count of High-Risk suppliers
-  (Supplier.riskScore >= 70), count of Delinquent customers, and count of open
-  ComplianceFindings.
-- High-risk suppliers ranked by riskScore, with their category and subcategory.
-- Critical Supplier view: suppliers ranked by Supplier.betweenness, highlighting
-  any above the Supply Concentration Threshold, with the business units their
-  multi-tier supply paths reach.
-- Ownership Risk view: customers ranked by Customer.pagerank, highlighting the
-  clean trading customers above the Ownership Contagion Threshold. A customer
-  qualifies only if it carries its own invoices and is neither defaulted nor
-  Delinquent, so invoice-less holding companies are excluded even though they
-  score highly. Show creditLimit as the committed credit facility and the open
-  invoice balance as the drawn portion of it. Rank by absorbed risk, not by
-  whether a defaulted company happens to share an owner.
-- Strategic accounts (Customers CLASSIFIED_AS 'Strategic Account') with segment
-  and any ownership link.
-- A lineage view: for a selected classified Customer or Supplier, walk
-  CLASSIFIED_AS -> BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> Entity
-  -MAPS_TO-> DataSource, showing the term, the reason, the rule, and the
-  physical DataSource.table.
-
-Prefer the governed CLASSIFIED_AS labels and BusinessRule thresholds over
-recomputing definitions from raw properties. All properties are camelCase.
-Supplier.betweenness and Customer.pagerank are precomputed graph properties.
-```
-
-### Optional focus
-
-```text
-Supplier and customer risk exposure, with governed classifications, the two
-graph-native risks, and provenance
-```
-
-- **Assumes:** the graph as loaded by `load.py` plus `gds.py`, so `Supplier.betweenness` and `Customer.pagerank` exist.
-- **If you skipped `gds.py`:** drop the Critical Supplier and Ownership Risk views, since those properties will not be present.
-
-## Why the demo is built this way
-
-The dataset looks more complicated than the story needs. Several webbed supplier clusters joined by non-glass bridges, a commodity test on every supply path, weighted multi-parent ownership, defaults planted in pairs, a trading-customer filter. None of it is there for realism or for show.
-
-**Every piece of that complexity is a scar.** We built the simple version four times. Each time, someone answered the graph's question with one line of SQL, and the demo died on the spot. The complexity is what is left after closing each of those shortcuts.
-
-### The four times the lakehouse tied
-
-- **Leak 1, the answers were in a Delta column.** The pipeline materializes the graph's classifications into the `classifications` and `business_unit_exposure` gold tables, and those tables were in the Genie space. The lakehouse-only engine read the graph's conclusions, labels and reasons included, without ever touching the graph. Both engines returned the same nine customers with the same rule split and the same threshold. **Fix:** the gold tables stay out of the space.
-- **Leak 2, the scores would have been in a Delta column.** Syncing `betweenness` and `pagerank` into a gold table recreates leak 1 one layer up. **Fix:** the GDS scores are never synced to Delta and live only in the graph.
-- **Leak 3, the supplier network was a star forest.** This was the one that nearly ended the project. Every supplier fed a few plants and nothing fed it back, so the graph was 46 disjoint one-hop stars. On a star, betweenness is exactly `k(k-1)/2` where `k` is the number of children, which means **betweenness rank and connection-count rank are the same ranking**. Cascade scored 10 because it had 5 children. The best filler scored 3 because it had 3. The cutoff sat at the midpoint. On that shape every centrality measure collapses to degree, so `COUNT(*) GROUP BY supplier` returned the graph's answer instantly. The worklog's verdict: *"The demo built a $1,000 tool to answer a $1 question."* **Fix:** rebuild the topology, described below.
-- **Leak 4, the ownership was one level deep.** Thirteen flat parent-and-children families, and both defaults sat in Kestrel's. Personalized PageRank could only answer *reachable or not*, never *how much*, and reachability is a join. Adding depth alone did not fix it either: counting defaults three levels out is three joins, annoying but not different in kind. **Fix:** put the ownership percentage on the edge, described below.
-
-### What each piece of complexity buys
-
-**Story 1, the supplier network:**
-
-- **Webbed regional clusters, not stars.** Each cluster grows by preferential attachment and then gets chords laid across it, governed by `SUP_WEB_CHORD_RATIO`, so several routes run between any two suppliers and a well-connected cluster hub is not a bottleneck. Betweenness only means something when there are multiple routes to choose between, and the chords are the mechanism that lets a high-degree supplier score low on betweenness.
-- **Several inter-cluster bridges, each a different supplier, and none of them carrying glass.** Cascade is not a cut vertex: remove it and the network stays in one component. Ranking highly by position is fine. Ranking highly because you are the only way across the graph is trivially true and invites a fair question from the room, so the topology no longer has that shape.
-- **A commodity test on every supply path.** More bridges make betweenness interesting and also give the exposure measure more places to leak. Scoping the measure to paths where every supplier trades in a glass subcategory is what keeps those two compatible.
-- **Cascade buys feedstock from vendors spread across the clusters and sells down through glass processors.** Cullet, sand, and soda ash flow in from several regions; container glass flows out toward the bottle makers. The fan-in is what earns the score, and it is the load-bearing realism claim: container glass is too heavy and too cheap to ship far, so a furnace selling raw glass across regions is a shaky premise while a furnace buying feedstock across regions is simply how furnaces work.
-- **A processor tier between Cascade and the bottle makers.** This is the hidden choke point shape: Cascade sells to no business unit directly and never sits one hop from the tier-1 makers, so a one-hop query returns the sub-tier vendors and stops. Confirmed live in the re-probe: asked what the glass bottle suppliers depend on, Genie alone wrote one hop and returned the container glass processors, and Cascade did not appear in the result set.
-- **Rival furnaces feeding the other units' bottle makers.** They make the raw-glass subcategory return a real cohort rather than a synonym for Cascade, and they make the other business units genuinely protected rather than merely unlinked, which is what Beat 4's comparison rests on. The re-probe read both back live: filtering to the raw glass subcategory returns a population of furnaces with Cascade as one ordinary row among them, and the other units' bottle makers do show furnaces as direct upstreams, so their glass supply is real rather than an absence of edges.
-
-**Story 2, the ownership network:**
-
-- **Ownership percentages on the edge.** The single most important change in the demo. Influence splits by the size of each stake instead of by hop count, so the question stops being *how close are you to the fire* and becomes *how many pipes lead to you and how wide is each one*. Without weights this collapses back into hop counting and the nearest account wins, which anyone can write in SQL.
-- **Multi-parent ownership.** `owned_by.csv` with an `ownershipPct` column replaced the single `parentCustomerId` field, because a subsidiary can now be held by several owners at different stakes.
-- **Filler defaults planted in pairs holding each other at 80% to 95%.** A default with a single neighbour dumps all of its mass onto that neighbour no matter what the weight says, so lone defaults kept handing the top score to whoever happened to sit beside them. Paired defaults absorb each other and only a token stake leaks outward.
-- **Filler stakes spread wide, not uniformly thin.** Weighted PageRank normalizes per node, so making every filler stake small had literally zero effect on the ranking. Only the relative stake around a given node matters. The gap between Kestrel's controlling stakes and the filler minority stakes is what makes accumulation beat proximity.
-- **Two intermediate holding companies between Kestrel and the four defaults,** at 65% to 90% throughout. This puts Jade three hops from every failure while ordinary clean accounts sit one hop from one, so distance ranks Jade as safe and pipe-width ranks it first.
-- **The trading-customer filter.** The three holding companies stand between Jade and the damage, so they always score higher. They are excluded for carrying no invoices, which the governed term already required by saying "an active customer." This is a real filter, not a fudge, and it is load-bearing.
-
-**Both stories:**
-
-- **Governed cutoffs that live in the graph rather than in a column.** If a cutoff were a constant in a column, the lakehouse could sort on it. Story 1's Supply Concentration Threshold is a hand-set percentile of supply betweenness, committed before the run and resolved against the scores at build time, so it is neither a column nor a number chosen after seeing who it catches. Story 2's Ownership Contagion Threshold is still read off its score distribution.
-- **A few hundred filler entities with ordinary edge shapes.** Row count alone hides a plant in a table scan but does nothing against a graph algorithm. If Cascade were the only supplier-of-suppliers, or Kestrel the only owned group, each would be the only structure of its kind and trivially findable.
-
-### What keeps it honest
-
-The rule is that the generator asserts structural relationships and never asserts an outcome. Fitting the data until an algorithm ranks the way the story wants is the failure this project keeps having, so the checks are written to make that impossible to do quietly.
-
-- **Story 1 asserts the premise, not the finding.** `check_supply_structure` in `generate_data.py` asserts the shape in which betweenness and connection count *can* diverge: one connected component, not a forest, a substantial share of suppliers on both sides of `supply_relationships`, and real traversal depth. It deliberately refuses to assert that the two measures *do* diverge. The realized overlap between the top of each ranking prints to the build log every run, alongside the degree leader, and is read rather than asserted. A build where the separation disappears is a finding to escalate, not a reason to turn a constant.
-- **The one Story 1 ranking constraint that is asserted is negative:** Cascade is not the top-degree supplier. Cascade sitting one tier back from the bottle makers is the definition of a hidden choke point, so this is a property of an honest topology rather than a plant. It is not the last line of defense either, because the probe showed Genie does not reach for connection counts at all.
-- **The real last line of defense is the one-hop ceiling, and the re-probe closed it as a finding rather than a question.** Across every question probed against the rebuilt data, including the two phrased with explicit chain language, Genie wrote no recursive CTE and never walked past one hop. Moving Cascade two tiers back did not raise the ceiling, which was the largest open risk in the rebuild. It is a measurement of the default reflex on one build, not a guarantee: nothing was hinted, nothing was asked twice in a conversation, and model updates move reflexes. Re-probe after any regenerate.
-- **Story 2 still asserts that Jade tops weighted PageRank** among trading customers, and that hop distance to the nearest default and defaults per ownership group both return someone else.
-
-This is why the offer in the fairness rebuttal is safe: you can invite the room to run the shortcuts live, because they run and they return a different name.
-
-### What we deliberately did not do
-
-- **We did not hide data from the lakehouse.** Pulling `supply_relationships` or `owned_by` out of the Genie space would have made the shortcut invisible rather than absent. That rigs the demo instead of repairing it. Both engines get every table.
-- **We did not claim SQL cannot do this.** Both algorithms are expressible in SQL and a Databricks audience knows it. The claim that survives is narrower and true: no BI tool writes them unprompted from a business question, and no column governs the cutoff.
-- **We did not pre-plant the two graph-native labels.** They are resolved live and never exist as a `CLASSIFIED_AS` edge, so they can never be materialized into a gold table and leak back.
-
-### Why it is simpler than it looks
-
-The audience never sees any of this. On stage the two stories are still *separately contracted bottle suppliers, one hidden furnace* and *one spotless account inside a family of failures*. The webbing, the chords, the non-glass bridges, the paired defaults, and the filler stakes are all background that goes unmentioned, in exactly the way the filler suppliers go unmentioned today.
-
-**Depth in the data does not require depth in the story.** The complexity buys one thing: when someone in the room reaches for the obvious query, it runs and it returns a different name. That moment is the demo.
+**Supervisor routing (Genie + Graph only).** Routing lives in the supervisor's description of the
+Genie tool, never in the neutral space above. Set that tool description to: Genie owns facts, counts,
+totals, and rankings over the instance tables; route anything that needs a business-term definition, a
+relationship judgment, or classification provenance to the graph tool instead.

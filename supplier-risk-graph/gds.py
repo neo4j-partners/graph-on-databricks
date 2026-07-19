@@ -652,8 +652,16 @@ def concentration_cutoff(scores: list[Score]) -> Cohort:
     # actually has and "at or above the 95th percentile" means what a risk
     # committee reading it would think it means.
     index = math.ceil(SUPPLY_CONCENTRATION_PERCENTILE / 100 * len(ranked)) - 1
-    value = round(ranked[max(index, 0)], 2)
-    members = [s for s in scores if s.value >= value]
+    # Select the cohort against the unrounded nearest-rank score, and round only
+    # for the value written to the Threshold node, to thresholds.csv and to the
+    # display. Rounding before the >= comparison drops the supplier that defines
+    # the percentile whenever the round goes up: its own score sits fractionally
+    # below the cutoff derived from it and it falls out of its own cohort. A round
+    # down lets suppliers below the percentile join. Selecting against the score
+    # the field actually produced keeps the cohort the percentile names.
+    selection = ranked[max(index, 0)]
+    members = [s for s in scores if s.value >= selection]
+    value = round(selection, 2)
     return Cohort(SUPPLY_CONCENTRATION_PERCENTILE, value, members)
 
 
@@ -957,7 +965,13 @@ def assert_betweenness(
     """
     by_id = score_index(scores)
     cascade = require_score(by_id, protags.cascade_id, "Cascade")
-    if cascade < conc.value:
+    # Membership, not a comparison against the rounded value. conc.value is the
+    # display figure written to the Threshold node; the cohort was selected
+    # against the unrounded percentile score, so "Cascade clears THR-03" is
+    # exactly "Cascade is in the cohort". Comparing the 4-decimal score against
+    # the 2-decimal value here would reintroduce the rounding boundary that the
+    # cohort selection in concentration_cutoff was fixed to avoid.
+    if not any(s.node_id == protags.cascade_id for s in conc.members):
         sys.exit(
             f"Story 1 betweenness: Cascade ({protags.cascade_id})={cascade} does "
             f"not clear the THR-03 cutoff {conc.value}, resolved from the "
