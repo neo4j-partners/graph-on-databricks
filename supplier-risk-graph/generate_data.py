@@ -93,6 +93,30 @@ FILLER_STAKE_RANGE = (0.03, 0.18)
 SUPPLIER_RISK_THRESHOLD = 70  # riskScore on a 0-100 scale
 LATE_DAYS_THRESHOLD = 60  # days
 
+# THR-03, the Supply Concentration Threshold, as the governed parameter rather
+# than as a score. A risk committee writes "review any supplier at or above the
+# 95th percentile of supply betweenness"; it does not write a raw betweenness
+# constant, which would mean nothing to it. The percentile is what RULE-05
+# compares against, and it deliberately catches a cohort rather than a winner.
+#
+# This constant is fixed before any betweenness is computed and before the
+# topology it will be applied to exists. That ordering is the point, and it is
+# why this lands in its own commit ahead of the rebuild: "chosen before the run"
+# has to be checkable from git history rather than asserted in a document. A
+# threshold set after seeing the distribution is a post-hoc threshold no matter
+# how it was derived.
+#
+# It does not move. If the protagonist fails to clear it, the topology is what
+# gets fixed, under the two-iteration stopping rule in CONTRACT.md section 7.
+# Widening it until something clears is the failure mode this comment exists to
+# prevent.
+#
+# gds.py resolves this percentile against the computed distribution and writes
+# the resulting cutoff onto the live THR-03 node, because that value cannot be
+# known until betweenness has run. The resolved cutoff is an output. This is the
+# input.
+SUPPLY_CONCENTRATION_PERCENTILE = 95
+
 # Filler risk scores are remapped from a uniform draw onto this right-skewed
 # triangular shape (low, high, mode). Most filler suppliers land in a healthy
 # band, the tail thins, and the ceiling caps near 80, so only a small cohort
