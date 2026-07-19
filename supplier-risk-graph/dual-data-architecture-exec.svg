@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="620" viewBox="0 0 1180 620" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1148" height="510" viewBox="16 88 1148 510" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <defs>
     <marker id="arrow-gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#A87E0D"/>
@@ -12,16 +12,13 @@
     <marker id="arrow-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#4B5563"/>
     </marker>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0F857B"/>
+    </marker>
     <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
       <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/>
     </filter>
   </defs>
-
-  <rect width="1180" height="620" fill="#F3F2ED"/>
-
-  <!-- Title -->
-  <text x="590" y="44" text-anchor="middle" font-size="23" font-weight="bold" fill="#16233A">Supplier Risk: Dual Data Architecture</text>
-  <text x="590" y="70" text-anchor="middle" font-size="13.5" fill="#5C6470">The lakehouse holds and computes the data; the graph owns the knowledge layer that governs and classifies the instance graph.</text>
 
   <!-- ===================== LEFT: Databricks Lakehouse ===================== -->
   <rect x="40" y="104" width="470" height="472" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
@@ -147,14 +144,20 @@
 
   <text x="708" y="555" font-size="11" font-style="italic" fill="#5E97C9">+ RevenueEntry &#183; ComplianceFinding</text>
 
-  <!-- ===================== Cross-panel flows ===================== -->
-  <!-- MAPS_TO lineage -->
-  <path d="M 688 292 C 610 300 600 300 496 300" fill="none" stroke="#A87E0D" stroke-width="1.8" stroke-dasharray="6,4" marker-end="url(#arrow-gold)"/>
-  <text x="592" y="256" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#92660A">MAPS_TO lineage</text>
-  <text x="592" y="271" text-anchor="middle" font-size="10" fill="#92660A">points at real UC tables (zero-copy)</text>
+  <!-- ===================== Cross-panel: semantic governance binding ===================== -->
+  <!-- Knowledge layer governs the source data; maps_to lineage is only one facet -->
+  <path d="M 688 248 C 610 250 600 250 496 250" fill="none" stroke="#A87E0D" stroke-width="1.8" stroke-dasharray="6,4" marker-end="url(#arrow-gold)"/>
+  <text x="592" y="206" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#92660A">GOVERNS the source data</text>
+  <text x="592" y="221" text-anchor="middle" font-size="10" fill="#92660A">maps_to lineage is one facet &#8212;</text>
+  <text x="592" y="234" text-anchor="middle" font-size="10" fill="#92660A">also classifies &amp; evaluates rules</text>
 
-  <!-- Write-back -->
-  <line x1="686" y1="472" x2="514" y2="472" stroke="#1F9D55" stroke-width="2.4" marker-end="url(#arrow-green)"/>
-  <text x="600" y="464" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#166534">CLASSIFIED_AS results write back</text>
-  <text x="600" y="502" text-anchor="middle" font-size="10" fill="#166534">verified classifications &#8594; Gold Delta</text>
+  <!-- ===================== Cross-panel: Neo4j Spark Connector (bidirectional), sitting at the silver/gold seam ===================== -->
+  <!-- ingest: Databricks Delta tables (silver, above) -> Neo4j graph -->
+  <text x="590" y="349" text-anchor="middle" font-size="9" fill="#0F6F66">ingest: Delta &#8594; graph</text>
+  <line x1="510" y1="356" x2="670" y2="356" stroke="#0F857B" stroke-width="2.4" marker-end="url(#arrow-teal)"/>
+  <text x="590" y="381" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#0F6F66">Neo4j Spark Connector</text>
+  <text x="590" y="393" text-anchor="middle" font-size="9" font-style="italic" fill="#4FA39B">one connector, both directions</text>
+  <!-- write-back: Neo4j classifications -> Databricks Gold Delta (gold, below) -->
+  <line x1="670" y1="402" x2="510" y2="402" stroke="#0F857B" stroke-width="2.4" marker-end="url(#arrow-teal)"/>
+  <text x="590" y="418" text-anchor="middle" font-size="9" fill="#0F6F66">write-back: results &#8594; Gold Delta</text>
 </svg>

@@ -2,13 +2,25 @@
 
 The demo uses a dual data architecture. The Databricks lakehouse owns the instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
 
+The point of the demo is a contrast between two engines. A Databricks Genie Agent over the Unity Catalog Delta tables is the lakehouse-only engine: it sees the facts and nothing else. Genie paired with the read-only Neo4j knowledge graph is the second engine: it sees the same facts plus the governed meaning. Both engines answer the everyday risk questions. The payoff is the two graph-native questions the lakehouse-only engine cannot answer, because their definitions live only in the graph.
+
 > **A note on "knowledge layer".** This demo uses the term narrowly, for the governed-meaning half of the graph: entities, business terms, business rules, policies, thresholds, and the semantic mapping (`MAPS_TO`), held distinct from the instance layer. The two are kept as sibling layers because the split maps directly onto the demo's division of labor: the lakehouse owns the facts, Neo4j owns the meaning.
 
-## Classification and provenance
+## The two stories
 
-A single classification, traced end to end. A Databricks job runs the graph algorithm, which classifies customer CUST-084 as a Risky Customer. The `CLASSIFIED_AS` edge carries the provenance: the source, the kNN algorithm, the similarity score, the evaluation date, and a human-readable reason. From that business term the chain continues through the rule that defines it, the entities the rule evaluates, and the `MAPS_TO` lineage down to the physical Unity Catalog tables `supplier_risk.customers` and `supplier_risk.invoices`. Every answer resolves from an instance record, to a business term, to a rule, to an entity, to the real table behind it. The customer id and score are illustrative, emergent from the run; every other value comes from the data files.
+The dataset serves two contrasts. Each is a question the lakehouse-only engine gets wrong or misses, and the graph engine answers by resolving a governed definition that has no lakehouse column.
 
-![Classification and provenance](classification-provenance.png)
+### Story 1: the hidden glassworks
+
+Cascade Glassworks is a mid-tier raw-glass supplier. Its own risk score sits in the middling band, below the risk threshold, so no risk-score sort ever surfaces it. Yet the Americas business unit depends on it disproportionately, because five clean tier-1 bottle suppliers all trace back to Cascade for their raw glass. If Cascade fails, all five paths into the Americas fail with it.
+
+The graph engine surfaces Cascade with betweenness centrality over the multi-tier supply graph, the metric behind the **Critical Supplier** term. Cascade is the narrowest bridge on the Americas' supply paths. Roughly 4.2M EUR per quarter of Americas revenue sits behind it. The lakehouse-only engine cannot find Cascade: there is no column that says "critical", and no threshold a BI tool could sort by.
+
+### Story 2: the clean payer in a bad family
+
+Jade Beverage Distribution is a spotless platinum customer with a clean payment record and a Strategic Account flag. It sits inside the Kestrel Holdings ownership group, whose sibling companies (Marlin and Pelican) have defaulted. Asked for late payers, the lakehouse-only engine returns the delinquent accounts, and Jade is nowhere on the list: its own record is clean.
+
+The graph engine flags Jade with personalized PageRank seeded on the defaulted siblings and propagated over the `OWNED_BY` edges, the metric behind the **Ownership Risk** term. Roughly 800K EUR of live exposure sits behind Jade. The lakehouse-only engine cannot find it: ownership contagion is a traversal, not a column.
 
 ## Dual data architecture
 
@@ -16,33 +28,38 @@ A single classification, traced end to end. A Databricks job runs the graph algo
 
 ## A note on BusinessUnit
 
-`BusinessUnit` is an internal division of the enterprise this demo models, not a unit of a supplier or a customer. It is the shared pivot of the instance layer: customers roll up into it (`BELONGS_TO`), suppliers feed it (`SUPPLIES`), and revenue is booked against it (`RECOGNIZES`). A customer is therefore a customer of the enterprise; `BELONGS_TO` only records which internal division carries that account for revenue roll-up, and `SUPPLIES` points a vendor into the division it serves. This convergence on the same unit is what lets Q4 propagate supplier risk to a division's customers along the path `Supplier-SUPPLIES->BusinessUnit<-BELONGS_TO-Customer`.
+`BusinessUnit` is an internal division of the enterprise this demo models, not a unit of a supplier or a customer. It is the shared pivot of the instance layer: customers roll up into it (`BELONGS_TO`), suppliers feed it (`SUPPLIES`), and revenue is booked against it (`RECOGNIZES`). A customer is therefore a customer of the enterprise; `BELONGS_TO` only records which internal division carries that account for revenue roll-up, and `SUPPLIES` points a vendor into the division it serves. The Americas division (`BU-03`) is the pivot for Story 1: the five tier-1 bottle suppliers all supply it, so the multi-tier path `Supplier-SUPPLIES->Supplier-SUPPLIES->BusinessUnit` converges on Cascade behind it.
 
 ## Lakehouse Tables (Unity Catalog Delta)
 
-The lakehouse holds two kinds of table: the six **core instance tables** that carry the facts, and the two **gold write-back tables** the graph produces. Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC. The two gold tables are snake_case, built from Cypher `RETURN` aliases.
+The lakehouse holds three kinds of table: the **core instance tables** that carry the facts, the two **gold write-back tables** the pipeline produces, and one **bridge table**. Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC. The two gold tables are snake_case, built from Cypher `RETURN` aliases.
 
 ### Core instance tables
 
 | Table | Business description | Columns (key) | Notes |
 |---|---|---|---|
-| `customers` | The accounts the enterprise sells to, with commercial segment and risk/ML attributes | `id, businessUnitId, name, segment, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | The trend, churn, and score columns are derived ML features consumed by the graph. Drives Q3 |
-| `suppliers` | The vendors the enterprise buys from, each carrying a procurement risk score | `id, name, category, riskScore` | Procurement counterpart; drives Q4 |
+| `customers` | The accounts the enterprise sells to, with commercial segment, credit line, and ownership | `id, businessUnitId, name, segment, creditLimit, parentCustomerId, defaultedPeriod, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | `parentCustomerId` self-references `customers.id` and sources the `OWNED_BY` edge. `creditLimit` (EUR) is set for every customer and feeds the Story 2 exposure figure. `defaultedPeriod` (format `YYYY-Qn`) is set only on defaulted customers, null otherwise |
+| `suppliers` | The vendors the enterprise buys from, each carrying a procurement risk score and a specialty | `id, name, category, subcategory, riskScore` | `subcategory` is the supplier's specialty within its category (for example `glass bottles` or `raw glass` under `packaging`), never null. It is the column the lakehouse-only engine groups by in Story 1 (the "five glass-bottle suppliers, diversified" read); `riskScore` is what drives the High-Risk Supplier term |
 | `business_units` | The enterprise's own internal divisions; the pivot customers roll up into, suppliers feed, and revenue is booked to | `id, name, region` | Rolls up customers, suppliers, and revenue |
-| `invoices` | Bills the enterprise issued to its customers, each recording what was owed, when it was due, and how late it was paid | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Drives Q5 and the Q6 overdue condition |
-| `revenue_entries` | Revenue booked to an internal division for a period, marked reconciled or not | `id, businessUnitId, period, amount, currency, reconciled` | `businessUnitId` joins to `business_units.id`; `reconciled = false` drives Q1 |
-| `compliance_findings` | Compliance issues (KYC, AML, sanctions) raised against a customer, open or closed | `id, customerId, type, status, openedDate` | `customerId` joins to `customers.id`; `type = 'KYC'` and `status = 'open'` drive Q2; open findings feed Q6 |
+| `invoices` | Bills the enterprise issued to its customers, each recording what was owed, when it was due, and how late it was paid | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Backs the Delinquent Customer term and Jade's open-balance exposure |
+| `revenue_entries` | Revenue booked to an internal division for a period | `id, businessUnitId, period, amount, currency, reconciled` | `businessUnitId` joins to `business_units.id`. The Americas rows for the recent quarters back the Story 1 exposure figure |
+| `compliance_findings` | Compliance issues (KYC, AML, sanctions) raised against a customer, open or closed | `id, customerId, type, status, openedDate` | `customerId` joins to `customers.id`. Feeds the Compliance (KYC) Policy |
+| `supply_relationships` | The supplier-to-supplier links: which supplier supplies which other supplier | `fromSupplierId, toSupplierId` | New table. A row `fromSupplierId = SUP-901, toSupplierId = SUP-902` means SUP-901 supplies SUP-902. This is the one CSV that loads into both sides: UC gets the table so the lakehouse-only engine can see the raw links, and Neo4j gets the supplier-to-supplier `SUPPLIES` edges |
 
-One bridge table, `supplier_business_units` (`supplierId, businessUnitId`), carries the many-to-many supplier-to-unit link so the lakehouse can join suppliers to the units they supply. It mirrors the `SUPPLIES` edge and is uploaded to UC but not loaded into Neo4j.
+The commercial and payment-behavior attributes on `customers` (`churnRisk`, `upsellScore`, `profitabilityTrend`, `avgDaysLate`, `overdueShare`) provide background realism so the population looks ordinary; no story depends on them.
+
+One bridge table, `supplier_business_units` (`supplierId, businessUnitId`), carries the many-to-many supplier-to-unit link so the lakehouse can join suppliers to the units they supply. It mirrors the supplier-to-unit `SUPPLIES` edge and is uploaded to UC but not loaded into Neo4j.
 
 ### Gold write-back tables
 
 | Table | Business description | Columns (key) | Notes |
 |---|---|---|---|
-| `classifications` | Business-term labels assigned to customers and suppliers, with the reason and the source that produced them | `entity_id, entity_type, term, source, algorithm, score, reason, evaluated_at, rule_version` | `CLASSIFIED_AS` results written back from Neo4j, the Multi-Hop Native story. Join `entity_id` to `customers.id` or `suppliers.id`. `source` is `rule` for policy-based edges, whether pre-planted (Platinum Customer, Strategic Account) or derived at load time (High-Risk Supplier, Risky Customer), or `gds` for the algorithm-derived ones; `algorithm`, `score` are populated only for `gds` rows and `rule_version` only for `rule` rows |
-| `business_unit_exposure` | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | The Q4 supplier-risk propagation result, one row per business unit |
+| `classifications` | Business-term labels assigned to customers and suppliers, with the reason that produced them | `entity_id, entity_type, term, reason, evaluated_at, rule_version` | Materializes the `CLASSIFIED_AS` edges written back from Neo4j, each carrying rule provenance. Because the two graph-native terms are never planted as edges, this table holds only the column-findable classifications, never Critical Supplier or Ownership Risk |
+| `business_unit_exposure` | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk` | One row per business unit |
 
-The six instance tables are mirrored into Neo4j as nodes; the two write-back tables surface as `CLASSIFIED_AS` edges and a `supplierExposureScore` property on `BusinessUnit`. Sample a few of each mirrored instance label:
+**The two gold tables must never be added to the Genie space.** They materialize the graph's answers into Delta. Re-adding them re-introduces write-back leakage, so the lakehouse-only engine could read the graph's conclusions straight from a column and tie. That leakage is the exact failure the demo is built to avoid, so the gold tables stay out of the space. See "GDS properties" below for the same rule applied to the graph algorithm scores.
+
+The six core instance tables are mirrored into Neo4j as nodes; `supply_relationships` is not a node type, it sources the supplier-to-supplier `SUPPLIES` edges. Sample a few of each mirrored instance label:
 
 ```cypher
 UNWIND ['Customer', 'Supplier', 'BusinessUnit', 'Invoice', 'RevenueEntry', 'ComplianceFinding'] AS label
@@ -58,16 +75,16 @@ RETURN label, n;
 
 ### Instance layer (mirror of the lakehouse)
 
-Because the instance CSVs are the single source for both sides, the mirror nodes also carry the foreign-key columns as properties (`Invoice.customerId`, `RevenueEntry.businessUnitId`, `ComplianceFinding.customerId`, `Customer.businessUnitId`). They are redundant with the instance-layer relationships below, which is what the demo's Cypher traverses.
+Because the instance CSVs are the single source for both sides, the mirror nodes also carry the foreign-key columns as properties (`Invoice.customerId`, `RevenueEntry.businessUnitId`, `ComplianceFinding.customerId`, `Customer.businessUnitId`, `Customer.parentCustomerId`). They are redundant with the instance-layer relationships below, which is what the demo's Cypher traverses.
 
 | Label | Key properties | Business description | Notes |
 |---|---|---|---|
-| `Customer` | `id, name, segment, profitabilityTrend, churnRisk, upsellScore` | An account the enterprise sells to | Trend and score fields come from the warehouse ML features |
-| `Supplier` | `id, name, category, riskScore` | A vendor the enterprise buys from | Procurement counterpart |
+| `Customer` | `id, name, segment, creditLimit, parentCustomerId, defaultedPeriod` | An account the enterprise sells to | `parentCustomerId` sources `OWNED_BY`; `defaultedPeriod` is set only on defaulted customers |
+| `Supplier` | `id, name, category, subcategory, riskScore` | A vendor the enterprise buys from | `subcategory` is the specialty within the category |
 | `BusinessUnit` | `id, name, region` | An internal division of the enterprise; the pivot customers, suppliers, and revenue attach to | Rolls up customers, suppliers, revenue |
 | `Invoice` | `id, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | A bill issued to a customer | Basis for payment-behavior rules |
-| `RevenueEntry` | `period, amount, currency, reconciled` | Revenue booked to a division for a period | `reconciled = false` drives Q1 |
-| `ComplianceFinding` | `id, type, status, openedDate` | A compliance issue raised against a customer | `status = 'open'` drives Q2 and Q6 |
+| `RevenueEntry` | `period, amount, currency, reconciled` | Revenue booked to a division for a period | Backs the Story 1 exposure figure for the Americas |
+| `ComplianceFinding` | `id, type, status, openedDate` | A compliance issue raised against a customer | Feeds the Compliance (KYC) Policy |
 
 Sample one customer's instance subgraph, its unit, invoices, and findings:
 
@@ -82,11 +99,11 @@ RETURN c, bu, i, f LIMIT 25;
 
 | Label | Key properties | Business description | Notes |
 |---|---|---|---|
-| `Entity` | `name, description` | A logical business entity in the knowledge layer | Logical entities in the knowledge layer |
-| `BusinessTerm` | `name, definition` | A named business definition the organization agrees on | Human-readable definition, for example "Platinum Customer" |
+| `Entity` | `name, description` | A logical business entity in the knowledge layer | Seven entities, each mapping to one UC table |
+| `BusinessTerm` | `name, definition` | A named business definition the organization agrees on | For example "Critical Supplier" or "Ownership Risk" |
 | `BusinessRule` | `name, expression, description` | The machine-evaluable logic that backs a term | Machine-evaluable logic behind a term |
-| `Policy` | `name, type` | A governance policy that scopes entities and rules | For example KYC Policy, Procurement Policy |
-| `Threshold` | `name, value, currency` | A parameter value a business term depends on | For example Materiality Threshold |
+| `Policy` | `name, type` | A governance policy that scopes entities and rules | For example Credit Risk Policy, Supply Chain Resilience Policy |
+| `Threshold` | `name, value, currency` | A parameter value a business term depends on | For example the Supplier Risk Threshold |
 | `DataSource` | `name, system, table` | The physical table a logical entity is stored in | Lineage target; `table` holds the real Unity Catalog table name |
 
 Sample a few of each knowledge-layer label:
@@ -101,6 +118,81 @@ CALL {
 RETURN label, n;
 ```
 
+## The knowledge layer (governed ontology)
+
+The knowledge layer is rebuilt from scratch so every governed concept earns its place in one of the two stories or the background contrast. Entities map to tables, terms are defined by rules, rules read entities, policies govern rules and constrain entities, thresholds apply to terms. The payoff is the two graph-native terms: their definitions and thresholds live only in the graph, and no lakehouse column carries them, which is exactly why the lakehouse-only engine cannot resolve them.
+
+### Entities and their table mappings
+
+Each entity is a logical business object mapped to one Unity Catalog table by a `MAPS_TO` edge, so any definition traces down to the physical table.
+
+| Entity | Maps to table |
+|---|---|
+| Customer | `supplier_risk.customers` |
+| Supplier | `supplier_risk.suppliers` |
+| BusinessUnit | `supplier_risk.business_units` |
+| Invoice | `supplier_risk.invoices` |
+| RevenueEntry | `supplier_risk.revenue_entries` |
+| ComplianceFinding | `supplier_risk.compliance_findings` |
+| SupplyRelationship | `supplier_risk.supply_relationships` |
+
+`SupplyRelationship` is a new entity, mapping the new supplier-to-supplier table, so the Critical Supplier definition traces to a real table. Ownership needs no new entity: it is the `parentCustomerId` column on Customer, so it traces through the existing Customer mapping.
+
+### Business terms
+
+| Term | Plain meaning | Nature |
+|---|---|---|
+| Strategic Account | A platinum customer flagged strategic by account management | Rule, column-findable |
+| Defaulted Customer | A customer with a recorded default in the snapshot | Fact, column-findable |
+| Delinquent Customer | A customer more than 60 days late on each of its last three invoices | Rule, column-findable |
+| High-Risk Supplier | A supplier whose procurement risk score meets or exceeds the threshold | Rule, column-findable |
+| Critical Supplier | A supplier the network disproportionately depends on: the narrowest bridge on a business unit's multi-tier supply paths | Graph-native, no column |
+| Ownership Risk | A customer inside an ownership group that contains a defaulted member, so its risk exceeds its own record | Graph-native, no column |
+
+The two graph-native terms are the whole point. **Critical Supplier and Ownership Risk have no lakehouse column, no threshold a BI tool could sort by, and no clean SQL the lakehouse-only engine would spontaneously write.** Their definitions live in the graph. The four column-findable terms exist to make the contrast honest: they show what the lakehouse-only engine can govern, so the gap is clearly the two it cannot.
+
+### Business rules
+
+One rule defines each term, by a `DEFINED_BY` edge, and reads one or more entities, by `EVALUATES` edges.
+
+| Rule | Defines | Plain expression | Reads (EVALUATES) |
+|---|---|---|---|
+| Strategic Account Rule | Strategic Account | segment is platinum and flagged strategic | Customer |
+| Defaulted Customer Rule | Defaulted Customer | a default period is recorded | Customer |
+| Delinquent Customer Rule | Delinquent Customer | each of the last three invoices is more than 60 days late | Customer, Invoice |
+| High-Risk Supplier Rule | High-Risk Supplier | risk score is at least 70 | Supplier |
+| Critical Supplier Rule | Critical Supplier | highest-betweenness bridge on a business unit's multi-tier supply paths, at or above the supply concentration threshold | Supplier, SupplyRelationship, BusinessUnit |
+| Ownership Risk Rule | Ownership Risk | member of an ownership group (`OWNED_BY`, walked transitively) that contains a Defaulted Customer, with propagated risk at or above the ownership contagion threshold | Customer |
+
+The two graph-native rules are expressed as traversals and graph metrics, never as a column predicate. Critical Supplier references betweenness over the supply network; Ownership Risk references transitive ownership plus a propagated risk score. Both read the precomputed Neo4j node properties, not a Delta column.
+
+### Policies
+
+| Policy | Governs (rules) | Constrains (entities) |
+|---|---|---|
+| Credit Risk Policy | Delinquent Customer Rule, Defaulted Customer Rule, Ownership Risk Rule | Customer |
+| Supply Chain Resilience Policy | High-Risk Supplier Rule, Critical Supplier Rule | Supplier |
+| Compliance (KYC) Policy | (none) | Customer (via ComplianceFinding) |
+
+The Compliance (KYC) Policy carries no rule. It is operationalized through compliance findings, not a business rule. It stays for governance breadth and to answer "which policies govern customer data."
+
+### Thresholds
+
+| Threshold | Value | Applies to term |
+|---|---|---|
+| Supplier Risk Threshold | 70 | High-Risk Supplier |
+| Late Payment Threshold | 60 days | Delinquent Customer |
+| Supply Concentration Threshold | a betweenness cutoff, set from the computed distribution | Critical Supplier |
+| Ownership Contagion Threshold | a propagated-risk (personalized PageRank) cutoff, set from the computed distribution | Ownership Risk |
+
+The two graph-native thresholds are set after the algorithms run, from the score distribution, so Cascade clears the concentration cutoff and Jade clears the contagion cutoff while filler entities do not. They are governed values in the graph, never columns.
+
+### Classifications
+
+Column-findable classifications are pre-planted as `CLASSIFIED_AS` edges carrying provenance (source, reason, evaluated-at, rule version): Jade to Strategic Account; Marlin and Pelican to Defaulted Customer; the background high-risk suppliers to High-Risk Supplier; the background late payers to Delinquent Customer. These are deterministic facts.
+
+**The two graph-native terms are resolved live, never pre-planted.** No `CLASSIFIED_AS` edge is created for Critical Supplier or Ownership Risk. The graph engine resolves the governed definition from the ontology, then walks the graph live using the precomputed betweenness and PageRank node properties to apply it. This keeps the flag a genuine live traversal and guarantees the two graph-native labels never exist as a materializable row anywhere, so they can never leak into a gold table.
+
 ## Relationships
 
 ### Instance layer
@@ -110,13 +202,14 @@ RETURN label, n;
 | `HAS_INVOICE` | `(:Customer)-[:HAS_INVOICE]->(:Invoice)` | A customer was billed on this invoice | Payment behavior per customer |
 | `BELONGS_TO` | `(:Customer)-[:BELONGS_TO]->(:BusinessUnit)` | A customer account rolls up into this internal division | Customer roll-up |
 | `RECOGNIZES` | `(:BusinessUnit)-[:RECOGNIZES]->(:RevenueEntry)` | A division books this revenue entry | Revenue recognition per unit |
-| `SUPPLIES` | `(:Supplier)-[:SUPPLIES]->(:BusinessUnit)` | A supplier feeds this internal division | Supply relationships |
+| `SUPPLIES` | `(:Supplier)-[:SUPPLIES]->(:BusinessUnit)` and `(:Supplier)-[:SUPPLIES]->(:Supplier)` | A supplier feeds this internal division, or a supplier feeds another supplier | Now runs at two levels: supplier-to-unit (from `supplies.csv`) and supplier-to-supplier (from `supply_relationships.csv`), giving the multi-tier supply chain Story 1 needs |
+| `OWNED_BY` | `(:Customer)-[:OWNED_BY]->(:Customer)` | A customer is owned by a parent customer | New edge, sourced from `parentCustomerId`. Builds the ownership groups Story 2 needs |
 | `HAS_FINDING` | `(:Customer)-[:HAS_FINDING]->(:ComplianceFinding)` | A customer has this compliance issue | Compliance exposure |
 
 Sample a few of each instance-layer relationship:
 
 ```cypher
-UNWIND ['HAS_INVOICE', 'BELONGS_TO', 'RECOGNIZES', 'SUPPLIES', 'HAS_FINDING'] AS relType
+UNWIND ['HAS_INVOICE', 'BELONGS_TO', 'RECOGNIZES', 'SUPPLIES', 'OWNED_BY', 'HAS_FINDING'] AS relType
 CALL {
   WITH relType
   MATCH (a)-[r]->(b) WHERE type(r) = relType
@@ -129,10 +222,10 @@ RETURN a, r, b;
 
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
-| `DEFINED_BY` | `(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)` | A business term is backed by this rule | A term is backed by an explicit rule |
-| `EVALUATES` | `(:BusinessRule)-[:EVALUATES]->(:Entity)` | A rule operates over this logical entity | The rule operates over entities |
+| `DEFINED_BY` | `(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)` | A business term is backed by this rule | One rule per term |
+| `EVALUATES` | `(:BusinessRule)-[:EVALUATES]->(:Entity)` | A rule operates over this logical entity | The rule reads one or more entities |
+| `GOVERNS` | `(:Policy)-[:GOVERNS]->(:BusinessRule)` | A policy operationalizes this rule | Credit Risk governs the Delinquent, Defaulted, and Ownership Risk rules; Supply Chain Resilience governs the High-Risk Supplier and Critical Supplier rules; the Compliance (KYC) Policy governs no rule, since it is operationalized through `ComplianceFinding` records |
 | `CONSTRAINS` | `(:Policy)-[:CONSTRAINS]->(:Entity)` | A policy governs this logical entity | Policy scope, the entity a policy governs |
-| `GOVERNS` | `(:Policy)-[:GOVERNS]->(:BusinessRule)` | A policy operationalizes this rule | The rules a policy operationalizes, an explicit edge so rules are read directly rather than inferred from a shared entity. Procurement governs the High-Risk Supplier rule, Revenue Recognition the Unreconciled Revenue rule. KYC governs no rule: it is operationalized through `ComplianceFinding` records, and the Platinum, Strategic, and Risky Customer rules are commercial and credit definitions outside its scope |
 | `APPLIES_TO` | `(:Threshold)-[:APPLIES_TO]->(:BusinessTerm)` | A threshold parameterizes this term | Threshold that parameterizes a term |
 | `MAPS_TO` | `(:Entity)-[:MAPS_TO]->(:DataSource)` | The semantic mapping: a logical entity is stored in this physical source | Lineage from logical entity to physical source; `DataSource.table` points at the real UC table |
 
@@ -152,8 +245,8 @@ RETURN a, r, b;
 
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
-| `REALIZED_AS` | `(:Entity)-[:REALIZED_AS]->(:Customer\|:Invoice)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The demo realizes only the Customer and Invoice entities, the ones the six questions traverse: 100 Customer edges and 612 Invoice edges. |
-| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with this business term | Materialized classification with provenance; written back to the `classifications` Delta table |
+| `REALIZED_AS` | `(:Entity)-[:REALIZED_AS]->(:Customer\|:Supplier\|:BusinessUnit\|:Invoice\|:RevenueEntry\|:ComplianceFinding)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The six instance entities (Customer, Supplier, BusinessUnit, Invoice, RevenueEntry, ComplianceFinding) are realized; SupplyRelationship has a table mapping but no realized instance nodes |
+| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {source, reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with a column-findable business term | Materialized classification with provenance; written back to the `classifications` Delta table. Only the four column-findable terms carry these edges. The two graph-native terms are never planted here |
 
 Sample the cross-layer edges that tie the knowledge layer to instances:
 
@@ -167,45 +260,38 @@ CALL {
 RETURN a, r, b;
 ```
 
-The `CLASSIFIED_AS` edge is the explainability payoff: every answer can be traced instance to business term to rule to entity to data source, so Q6 can report which business definitions and data sources were used.
+The `CLASSIFIED_AS` edge is the explainability payoff for the column-findable terms: every one traces instance to business term to rule to entity to data source. The two graph-native flags are explainable too, but through a live traversal over the precomputed graph metrics rather than a stored edge.
 
 ## CSV Mapping
 
-Each node label and each relationship type loads from one CSV in `data/`. The six instance node CSVs, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer and relationship CSVs stay graph-only.
+Each node label and each relationship type loads from one CSV in `data/`. The six core instance node CSVs and `supply_relationships.csv`, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer CSVs stay graph-only.
 
 - Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
-- Relationship CSVs: `has_invoice.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
-- Lakehouse-only CSV: `supplier_business_units.csv`, the camelCase bridge uploaded to UC but not loaded into Neo4j, where the `SUPPLIES` edge already carries the link.
+- Relationship CSVs: `has_invoice.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `supply_relationships.csv`, `owned_by.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
+- Loads on both sides: `supply_relationships.csv`. UC gets it as the `supply_relationships` table so the lakehouse-only engine can see the raw supplier-to-supplier links; Neo4j sources the supplier-to-supplier `SUPPLIES` edge from the same file.
+- Lakehouse-only CSV: `supplier_business_units.csv`, the camelCase bridge uploaded to UC but not loaded into Neo4j, where the supplier-to-unit `SUPPLIES` edge already carries the link.
 
-`classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`.
+`classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`, and targets both Customer and Supplier instances.
 
-## Graph Analytics Extensions
+## GDS properties (precomputed, never synced to Delta)
 
-The demo uses two graph analytics passes to extend the rule-based answers: a plain Cypher exposure aggregation for Q4 and one Graph Data Science algorithm, kNN, for Q5/Q6. Both write their results back as `CLASSIFIED_AS` edges, so they join the same provenance story and flow into the `classifications` Delta table.
+The two graph-native terms are resolved with two Graph Data Science passes, precomputed once and stored as Neo4j node properties.
 
-### Supplier risk exposure (extends Q4)
+### Betweenness centrality (Critical Supplier)
 
-- **ELI5:** think of each supplier as carrying a risk score. A business unit's exposure is the average risk of all the suppliers feeding it. A unit served by several middling-risk suppliers can carry high average exposure even when no single supplier looks alarming on its own.
-- **Method:** the mean supplier `riskScore` per business unit. This is a one-hop aggregation, computed with a single Cypher `avg()` over the supply edges.
-- **Edges aggregated:** `Supplier-SUPPLIES->BusinessUnit`.
-- **What it does:** averages supplier risk per business unit to score its exposure.
-- **Why it matters:** the rule filter `riskScore >= 70` only finds individually risky suppliers. The aggregation finds a business unit whose average exposure is high because several mid-risk suppliers serve it, even though no single supplier crosses the threshold.
-- **Demo line:** the rule finds risky suppliers; the graph finds risky exposure.
+- **What it does:** computes betweenness over the multi-tier supplier network (`Supplier-SUPPLIES->Supplier` and `Supplier-SUPPLIES->BusinessUnit`), stored as a node property on suppliers.
+- **Why it matters:** a plain risk-score filter only finds individually risky suppliers. Betweenness finds the narrowest bridge: Cascade sits where five clean same-subcategory tier-1 suppliers feeding the Americas converge, so it carries the most supply flow while its own score stays middling.
+- **Story line:** the score filter finds risky suppliers; the graph finds the supplier the network cannot lose.
 
-### Customer similarity (extends Q5 and Q6)
+### Personalized PageRank (Ownership Risk)
 
-- **ELI5:** describe every customer as a point on a map, where the coordinates are how late they pay, how much of their book is overdue, and how their profitability is trending. Customers who behave alike land close together. If a customer's point sits in the same neighborhood as the known troublemakers, they probably belong to that crowd, even if they have not broken a rule yet.
-- **Algorithm:** GDS k-Nearest Neighbors over payment-behavior features. It builds a similarity graph, linking each customer to its most similar peers by feature distance, then ranks the non-flagged customers by their highest similarity to any member of the known risky cohort. The four nearest are the candidates; they emerge from the run, not a planted set.
-- **Features:** `avgDaysLate`, `overdueShare`, `churnRisk`, and `profitabilityTrend`, with the categorical fields encoded numerically. `upsellScore` is deliberately excluded because it is random relative to risk and would make results nondeterministic.
-- **What it does:** surfaces the non-flagged customers whose feature vectors sit closest to the known risky accounts in the kNN similarity graph.
-- **Why it matters:** the last-3-invoices rule only catches customers who already trip it. Similarity surfaces the ones trending toward the risky cohort before the rule fires.
-- **Demo line:** rule-based classification finds the ones already defined; GDS finds the next ones.
+- **What it does:** computes personalized PageRank seeded on the defaulted siblings and propagated over the `OWNED_BY` edges, stored as a node property on customers.
+- **Why it matters:** the late-payment rule only catches customers who already trip it. PageRank propagates default risk through ownership, so Jade lights up because its siblings defaulted, even though its own record is spotless.
+- **Story line:** the payment rule finds the late payers; the graph finds the clean payer in a bad family.
 
-### Write-back with provenance
+### Why they never sync to Delta
 
-- Both passes write new `CLASSIFIED_AS` edges carrying `source: 'gds'`, the algorithm name, the score, and `evaluatedAt`.
-- The edges have the same shape as the rule-planted ones, so the Q6 explanation query returns them without modification.
-- Results are deterministic given the fixed-seed data. Q4 exposure matches the `gds_q4_*` entries in `ground_truth.json`; the Q5/Q6 kNN candidates emerge from the run and are checked only for shape (four non-flagged customers, each near the risky cohort).
+**Both scores stay as Neo4j node properties only. Neither is ever written into a Delta table.** Syncing them would re-materialize the graph's answers into a column the lakehouse-only engine could sort by, and the contrast the demo is built on would collapse: the lakehouse-only engine would tie. This is the same guardrail as the two gold tables staying out of the Genie space. The graph-native terms have no lakehouse column by design, and the GDS scores must stay in the graph to keep it that way.
 
 ## Lineage
 
@@ -215,9 +301,9 @@ The `MAPS_TO` edge is the semantic mapping: the data lineage that connects a log
 (:Entity {name:'Customer'})-[:MAPS_TO]->(:DataSource {table:'supplier_risk.customers'})
 ```
 
-So "Customer" as a logical entity in the knowledge layer is realized in `supplier_risk.customers` on the lakehouse. The `DataSource.table` values are the actual UC table names (`supplier_risk.customers`, `.suppliers`, `.invoices`, and so on), which is why lineage points at real Databricks assets rather than placeholders. All six instance entities have a 1:1 mapping.
+So "Customer" as a logical entity in the knowledge layer is realized in `supplier_risk.customers` on the lakehouse. The `DataSource.table` values are the actual UC table names (`supplier_risk.customers`, `.suppliers`, `.supply_relationships`, and so on), which is why lineage points at real Databricks assets rather than placeholders. All seven entities have a 1:1 mapping.
 
-Lineage is one link in a longer chain that answers "where did this answer come from". A business term traces down through its rule, to the logical entity, and finally to the exact UC table backing it, which is what Q6 reports:
+Lineage is one link in a longer chain that answers "where did this answer come from". A business term traces down through its rule, to the logical entity, and finally to the exact UC table backing it:
 
 ```
 BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> Entity -MAPS_TO-> DataSource (physical table)
@@ -257,4 +343,4 @@ OPTIONAL MATCH (e)-[:REALIZED_AS]->(inst)
 RETURN e, ds, inst LIMIT 25;
 ```
 
-Only `Customer` and `Invoice` have `REALIZED_AS` edges to instances in this demo; the other four entities have lineage (`MAPS_TO`) but no realized instances.
+The six instance entities (`Customer`, `Supplier`, `BusinessUnit`, `Invoice`, `RevenueEntry`, `ComplianceFinding`) have `REALIZED_AS` edges to their instances; `SupplyRelationship` has lineage (`MAPS_TO`) to its table but no realized instance nodes.

@@ -1,4 +1,4 @@
 id,name,type
-POL-01,KYC Policy,Compliance
-POL-02,Procurement Policy,Procurement
-POL-03,Revenue Recognition Policy,Finance
+POL-01,Credit Risk Policy,Credit
+POL-02,Supply Chain Resilience Policy,Procurement
+POL-03,Compliance (KYC) Policy,Compliance

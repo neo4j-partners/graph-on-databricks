@@ -1,6 +1,7 @@
 id,name,expression,description,threshold
-RULE-01,Platinum Customer Rule,customer.segment = 'platinum',Membership of the platinum commercial segment.,
-RULE-02,Strategic Account Rule,customer.segment = 'platinum' AND flagged strategic by account management,Platinum customers designated strategic.,
-RULE-03,High-Risk Supplier Rule,supplier.riskScore >= 70,Procurement risk score at or above the supplier risk threshold.,70
-RULE-04,Risky Customer Rule,all(last 3 invoices WHERE invoice.daysLate > 60),More than 60 days late on each of the last three invoices.,60
-RULE-05,Unreconciled Revenue Rule,sum(revenueEntry.amount WHERE reconciled = false) > materiality threshold,Unreconciled revenue per business unit above the materiality threshold.,100000
+RULE-01,Strategic Account Rule,customer.segment = 'platinum' AND flagged strategic,A platinum customer designated strategic by account management.,
+RULE-02,Defaulted Customer Rule,customer.defaultedPeriod is set,A default period is recorded on the customer.,
+RULE-03,Delinquent Customer Rule,all(last 3 invoices WHERE invoice.daysLate > 60),More than 60 days late on each of the last three invoices.,60
+RULE-04,High-Risk Supplier Rule,supplier.riskScore >= 70,Procurement risk score at or above the supplier risk threshold.,70
+RULE-05,Critical Supplier Rule,"highest-betweenness bridge on a business unit's multi-tier supply paths, at or above the supply concentration threshold",The supplier the network most depends on across multi-tier supply paths into a business unit; read from precomputed betweenness.,
+RULE-06,Ownership Risk Rule,"member of an OWNED_BY group (transitive) containing a Defaulted Customer, with propagated risk >= ownership contagion threshold","A customer whose ownership group contains a defaulted member, with propagated risk above the contagion threshold; read from precomputed PageRank.",

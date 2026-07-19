@@ -1,4 +1,5 @@
 id,name,value,currency
-THR-01,Materiality Threshold,100000,EUR
-THR-02,Supplier Risk Threshold,70,
-THR-03,Late Payment Threshold,60,
+THR-01,Supplier Risk Threshold,70,
+THR-02,Late Payment Threshold,60,
+THR-03,Supply Concentration Threshold,,
+THR-04,Ownership Contagion Threshold,,

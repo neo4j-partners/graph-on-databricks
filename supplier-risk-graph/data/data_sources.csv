@@ -3,5 +3,6 @@ DS-01,customers,Databricks Unity Catalog,supplier_risk.customers
 DS-02,suppliers,Databricks Unity Catalog,supplier_risk.suppliers
 DS-03,business_units,Databricks Unity Catalog,supplier_risk.business_units
 DS-04,invoices,Databricks Unity Catalog,supplier_risk.invoices
-DS-06,revenue_entries,Databricks Unity Catalog,supplier_risk.revenue_entries
-DS-07,compliance_findings,Databricks Unity Catalog,supplier_risk.compliance_findings
+DS-05,revenue_entries,Databricks Unity Catalog,supplier_risk.revenue_entries
+DS-06,compliance_findings,Databricks Unity Catalog,supplier_risk.compliance_findings
+DS-07,supply_relationships,Databricks Unity Catalog,supplier_risk.supply_relationships

@@ -1,13 +1,28 @@
 """Upload the supplier-risk-graph instance data to Unity Catalog as Delta tables.
 
 Two-layer demo: the lakehouse owns the data/instance layer while Neo4j owns the
-knowledge layer. This script materializes the lakehouse side. It uploads the
-six instance node CSVs plus the supplier-to-business-unit bridge into a UC
-volume and builds one Delta table each with `read_files`, then reads the two
-graph-derived tables back out of Neo4j:
+knowledge layer. This script materializes the lakehouse side. It uploads eight
+base instance CSVs — the six instance node CSVs (customers, suppliers,
+business_units, invoices, revenue_entries, compliance_findings), the
+supplier-to-business-unit bridge (supplier_business_units), and the
+supplier-to-supplier link (supply_relationships) — into a UC volume and builds
+one Delta table each with `read_files`, then reads the two graph-derived tables
+back out of Neo4j:
 
-  - `classifications`         — every CLASSIFIED_AS edge (rule- and GDS-planted)
-  - `business_unit_exposure`  — the Q4 supplier-risk propagation result
+  - `classifications`         — every CLASSIFIED_AS edge (the four column-findable
+                                terms only; the graph-native terms are never planted)
+  - `business_unit_exposure`  — each business unit's aggregate supplier-risk exposure
+
+The `supply_relationships` table carries the raw supplier-to-supplier edges
+(fromSupplierId, toSupplierId), uploaded so plain Genie can see the links in the
+lakehouse; Neo4j sources the SUPPLIES edge from the same CSV. The `customers`
+table gains three columns — parentCustomerId (self-reference sourcing OWNED_BY),
+creditLimit (the Story 2 exposure figure), and defaultedPeriod (the quarter a
+sibling defaulted) — and `suppliers` gains subcategory (the supplier specialty).
+
+The two gold tables (`classifications`, `business_unit_exposure`) must never be
+added to the Genie space: they materialize the graph's answers, and re-adding
+them re-introduces write-back leakage and lets plain Genie tie.
 
 CSV headers stay verbatim (camelCase), so the demo's Cypher and the UC column
 names line up. Instance tables carry foreign-key columns (invoices.customerId,
@@ -80,14 +95,21 @@ class DerivedSpec:
     types: dict[str, str] = field(default_factory=dict)
 
 
-# The seven instance node CSVs that become UC tables. Type maps mirror the
-# matching NODE_SPECS in load.py; knowledge-layer and relationship CSVs stay
-# graph-only. Table names match data_sources.csv.
+# The eight base instance CSVs that become UC tables. Type maps mirror the
+# matching NODE_SPECS in load.py; knowledge-layer and remaining relationship
+# CSVs stay graph-only. Table names match data_sources.csv.
 BASE_SPECS = [
     TableSpec(
         "customers.csv",
         "customers",
-        {"upsellScore": "int", "avgDaysLate": "float", "overdueShare": "float"},
+        {
+            "upsellScore": "int",
+            "avgDaysLate": "float",
+            "overdueShare": "float",
+            # parentCustomerId and defaultedPeriod are strings (inference is fine);
+            # only creditLimit needs a hint so it lands DOUBLE, not string/int.
+            "creditLimit": "number",
+        },
     ),
     TableSpec("suppliers.csv", "suppliers", {"riskScore": "int"}),
     TableSpec("business_units.csv", "business_units"),
@@ -111,21 +133,23 @@ BASE_SPECS = [
     # Bridge table for the many-to-many supplier-to-business-unit link, so Genie
     # can join suppliers to the units they supply. Both columns are strings.
     TableSpec("supplier_business_units.csv", "supplier_business_units"),
+    # Supplier-to-supplier link (fromSupplierId, toSupplierId), the raw edges
+    # behind the graph's SUPPLIES relationship. Uploaded so plain Genie can see
+    # the links in the lakehouse. Both columns are strings, so no schemaHints.
+    TableSpec("supply_relationships.csv", "supply_relationships"),
 ]
 
-# Gold table: all CLASSIFIED_AS edges written back from the graph. Rule-planted
-# edges carry ruleVersion and no source/algorithm/score; GDS edges (gds.py,
-# Phase 5) carry source='gds', algorithm, score and no ruleVersion. Both land
-# here, so nullable columns are expected.
+# Gold table: the CLASSIFIED_AS edges written back from the graph. In the
+# rebuilt demo only the four column-findable terms are planted as edges, each
+# carrying rule provenance (reason, evaluatedAt, ruleVersion). The two
+# graph-native terms (Critical Supplier, Ownership Risk) are resolved live and
+# never planted, so they never materialize here.
 CLASSIFICATIONS_SPEC = DerivedSpec(
     table="classifications",
     columns=[
         "entity_id",
         "entity_type",
         "term",
-        "source",
-        "algorithm",
-        "score",
         "reason",
         "evaluated_at",
         "rule_version",
@@ -133,17 +157,15 @@ CLASSIFICATIONS_SPEC = DerivedSpec(
     cypher=(
         "MATCH (e)-[r:CLASSIFIED_AS]->(t:BusinessTerm) "
         "RETURN e.id AS entity_id, labels(e)[0] AS entity_type, t.name AS term, "
-        "coalesce(r.source, 'rule') AS source, r.algorithm AS algorithm, "
-        "r.score AS score, r.reason AS reason, "
-        "toString(r.evaluatedAt) AS evaluated_at, r.ruleVersion AS rule_version"
+        "r.reason AS reason, toString(r.evaluatedAt) AS evaluated_at, "
+        "r.ruleVersion AS rule_version"
     ),
-    types={"score": "float", "evaluated_at": "datetime"},
+    types={"evaluated_at": "datetime"},
 )
 
-# Gold table: the Q4 supplier-risk propagation result, one row per business
-# unit. Columns match ground_truth.json's gds_q4_supplier_exposure_by_business_unit.
-# supplierExposureScore is written by gds.py (Phase 5); if it has not run the
-# exposure column lands null, which is fine.
+# Gold table: each business unit's aggregate supplier-risk exposure, one row per
+# unit. supplierExposureScore is a precomputed Neo4j node property; if the graph
+# algorithms have not run yet the exposure column lands null, which is fine.
 EXPOSURE_SPEC = DerivedSpec(
     table="business_unit_exposure",
     columns=[

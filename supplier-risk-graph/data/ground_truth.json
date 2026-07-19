@@ -1,354 +1,125 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "seed": 42,
   "as_of_date": "2026-07-01",
   "summary": {
-    "customers": 100,
-    "suppliers": 30,
+    "customers": 504,
+    "suppliers": 156,
     "business_units": 5,
-    "invoices": 612,
-    "revenue_entries": 69,
-    "compliance_findings": 24,
-    "answers": {
-      "q1": 2,
-      "q2": 6,
-      "q3": 15,
-      "q4": 5,
-      "q5": 5,
-      "q6": 3
-    }
+    "invoices": 3006,
+    "revenue_entries": 60,
+    "compliance_findings": 93,
+    "supply_relationships": 42,
+    "owned_by_edges": 40
   },
-  "q1_unreconciled_business_units": [
-    {
-      "business_unit_id": "BU-04",
-      "name": "Asia Pacific",
-      "unreconciled_total": 189924.86,
-      "threshold": 100000
+  "story1_hidden_glassworks": {
+    "cascade_id": "SUP-901",
+    "cascade_risk_score": 65,
+    "tier1_ids": [
+      "SUP-902",
+      "SUP-903",
+      "SUP-904",
+      "SUP-905",
+      "SUP-906"
+    ],
+    "tier1_risk_scores": {
+      "SUP-902": 37,
+      "SUP-903": 18,
+      "SUP-904": 18,
+      "SUP-905": 30,
+      "SUP-906": 32
     },
-    {
-      "business_unit_id": "BU-02",
-      "name": "Southern Europe",
-      "unreconciled_total": 175803.01,
-      "threshold": 100000
-    }
-  ],
-  "q2_kyc_violators": [
-    {
-      "customer_id": "CUST-016",
-      "name": "Pinnacle Retail",
-      "open_kyc_findings": [
-        "CF-005",
-        "CF-006"
-      ]
-    },
-    {
-      "customer_id": "CUST-017",
-      "name": "Kestrel Group",
-      "open_kyc_findings": [
-        "CF-003",
-        "CF-004"
-      ]
-    },
-    {
-      "customer_id": "CUST-024",
-      "name": "Pinnacle Hospitality",
-      "open_kyc_findings": [
-        "CF-008",
-        "CF-009"
-      ]
-    },
-    {
-      "customer_id": "CUST-040",
-      "name": "Umber Foods",
-      "open_kyc_findings": [
-        "CF-010"
-      ]
-    },
-    {
-      "customer_id": "CUST-067",
-      "name": "Quartz Beverages",
-      "open_kyc_findings": [
-        "CF-001",
-        "CF-002"
-      ]
-    },
-    {
-      "customer_id": "CUST-080",
-      "name": "Tidal Group",
-      "open_kyc_findings": [
-        "CF-007"
-      ]
-    }
-  ],
-  "q3_platinum_by_upsell": [
-    {
-      "customer_id": "CUST-065",
-      "name": "Orchid Retail",
-      "upsellScore": 100
-    },
-    {
-      "customer_id": "CUST-019",
-      "name": "Alder Drinks Co",
-      "upsellScore": 99
-    },
-    {
-      "customer_id": "CUST-011",
-      "name": "Ridgeline Trading",
-      "upsellScore": 98
-    },
-    {
-      "customer_id": "CUST-001",
-      "name": "Quartz Trading",
-      "upsellScore": 93
-    },
-    {
-      "customer_id": "CUST-010",
-      "name": "Cedar Foods",
-      "upsellScore": 83
-    },
-    {
-      "customer_id": "CUST-092",
-      "name": "Ember Trading",
-      "upsellScore": 64
-    },
-    {
-      "customer_id": "CUST-029",
-      "name": "Quartz Foods",
-      "upsellScore": 59
-    },
-    {
-      "customer_id": "CUST-026",
-      "name": "Orchid Trading",
-      "upsellScore": 55
-    },
-    {
-      "customer_id": "CUST-067",
-      "name": "Quartz Beverages",
-      "upsellScore": 49
-    },
-    {
-      "customer_id": "CUST-096",
-      "name": "Lumen Group",
-      "upsellScore": 39
-    },
-    {
-      "customer_id": "CUST-098",
-      "name": "Granite Wholesale",
-      "upsellScore": 22
-    },
-    {
-      "customer_id": "CUST-003",
-      "name": "Alder Foods",
-      "upsellScore": 20
-    },
-    {
-      "customer_id": "CUST-049",
-      "name": "Iris Foods",
-      "upsellScore": 16
-    },
-    {
-      "customer_id": "CUST-066",
-      "name": "Harbor Markets",
-      "upsellScore": 14
-    },
-    {
-      "customer_id": "CUST-062",
-      "name": "Delta Retail",
-      "upsellScore": 13
-    }
-  ],
-  "q4_high_risk_suppliers": [
-    {
-      "supplier_id": "SUP-024",
-      "name": "Granite Labels",
-      "riskScore": 94,
-      "threshold": 70
-    },
-    {
-      "supplier_id": "SUP-010",
-      "name": "Summit Ingredients",
-      "riskScore": 90,
-      "threshold": 70
-    },
-    {
-      "supplier_id": "SUP-003",
-      "name": "Iris Packaging",
-      "riskScore": 86,
-      "threshold": 70
-    },
-    {
-      "supplier_id": "SUP-007",
-      "name": "Lumen Glassworks",
-      "riskScore": 85,
-      "threshold": 70
-    },
-    {
-      "supplier_id": "SUP-001",
-      "name": "Orchid Glassworks",
-      "riskScore": 77,
-      "threshold": 70
-    }
-  ],
-  "q5_risky_customers": [
-    {
-      "customer_id": "CUST-015",
-      "name": "Cedar Distribution",
-      "last_three": [
-        {
-          "invoice_id": "INV-0088",
-          "daysLate": 65
-        },
-        {
-          "invoice_id": "INV-0087",
-          "daysLate": 94
-        },
-        {
-          "invoice_id": "INV-0086",
-          "daysLate": 111
-        }
-      ]
-    },
-    {
-      "customer_id": "CUST-020",
-      "name": "Cedar Trading",
-      "last_three": [
-        {
-          "invoice_id": "INV-0118",
-          "daysLate": 88
-        },
-        {
-          "invoice_id": "INV-0117",
-          "daysLate": 97
-        },
-        {
-          "invoice_id": "INV-0116",
-          "daysLate": 98
-        }
-      ]
-    },
-    {
-      "customer_id": "CUST-036",
-      "name": "Harbor Retail",
-      "last_three": [
-        {
-          "invoice_id": "INV-0221",
-          "daysLate": 71
-        },
-        {
-          "invoice_id": "INV-0220",
-          "daysLate": 115
-        },
-        {
-          "invoice_id": "INV-0219",
-          "daysLate": 119
-        }
-      ]
-    },
-    {
-      "customer_id": "CUST-067",
-      "name": "Quartz Beverages",
-      "last_three": [
-        {
-          "invoice_id": "INV-0418",
-          "daysLate": 78
-        },
-        {
-          "invoice_id": "INV-0417",
-          "daysLate": 85
-        },
-        {
-          "invoice_id": "INV-0416",
-          "daysLate": 88
-        }
-      ]
-    },
-    {
-      "customer_id": "CUST-091",
-      "name": "Pinnacle Markets",
-      "last_three": [
-        {
-          "invoice_id": "INV-0559",
-          "daysLate": 73
-        },
-        {
-          "invoice_id": "INV-0558",
-          "daysLate": 84
-        },
-        {
-          "invoice_id": "INV-0557",
-          "daysLate": 89
-        }
-      ]
-    }
-  ],
-  "q6_strategic_at_risk": [
-    {
-      "customer_id": "CUST-019",
-      "name": "Alder Drinks Co",
-      "conditions": {
-        "profitabilityTrend": "declining",
-        "churnRisk": "high",
-        "overdue_invoice": true,
-        "open_compliance_finding": true
-      }
-    },
-    {
-      "customer_id": "CUST-065",
-      "name": "Orchid Retail",
-      "conditions": {
-        "profitabilityTrend": "declining",
-        "churnRisk": "high",
-        "overdue_invoice": true,
-        "open_compliance_finding": true
-      }
-    },
-    {
-      "customer_id": "CUST-067",
-      "name": "Quartz Beverages",
-      "conditions": {
-        "profitabilityTrend": "declining",
-        "churnRisk": "high",
-        "overdue_invoice": true,
-        "open_compliance_finding": true
-      }
-    }
-  ],
-  "gds_q4_exposed_business_unit": "BU-03",
-  "gds_q4_supplier_exposure_by_business_unit": [
-    {
-      "business_unit_id": "BU-03",
-      "name": "Americas",
-      "supplier_count": 4,
-      "avg_supplier_risk": 64.2,
-      "max_supplier_risk": 67
-    },
-    {
-      "business_unit_id": "BU-01",
-      "name": "Northern Europe",
-      "supplier_count": 24,
-      "avg_supplier_risk": 42.0,
-      "max_supplier_risk": 94
-    },
-    {
-      "business_unit_id": "BU-02",
-      "name": "Southern Europe",
-      "supplier_count": 22,
-      "avg_supplier_risk": 40.0,
-      "max_supplier_risk": 94
-    },
-    {
-      "business_unit_id": "BU-05",
-      "name": "Africa & Middle East",
-      "supplier_count": 23,
-      "avg_supplier_risk": 35.3,
-      "max_supplier_risk": 90
-    },
-    {
-      "business_unit_id": "BU-04",
-      "name": "Asia Pacific",
-      "supplier_count": 18,
-      "avg_supplier_risk": 33.2,
-      "max_supplier_risk": 94
-    }
-  ]
+    "business_unit": "BU-03",
+    "last_quarter": "2026-Q2",
+    "bu03_last_quarter_revenue": 4222032.81
+  },
+  "story2_clean_payer": {
+    "kestrel_id": "CUST-901",
+    "jade_id": "CUST-904",
+    "sibling_ids": [
+      "CUST-902",
+      "CUST-903"
+    ],
+    "defaulted_period": "2026-Q2",
+    "jade_open_invoice_balance": 252448.11,
+    "jade_credit_limit": 548000,
+    "jade_exposure": 800448.11
+  },
+  "classification_cohorts": {
+    "high_risk_suppliers": [
+      "SUP-005",
+      "SUP-007",
+      "SUP-008",
+      "SUP-013",
+      "SUP-019",
+      "SUP-020",
+      "SUP-021",
+      "SUP-022",
+      "SUP-032",
+      "SUP-035",
+      "SUP-036",
+      "SUP-040",
+      "SUP-041",
+      "SUP-042",
+      "SUP-043",
+      "SUP-047",
+      "SUP-054",
+      "SUP-061",
+      "SUP-062",
+      "SUP-063",
+      "SUP-064",
+      "SUP-068",
+      "SUP-079",
+      "SUP-086",
+      "SUP-087",
+      "SUP-089",
+      "SUP-096",
+      "SUP-099",
+      "SUP-100",
+      "SUP-101",
+      "SUP-107",
+      "SUP-111",
+      "SUP-115",
+      "SUP-118",
+      "SUP-127",
+      "SUP-129",
+      "SUP-131",
+      "SUP-134",
+      "SUP-139",
+      "SUP-142",
+      "SUP-146",
+      "SUP-147",
+      "SUP-150"
+    ],
+    "delinquent_customers": [
+      "CUST-062",
+      "CUST-067",
+      "CUST-091",
+      "CUST-111",
+      "CUST-118",
+      "CUST-147",
+      "CUST-155",
+      "CUST-211",
+      "CUST-256",
+      "CUST-312",
+      "CUST-313",
+      "CUST-367",
+      "CUST-398",
+      "CUST-470",
+      "CUST-475"
+    ],
+    "strategic_accounts": [
+      "CUST-011",
+      "CUST-105",
+      "CUST-240",
+      "CUST-247",
+      "CUST-322",
+      "CUST-403",
+      "CUST-904"
+    ],
+    "defaulted_customers": [
+      "CUST-902",
+      "CUST-903"
+    ]
+  }
 }

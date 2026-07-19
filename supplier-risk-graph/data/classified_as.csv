@@ -1,24 +1,68 @@
-entity_id,term_id,reason,evaluatedAt,ruleVersion
-CUST-001,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-003,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-010,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-011,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-019,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-026,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-029,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-049,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-062,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-065,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-066,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-067,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-092,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-096,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-098,TERM-01,segment = 'platinum' per Platinum Customer Rule,2026-07-01T00:00:00Z,v1.0
-CUST-067,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
-CUST-019,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
-CUST-065,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
-CUST-066,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
-CUST-062,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
-CUST-001,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
-CUST-098,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
-CUST-096,TERM-02,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+entity_id,entity_label,term_id,reason,evaluatedAt,ruleVersion
+CUST-904,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-247,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-105,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-011,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-240,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-403,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-322,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-01T00:00:00Z,v1.0
+CUST-902,Customer,TERM-02,default period recorded in the snapshot,2026-07-01T00:00:00Z,v1.0
+CUST-903,Customer,TERM-02,default period recorded in the snapshot,2026-07-01T00:00:00Z,v1.0
+CUST-062,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-067,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-091,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-111,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-118,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-147,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-155,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-211,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-256,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-312,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-313,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-367,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-398,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-470,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+CUST-475,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-01T00:00:00Z,v1.0
+SUP-005,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-007,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-008,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-013,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-019,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-020,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-021,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-022,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-032,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-035,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-036,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-040,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-041,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-042,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-043,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-047,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-054,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-061,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-062,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-063,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-064,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-068,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-079,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-086,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-087,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-089,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-096,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-099,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-100,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-101,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-107,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-111,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-115,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-118,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-127,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-129,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-131,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-134,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-139,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-142,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-146,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-147,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
+SUP-150,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-01T00:00:00Z,v1.0
