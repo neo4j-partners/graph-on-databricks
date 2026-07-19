@@ -45,7 +45,7 @@ The data is generated from scratch, deterministically, with a fixed seed and a f
 
 ## How to run
 
-Run these in order from this folder. Steps 1 and 2 need no live service; steps 3 to 5 need `.env` filled in.
+**Run the five steps strictly in order.** Each step depends on the state the previous one leaves behind, and two of the graph's governing thresholds do not exist until step 4 computes them. Skipping a step, or re-running an earlier one without re-running the steps after it, leaves the graph inconsistent. If you re-run step 1, you must also re-run steps 3 and 4 before the demo. Steps 1 and 2 need no live service; steps 3 to 5 need `.env` filled in.
 
 1. Generate the data. This writes the 12 node CSVs, the relationship CSVs, the `supply_relationships` link CSV, the `supplier_business_units` lakehouse bridge CSV, and `ground_truth.json` to `data/`. It is deterministic, with a fixed seed and a frozen as-of date of 2026-07-01.
 
@@ -67,7 +67,7 @@ Run these in order from this folder. Steps 1 and 2 need no live service; steps 3
    uv run load.py --check    # validate CSVs only, no database
    ```
 
-4. Run the GDS analytics. This runs the two algorithms and writes their results back into Neo4j as node properties only: betweenness centrality over the supplier network (behind Critical Supplier) and personalized PageRank over the ownership network (behind Ownership Risk). Neither score is ever synced to Delta. Run it after the loader.
+4. Run the GDS analytics. This runs the two algorithms and writes their results back into Neo4j as node properties only: betweenness centrality over the supplier network (behind Critical Supplier) and personalized PageRank over the ownership network (behind Ownership Risk). Neither score is ever synced to Delta. This step also computes and sets the two graph-native thresholds, THR-03 and THR-04, which the generator leaves blank because they can only be placed once the scores exist. It writes them onto the live `Threshold` nodes and back into `data/thresholds.csv`. **Until this step runs, the Critical Supplier and Ownership Risk definitions have no cutoff and the demo cannot resolve them.** Run it after the loader.
 
    ```bash
    uv run gds.py
@@ -84,6 +84,17 @@ Quick check that the load worked, before you walk through anything live:
 - **Referential integrity:** `uv run load.py --check` reports the node and relationship totals and confirms every relationship endpoint resolves.
 - **Story 1:** after `gds.py`, Cascade Glassworks (SUP-901) carries the highest betweenness in the supplier network, and the five tier-1 bottle suppliers score clean.
 - **Story 2:** after `gds.py`, Jade Beverage Distribution (CUST-904) is the customer lit up by personalized PageRank, while its own record stays clean.
+
+## The threshold lifecycle
+
+`data/thresholds.csv` holds the four governing cutoffs, and they are filled at two different times, so the run order matters:
+
+- **THR-01 Supplier Risk Threshold (70)** and **THR-02 Late Payment Threshold (60)** are hand-set business constants. The generator writes them with values, and `load.py` loads them as-is. Edit these in the generator if you want to change what "high-risk supplier" or "delinquent customer" means.
+- **THR-03 Supply Concentration Threshold** and **THR-04 Ownership Contagion Threshold** are graph-native. The generator writes them blank, because their values can only be placed once the GDS scores exist. `load.py` therefore creates the two `Threshold` nodes with a null value. `gds.py` then computes each cutoff from the score distribution and writes it onto both the live `Threshold` node and back into `data/thresholds.csv`. Do not hand-edit these two; `gds.py` overwrites them on every run.
+
+The demo Cypher reads each cutoff from the live `Threshold` node, so the values only need to be correct in the graph, which they are once `gds.py` has run.
+
+`thresholds.csv` is graph-only and is **never uploaded to Unity Catalog.** `upload.py` does not touch it. This is deliberate: if the two graph-native cutoffs became a Delta column, the lakehouse-only engine could read them and the demo would tie. Keeping them in the graph alone is what makes Critical Supplier and Ownership Risk graph-native.
 
 ## Set up the Genie Agent (one-time)
 

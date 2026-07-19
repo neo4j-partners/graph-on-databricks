@@ -71,55 +71,13 @@ Five names, five clean scores, so the read is "well diversified." The `supply_re
 
 ### Beat 3, the flag
 
-Genie One first resolves the governed definition of a Critical Supplier from the graph:
+Genie One first resolves the governed definition of a Critical Supplier from the graph. The definition is "the narrowest bridge on a business unit's multi-tier supply paths," parameterized by the Supply Concentration Threshold (THR-03), a betweenness cutoff of 6.5. It then walks the multi-tier chain into the Americas and collapses the five bottle suppliers onto their shared source.
 
-```cypher
-MATCH (term:BusinessTerm {name: 'Critical Supplier'})-[:DEFINED_BY]->(rule:BusinessRule)
-MATCH (thr:Threshold)-[:APPLIES_TO]->(term)
-RETURN term.definition AS definition, rule.expression AS rule,
-       thr.name AS threshold, thr.value AS cutoff
-```
-
-The definition is "the narrowest bridge on a business unit's multi-tier supply paths," parameterized by the Supply Concentration Threshold (THR-03), a betweenness cutoff of 6.5. It then walks the multi-tier chain into the Americas and collapses the five bottle suppliers onto their shared source:
-
-```cypher
-MATCH (bu:BusinessUnit {name: 'Americas'})
-MATCH (tier2:Supplier)-[:SUPPLIES]->(tier1:Supplier {subcategory: 'glass bottles'})-[:SUPPLIES]->(bu)
-WITH tier2, count(DISTINCT tier1) AS bottleSuppliersReached,
-     collect(DISTINCT tier1.name) AS throughSuppliers
-WHERE bottleSuppliersReached >= 2
-RETURN tier2.id AS supplierId, tier2.name AS name,
-       tier2.subcategory AS subcategory, tier2.riskScore AS riskScore,
-       tier2.betweenness AS betweenness,
-       bottleSuppliersReached, throughSuppliers
-ORDER BY tier2.betweenness DESC
-```
-
-One row comes back: Cascade Glassworks (SUP-901), raw glass, riskScore 65, reaching all five bottle suppliers into the Americas. Its precomputed betweenness is the strict maximum in the supplier network, so it is the one node every Americas bottle path runs through. Applying the governed cutoff confirms it is the only Critical Supplier:
-
-```cypher
-MATCH (thr:Threshold {name: 'Supply Concentration Threshold'})
-MATCH (s:Supplier)
-WHERE s.betweenness >= thr.value
-RETURN s.id AS supplierId, s.name AS name,
-       s.betweenness AS betweenness, thr.value AS cutoff
-ORDER BY s.betweenness DESC
-```
-
-Cascade clears the cutoff; no other supplier does. Its own risk score of 65 sits below the 70 High-Risk threshold, so no score sort would ever surface it.
+One row comes back: Cascade Glassworks (SUP-901), raw glass, riskScore 65, reaching all five bottle suppliers into the Americas. Its precomputed betweenness is the strict maximum in the supplier network, so it is the one node every Americas bottle path runs through. Applying the governed cutoff confirms it is the only Critical Supplier: Cascade clears it, and no other supplier does. Its own risk score of 65 sits below the 70 High-Risk threshold, so no score sort would ever surface it.
 
 ### Beat 4, the exposure
 
-The flag gets a euro figure: the Americas' recognized revenue for the most recent quarter, read from the same lakehouse data through the graph.
-
-```cypher
-MATCH (bu:BusinessUnit {name: 'Americas'})-[:RECOGNIZES]->(re:RevenueEntry)
-WHERE re.period IN ['2026-04', '2026-05', '2026-06']
-RETURN bu.name AS businessUnit,
-       round(sum(re.amount), 2) AS lastQuarterRevenue
-```
-
-Result: about 4.2M EUR (4,222,032.81) of Americas revenue for 2026-Q2 sits behind this one hidden glassworks. Plain BI can read the same revenue, but it cannot tie a single euro to a supplier it cannot see.
+The flag gets a euro figure: the Americas' recognized revenue for the most recent quarter, read from the same lakehouse data through the graph. About 4.2M EUR (4,222,032.81) of Americas revenue for 2026-Q2 sits behind this one hidden glassworks. Plain BI can read the same revenue, but it cannot tie a single euro to a supplier it cannot see.
 
 ### Beat 5, the decision
 
@@ -154,66 +112,17 @@ Put to both engines:
 
 ### Beat 2, the miss
 
-The lakehouse-only engine returns the late payers, the customers more than 60 days late on each of their last three invoices. Jade Beverage Distribution is nowhere on the list. Its own payment record is spotless.
-
-```sql
-WITH ranked AS (
-  SELECT i.customerId, i.daysLate,
-         ROW_NUMBER() OVER (PARTITION BY i.customerId ORDER BY i.issueDate DESC) AS rn
-  FROM invoices i
-)
-SELECT customerId
-FROM ranked
-WHERE rn <= 3
-GROUP BY customerId
-HAVING COUNT(*) = 3 AND MIN(daysLate) > 60
-ORDER BY customerId;
-```
-
-Result: 15 delinquent customers. Jade (CUST-904) is not among them, because it is never late. A correct read of every invoice, and it misses the account credit review should worry about most.
+The lakehouse-only engine returns the late payers, the customers more than 60 days late on each of their last three invoices. It comes back with 15 delinquent customers. Jade Beverage Distribution (CUST-904) is nowhere on the list, because it is never late; its own payment record is spotless. A correct read of every invoice, and it misses the account credit review should worry about most.
 
 ### Beat 3, the flag
 
-Genie One resolves the governed definition of Ownership Risk from the graph:
-
-```cypher
-MATCH (term:BusinessTerm {name: 'Ownership Risk'})-[:DEFINED_BY]->(rule:BusinessRule)
-MATCH (thr:Threshold)-[:APPLIES_TO]->(term)
-RETURN term.definition AS definition, rule.expression AS rule,
-       thr.name AS threshold, thr.value AS cutoff
-```
-
-The definition is "a customer inside an ownership group that contains a defaulted member, so its risk exceeds its own record," parameterized by the Ownership Contagion Threshold (THR-04), a PageRank cutoff of 0.123197. It then returns the clean customers whose propagated risk clears the cutoff, with the ownership chain as the stated reason:
-
-```cypher
-MATCH (thr:Threshold {name: 'Ownership Contagion Threshold'})
-MATCH (c:Customer)-[:OWNED_BY]->(parent:Customer)<-[:OWNED_BY]-(sibling:Customer)
-WHERE c.defaultedPeriod IS NULL
-  AND sibling.defaultedPeriod IS NOT NULL
-  AND c.pagerank >= thr.value
-RETURN c.id AS customerId, c.name AS name, c.segment AS segment,
-       round(c.pagerank, 4) AS pagerank, parent.name AS parent,
-       collect(sibling.name) AS defaultedSiblings
-ORDER BY c.pagerank DESC
-```
+Genie One resolves the governed definition of Ownership Risk from the graph. The definition is "a customer inside an ownership group that contains a defaulted member, so its risk exceeds its own record," parameterized by the Ownership Contagion Threshold (THR-04), a PageRank cutoff of 0.123197. It then returns the clean customers whose propagated risk clears the cutoff, with the ownership chain as the stated reason.
 
 Jade Beverage Distribution (CUST-904) comes back: a platinum account, owned by Kestrel Holdings, whose siblings Marlin Wholesale Drinks and Pelican Beverage Retail both defaulted in 2026-Q2. The propagated risk lit Jade up over the `OWNED_BY` edges even though Jade itself never missed a payment. No filler customer clears the cutoff, because no filler family contains a defaulted member.
 
 ### Beat 4, the exposure
 
-The flag gets a euro figure: Jade's open invoice balance plus its credit line, read from the lakehouse.
-
-```cypher
-MATCH (jade:Customer {id: 'CUST-904'})
-OPTIONAL MATCH (jade)-[:HAS_INVOICE]->(inv:Invoice)
-WHERE inv.status <> 'paid'
-WITH jade, round(sum(inv.amount), 2) AS openBalance
-RETURN jade.name AS name, openBalance,
-       jade.creditLimit AS creditLimit,
-       openBalance + jade.creditLimit AS totalExposure
-```
-
-Result: about 800K EUR (800,448.11) of live exposure, an open balance of 252,448.11 across four open invoices plus a 548,000 credit line. Jade is also a Strategic Account, so the line lands hard: the biggest clean customer is one step away from two companies that just went under.
+The flag gets a euro figure: Jade's open invoice balance plus its credit line, read from the lakehouse. About 800K EUR (800,448.11) of live exposure, an open balance of 252,448.11 across four open invoices plus a 548,000 credit line. Jade is also a Strategic Account, so the line lands hard: the biggest clean customer is one step away from two companies that just went under.
 
 ### Beat 5, the decision
 
@@ -241,19 +150,7 @@ A savvy room will ask whether plain Genie was denied the scores. Show the `gds.p
 
 The two stories are the payoff. The four column-findable terms make the contrast honest by showing what the lakehouse-only engine can govern, so the gap is clearly the two it cannot. Use one as a warm-up if the room needs it.
 
-Ask both engines: "Which suppliers are high-risk?" The lakehouse-only engine has the `riskScore` column but no governed threshold, so it guesses a cutoff, often a top-N or a round number, and can miscount. Genie One reads the governed threshold off the rule:
-
-```cypher
-MATCH (term:BusinessTerm {name: 'High-Risk Supplier'})-[:DEFINED_BY]->(rule:BusinessRule)
-MATCH (thr:Threshold)-[:APPLIES_TO]->(term)
-MATCH (s:Supplier)
-WHERE s.riskScore >= thr.value
-RETURN s.id AS supplierId, s.name AS name, s.riskScore AS riskScore,
-       thr.value AS threshold
-ORDER BY s.riskScore DESC
-```
-
-Every supplier at or above 70, the governed cutoff, consistent no matter who asks. This is the honest baseline: with a column and a governed number, BI can close most of the gap. The two stories are exactly the cases where there is no such column.
+Ask both engines: "Which suppliers are high-risk?" The lakehouse-only engine has the `riskScore` column but no governed threshold, so it guesses a cutoff, often a top-N or a round number, and can miscount. Genie One reads the governed threshold off the rule and returns every supplier at or above 70, the governed cutoff, consistent no matter who asks. This is the honest baseline: with a column and a governed number, BI can close most of the gap. The two stories are exactly the cases where there is no such column.
 
 ## What else Genie One can answer
 
@@ -261,17 +158,7 @@ The knowledge layer answers questions that span definitions, which the fact side
 
 - **Impact analysis.** "If we lower the Late Payment Threshold to 45 days, which terms, rules, and tables change?" A traversal from `Threshold` through `APPLIES_TO`, `DEFINED_BY`, and `EVALUATES` to the affected entities and their Unity Catalog tables.
 - **Policy scope.** "Which policies govern customer data?" Follow `CONSTRAINS` from each `Policy` to its `Entity`. The Credit Risk Policy and the Compliance (KYC) Policy both constrain the Customer entity.
-- **Provenance.** "Show the full lineage behind Jade's Strategic Account label." Walk instance to term to rule to entity to the physical table:
-
-```cypher
-MATCH (c:Customer {id: 'CUST-904'})-[cls:CLASSIFIED_AS]->(term:BusinessTerm)
-MATCH (term)-[:DEFINED_BY]->(rule:BusinessRule)-[:EVALUATES]->(entity:Entity)-[:MAPS_TO]->(ds:DataSource)
-RETURN term.name AS term, cls.reason AS reason, rule.name AS rule,
-       entity.name AS entity, ds.table AS dataSource
-ORDER BY term, entity
-```
-
-Returns the Strategic Account term, the reason recorded on the edge, the Strategic Account Rule, the Customer entity, and the `supplier_risk.customers` table.
+- **Provenance.** "Show the full lineage behind Jade's Strategic Account label." Genie One walks instance to term to rule to entity to the physical table, returning the Strategic Account term, the reason recorded on the edge, the Strategic Account Rule, the Customer entity, and the `supplier_risk.customers` table.
 
 - **Queryable glossary.** The knowledge layer is the catalog. List every governed term and its definition, which threshold parameterizes which term, or which policy owns which rule.
 
