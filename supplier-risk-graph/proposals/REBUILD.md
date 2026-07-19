@@ -7,8 +7,28 @@ the pre-flight section to `DEMO.md`, since those two checks run on every demo da
 
 ## Status
 
-Guards are landed and green: `guard.py`, the structural asserts, the three-legs check, the quarter
-assert, the Story 2 landmine asserts. One guards item is still open, below.
+Guards are landed and green and the routing gate is cleared, so nothing in this section is open.
+`guard.py`, the three-legs check, the quarter assert, the Story 2 landmine asserts, and now the three
+structural asserts.
+
+- [x] **The three structural asserts. Landed, and they were missing rather than green.** An earlier
+      version of this line recorded them as landed alongside the other four. They were not in the
+      code: no forest check, no intermediate-share check, no depth check, and no
+      `MIN_INTERMEDIATE_FRACTION` for the stopping rule to govern, which is the failure mode
+      `CONTRACT.md` section 10 exists to catch. They are now `check_supply_structure` in
+      `generate_data.py`, called from `main` ahead of `check_story1`, with
+      `MIN_INTERMEDIATE_FRACTION`, `MIN_SUPPLY_TIERS` and `MAX_PROBE_TIERS` sitting with the other
+      governed constants. All three pass against the pre-rebuild build, each by a wide margin, and
+      the realized figures print to the build log every run rather than being asserted.
+- **Green here does not mean the topology is healthy, and the margins are the reason to say so.** All
+  three clear comfortably on the build whose betweenness is trivially maximal because Cascade is a cut
+  vertex. They catch star-forest collapse and nothing else, so the rebuild has to keep clearing them
+  while fixing what they cannot see. The depth floor has so much headroom on the background network
+  that it will not bind during the rebuild, and the intermediate share is far enough above its floor
+  that a failure there would signal something badly wrong rather than a near miss.
+- **The RNG stream is unmoved, verified rather than assumed.** The regenerate came back byte-identical
+  across every CSV except the resolved threshold values, which the generator emits empty and `gds.py`
+  writes back, so the pre-rebuild baseline still stands.
 
 - [x] **Run B routing probe. Done, and the gate is cleared: routing is not a defect.** Run B is the
       MAS serving endpoint, which carries the Story 1 Genie space, the Neo4j MCP tools, and a Python
@@ -47,41 +67,60 @@ rather than a dial. It is repeated as a pointer because the loop below is exactl
 violated. If Cascade fails to clear THR-03 twice, check whether the sole-source assert passes and
 escalate. Do not take a third run at the topology.
 
-### Topology proposal, under review, not yet agreed
+### Topology, agreed
 
-The bullets below state what the topology must satisfy without resolving the numbers. Those numbers
-decide whether Cascade clears the percentile, and finding out by building costs one of the two
-permitted iterations, so they get argued here first. Nothing in this block is settled. When it is,
-the numbers move into the bullets and this section goes.
+Cascade stops being the network's only bridge and becomes a genuine narrow waist: it buys feedstock
+from vendors spread across the regional clusters and sells down through intermediate glass processors
+to the five tier-1 bottle makers. It sits between a large upstream population and a large downstream
+one and earns its betweenness by position rather than by being the single cut vertex.
 
-**The sizing fact everything else hangs off.** The network holds the filler suppliers plus the six
-protagonists, and `SUPPLY_CONCENTRATION_PERCENTILE` is set at ninety-five. So the cohort clearing
-THR-03 is roughly the top twentieth of the supplier network by betweenness. Cascade has to land
-inside that band, not at the top of it, and the band is wide enough that a cohort of more than one
-member falls out naturally rather than being arranged.
+**Why the buy side carries the fan-in, which is the load-bearing realism claim.** Betweenness on an
+undirected projection is direction-blind, so fan-in and fan-out contribute identically to the score.
+They are not equally true. Container glass is heavy and cheap to the point that shipping it any
+distance costs more than it is worth, so melting and forming sit close together and a furnace selling
+raw glass across regions is a shaky premise. A furnace buying cullet, sand and soda ash from vendors
+across several regions is simply how furnaces work. Same topology, and the premise stands on its own
+without the score needing it to. Cullet therefore belongs upstream as feedstock rather than between
+the furnace and the bottle makers, which fixes the chain's direction and Cascade's fan-in in one edit.
 
-| Decision | Proposed | Why |
+**Measured before building, not after.** A throwaway simulation over the proposed shape, exact Brandes
+on the undirected projection, many seeds per configuration. It touched no generator code, no CSV and
+no graph, so it spent no part of the two-iteration budget. What it found:
+
+| Question | Answer |
+|---|---|
+| Does cluster count decide whether Cascade clears? | No. Cascade fails to clear at every cluster count from two to six when it sits at the end of the chain. This was the number the first draft of this proposal argued about, and it was the wrong one. |
+| What does decide it? | Cascade's fan-in across clusters, and it is a sharp threshold rather than a gradient. |
+| Is Cascade still a cut vertex? | No, at every fan-in tested. Removing it leaves the network in one component. |
+| Does chain depth change the score? | No. One processor tier and two behave the same, so depth is a staging decision. |
+
+| Decision | Agreed | Why |
 |---|---|---|
-| Regional clusters | Four | Two is the current cut-vertex shape. Four gives six cluster pairs to bridge, so no single supplier separates the graph, while still leaving each cluster thick enough that betweenness has a real distribution inside it. |
-| Inter-cluster bridges | Six to eight, every one a different supplier | Enough to cover most cluster pairs. Spreading them across distinct suppliers is what stops one bridge inheriting the maximal betweenness Cascade is being moved away from. |
-| Bridge commodities | Freight, equipment, and ingredients, never glass | Required by the bullet below. Three groups rather than one so the exposure measure has several places to leak and commodity scoping is doing visible work. |
-| Intermediate glass subcategories | Two: `glass cullet` and `container glass` | Real tiers between a furnace and a bottle maker. Two is the minimum that gives the sub-tier its own cohort while keeping the chain shallow. |
-| Sub-tier vendors | Three, each feeding one or two of the tier-1 bottle makers | Convergence the room can read. One vendor would recreate a cut vertex one tier down. |
-| Other raw-glass furnaces | Three or four, feeding the other units' bottle makers | This is what makes `WHERE subcategory = 'raw glass'` return a cohort instead of Cascade alone, and what makes the other units genuinely independent rather than merely unlinked. |
+| Regional clusters | Four | Measured as not load-bearing for the score, so this is chosen for plausibility and for giving each cluster enough members to hold a real internal distribution. |
+| Inter-cluster bridges | Six to eight, every one a different supplier | Covers most cluster pairs so no single supplier separates the graph. Distinct suppliers stop one bridge inheriting the score Cascade is being moved away from. |
+| Bridge commodities | Freight, equipment and ingredients, never glass | Keeps the commodity-scoped exposure measure leak-free while the background stays structurally rich. |
+| Cascade's feedstock fan-in | Six vendors, spread across the clusters | Four clears every seed and two clears fewer than half, so four sits close to the fragile edge. Six buys reseed headroom and is no less plausible for a furnace's feedstock base. |
+| Intermediate processor tiers | One, unless the room needs the extra realism | Costs nothing in score either way, so it is decided on whether Beat 3's convergence stays legible on screen. |
+| Rival furnaces | Three or four, feeding the other units' bottle makers | Makes the raw-glass subcategory return a real cohort, and makes the other four units genuinely protected rather than merely unlinked. |
 
-**The risk to name now rather than at iteration two.** Bridges must be non-glass, so Cascade's
-betweenness comes from the glass chain alone while the background network is deliberately built to be
-structurally rich. Those pull in opposite directions and the honest possibility is that Cascade lands
-below the percentile on the first build. If that happens the fix must change which structural
-relationship is true, for example a chain too shallow to accumulate path counts or a background too
-thin to spread betweenness. If the only available fix is nudging bridge counts or link counts until
-Cascade clears, that is the banned bar wearing new clothes: stop, report, and do not spend the second
-iteration on it.
+**Cascade ranks first at the agreed fan-in, and that is permitted.** The contract requires the cohort
+to have more than one member, and it holds at nine across every configuration tested. `assert_betweenness`
+reports the ranking and does not assert who wins. The original objection was never that Cascade ranks
+first, it was that it ranked first *because it was the only bridge*, which is trivially true and
+invites a fair question from the room. The cut-vertex test above is what separates those two, and it
+is the check to re-run against the real build rather than trusting the simulation.
 
-**`MIN_INTERMEDIATE_FRACTION` does not exist yet.** The stopping rule above and `CONTRACT.md` both
-govern it as though it were in the generator, and it is not in the code. `simplified-plan.md` records
-the intended floor on how many suppliers appear as intermediates rather than as endpoints. Creating
-it is rebuild work with no checkbox, so it gets one when this proposal is agreed.
+**The stopping rule still governs, and the simulation does not suspend it.** The model wired clusters
+as a chain plus random chords, which is not the generator, so treat the ranks as directional and the
+cut-vertex result as the robust finding. If the real build has Cascade below the percentile, the fix
+must change which structural relationship is true. If the only available fix is nudging fan-in or
+bridge counts until Cascade clears, that is the banned bar wearing new clothes: stop, report, and do
+not spend the second iteration on it.
+
+**`MIN_INTERMEDIATE_FRACTION` now exists,** with the floor `simplified-plan.md` intended, so the
+stopping rule above governs a constant that is actually in the generator. It landed with the other two
+structural asserts rather than waiting on this proposal, because a guard proven green on known-good
+data is what makes a later failure unambiguously the data's fault rather than the check's.
 
 ### Generator, `make_supply_relationships`
 
@@ -108,7 +147,14 @@ sub-tier to Cascade, and the other units' glass suppliers do not. That is the en
       intended behavior, not a regression.
 - [ ] **Real intermediate subcategories for the sub-tier,** not raw glass doing double duty as both
       Cascade's peers and its customers. Double duty breaks the cohort check, since `WHERE
-      subcategory = 'raw glass'` is supposed to return other furnaces.
+      subcategory = 'raw glass'` is supposed to return other furnaces. The processor tier sits
+      downstream of the furnace, so name it for what it makes, `container glass` being the obvious
+      one. Cullet is not a candidate here: the agreed topology puts it upstream as feedstock, which
+      is where it belongs physically and where it does the fan-in work.
+- [ ] **The feedstock tier is glass too, and it is easy to forget.** Cascade's feedstock vendors are
+      what give it the fan-in the score depends on, so if they are not in `COMMODITY_SUBCATEGORIES`
+      the paths through Cascade stop being commodity-carrying at exactly the point the story turns
+      on. Cullet, sand and soda ash all belong in the `glass` entry alongside the processor tier.
 - [ ] **Keep the glass chain shallow.** Cascade to sub-tier to tier-1 to business unit, so Beat 3's
       convergence paths stay legible on screen. The four-tier assert is cleared by the background
       network, which is also what gives betweenness a real distribution.
