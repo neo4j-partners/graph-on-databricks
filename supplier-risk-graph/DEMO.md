@@ -1,289 +1,300 @@
 # Demo walkthrough
 
-This walkthrough assumes the one-time setup in the [`README.md`](README.md) is done: the data is generated, Neo4j is loaded, the GDS analytics have run, the Unity Catalog tables are uploaded, and the Genie space is created. It walks the six validation questions and then the Genie flow that consumes the graph's semantics.
+This walkthrough assumes the one-time setup in the [`README.md`](README.md) is done: the data is generated, Neo4j is loaded, the GDS analytics have run, the Unity Catalog tables are uploaded, and the Genie space is created with the two gold tables kept out of it.
 
-The questions build in graph value:
+## What the demo proves
 
-- **Q1 to Q3:** definition lookups. The threshold and the definition come from the knowledge layer.
-- **Q4 to Q6:** add multi-hop provenance across both layers, returning the reasoning alongside the result.
-- **Two analytics passes:** find what the flat rules cannot. One is a supplier-risk exposure aggregation for Q4; the other is a Graph Data Science algorithm, kNN customer similarity, for Q5 and Q6.
+Two engines answer the same question over the same data:
 
-Each query resolves its definition in the knowledge layer and pulls its facts from the mirrored instance data. Thresholds are read from the graph, never hardcoded. Graph properties and the instance tables use camelCase, so the Cypher below runs unchanged against either side. See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the full label, relationship, and property model.
+- **Genie Agent (lakehouse-only):** a Databricks Genie space scoped to the `supplier_risk` schema. It reads the raw instance tables and nothing else.
+- **Genie One (Genie plus the graph):** the same Genie Agent under a supervisor that can also call a read-only Neo4j MCP server over the knowledge graph.
 
-## Note on Cypher Functions: a quick primer
+The demo runs two stories. In each, the lakehouse-only engine reads every column correctly and still gets the answer wrong, because the risk is a shape in the connections, not a value in a column. Genie One resolves the governed definition from the graph, walks the connections, and flags what the columns cannot show.
 
-A few functions appear repeatedly:
+### The honesty framing
 
-- `sum(...)`, `round(...)`, `size(...)` do what their names suggest.
-- `collect(...)` gathers many rows into a single list, the graph way of grouping child rows under a parent.
-- `[0..3]` slices the first three elements off a list.
-- `all(x IN list WHERE ...)` is true only when every element passes the test.
-- `EXISTS { (pattern) }` is true when that sub-pattern exists at all, a cheap "is there at least one" check without pulling the rows back.
+Never claim SQL cannot express these traversals. A Databricks audience knows recursive CTEs exist. The defensible claims are narrower and true:
 
-## The six questions
+- No lakehouse column governs what "single point of failure" or "same ownership group" means. The definition lives in the graph.
+- The two graph-native signals, supplier betweenness and ownership PageRank, are graph metrics BI cannot compute from the raw tables at all. Their governing cutoffs are governed values in the graph, never a column a BI tool could sort on.
+- Asked a plain question, Genie Agent groups by the obvious column and answers from it. It does not spontaneously write the multi-tier convergence query or the transitive ownership walk that surfaces the real risk.
 
-Each query resolves its definition in the knowledge layer and pulls its facts from the mirrored instance data. Thresholds are read from the graph, never hardcoded. The queries are grouped by how much graph they use:
+### The five-beat arc
 
-- **First three:** look up a governed definition.
-- **Next three:** traverse across both layers for provenance.
-- **Extensions at the end:** find what the rules alone miss.
+Both stories run the same five beats, so the audience learns the rhythm on story 1 and feels it confirm on story 2:
 
-### Definitions live in the graph (Q1 to Q3)
+1. **The ask:** one natural question, put to both engines.
+2. **The miss:** the lakehouse-only engine answers from the columns, correctly, and gets it wrong.
+3. **The flag:** Genie One shows the structure, one picture the tables cannot draw.
+4. **The exposure:** the flag gets a euro figure, computed from the same lakehouse data.
+5. **The decision:** the recommended action, handed to the room as a live choice.
 
-The first three questions are definition lookups. The threshold and the definition come from the knowledge layer, so the answer stays consistent no matter who asks it, instead of being baked into hardcoded SQL.
+Both engines write their own queries; the presenter types a question, and Genie or Genie One generates the SQL or Cypher. This script gives the questions and the talking points, not queries to paste. Graph properties and the instance tables use camelCase, so the same names line up on both sides. See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the full label, relationship, and property model.
 
-#### Q1 — Unreconciled revenue above the materiality threshold, per business unit
+## Story 1: the hidden glassworks
 
-**Plain English:** "Which business units have enough unmatched revenue above the materiality threshold that we'd better take a look at? And what is the materiality threshold currently set as?"
+Five bottle suppliers look independent and safe. All five secretly buy their glass from the same hidden glassworks, so if that one furnace fails the enterprise cannot bottle its product.
 
-Sums unreconciled revenue per business unit and keeps only the units whose total exceeds the Materiality Threshold read from the Threshold node. Backed by rule RULE-05, term "Unreconciled Revenue" (TERM-05), and Threshold "Materiality Threshold" (THR-01, 100000 EUR). Facts come from the `revenue_entries` table via `RevenueEntry`.
+```text
+              tier 1 glass bottle suppliers (all clean scores)
+              +--> Harbor Bottling Supply --+
+              +--> Summit Glass Packaging --+
+ Americas ----+--> Ironbridge Containers ---+--> Cascade Glassworks
+              +--> Clearwater Bottles ------+    (hidden tier 2, raw glass)
+              +--> Aurora Packaging Co -----+
 
-```cypher
-MATCH (thr:Threshold {name: 'Materiality Threshold'})
-MATCH (bu:BusinessUnit)-[:RECOGNIZES]->(re:RevenueEntry {reconciled: false})
-WITH bu, thr.value AS threshold, sum(re.amount) AS unreconciledTotal
-WHERE unreconciledTotal > threshold
-RETURN bu.id AS businessUnitId, bu.name AS name,
-       round(unreconciledTotal, 2) AS unreconciledTotal, threshold
-ORDER BY unreconciledTotal DESC
+ arrows read "buys from"; the SUPPLIES edges point the opposite way
+
+ BI sees:    five independent bottle suppliers, diversified
+ Graph sees: every bottle traces back to one hidden furnace
 ```
 
-Essentially it grabs the materiality threshold node so we have the number to compare against. Then follow every business unit out to the revenue entries it recognizes, keeping only the unreconciled ones, and add up their amounts per business unit. Keep the business units whose unreconciled total is over the threshold, and sort the biggest first.
+### Beat 1, the ask
 
-Why the graph: materiality is a governed threshold node rather than a number buried in a query, so finance owns it and every answer stays consistent.
+Put to both engines:
 
-Expected: 2 units, BU-04 Asia Pacific (189924.86) and BU-02 Southern Europe (175803.01).
+> "How diversified is our glass bottle supply for the Americas, and what is our single biggest point of failure?"
 
-#### Q2 — Customers with open KYC compliance findings
+### Beat 2, the miss
 
-**Plain English:** "Which customers have open KYC compliance findings that we still need to clear? And which policy defines what KYC covers?"
+The lakehouse-only engine groups suppliers by the `subcategory` column and reports five glass-bottle suppliers feeding the Americas, all with clean risk scores. A correct read of every column, and the wrong answer. The five rows that come back:
 
-- **What it does:** starts at the KYC Policy, walks to the Customer entity it constrains, follows that entity to the mirrored `Customer` instances, and keeps the ones with an open KYC finding.
-- **Backed by:** policy "KYC Policy" (POL-01), which CONSTRAINS the Customer entity (ENT-01).
-- **Scope note:** KYC constrains the Customer *entity* and is operationalized through `ComplianceFinding` records, not a business rule, so it `GOVERNS` no rule. The Platinum, Strategic Account, and Risky Customer rules also evaluate the Customer entity, but they are commercial and credit definitions, not part of the KYC policy. Read `(:Policy)-[:GOVERNS]->(:BusinessRule)` to see what a policy operationalizes rather than inferring it from the shared entity.
-- **Facts from:** `customers` and `compliance_findings`.
-- **Where the findings come from:** the compliance findings are synthetic demo data, not real regulatory filings. `generate_data.py` deterministically selects a 6-customer KYC cohort from a fixed seed, which includes the first at-risk strategic account, and gives each customer one or two findings of `type: KYC, status: open`. Those rows land in the `compliance_findings` table (DS-07), and the loader mirrors them into Neo4j as `ComplianceFinding` nodes linked to each customer by `HAS_FINDING`. The cohort is sized so Q2 returns exactly 6 customers.
+| supplierId | name | riskScore |
+|---|---|---|
+| SUP-903 | Summit Glass Packaging | 18 |
+| SUP-904 | Ironbridge Containers | 18 |
+| SUP-905 | Clearwater Bottles | 30 |
+| SUP-906 | Aurora Packaging Co | 32 |
+| SUP-902 | Harbor Bottling Supply | 37 |
 
-```cypher
-MATCH (pol:Policy {name: 'KYC Policy'})-[:CONSTRAINS]->(entity:Entity)-[:REALIZED_AS]->(c:Customer)
-MATCH (c)-[:HAS_FINDING]->(f:ComplianceFinding {type: 'KYC', status: 'open'})
-RETURN c.id AS customerId, c.name AS name, collect(f.id) AS openKycFindings
-ORDER BY c.id
-```
+Five names, five clean scores, so the read is "well diversified." The `supply_relationships` table is in the space, so the raw links are visible, but nothing labels Cascade as critical and the engine does not invent the multi-tier convergence join that would find it.
 
-Start at the KYC Policy, walk to the entity it constrains, then out to the real customers that entity stands for. From each of those customers, follow the findings and keep only the open KYC ones. Return each customer once, with the list of their open findings gathered together.
+### Beat 3, the flag
 
-Why the graph: the policy is connected to the data it governs, so the query starts from the policy itself rather than from a table name.
-
-Expected: 6 customers, CUST-016, CUST-017, CUST-024, CUST-040, CUST-067, CUST-080.
-
-#### Q3 — Platinum customers ranked by upsell score
-
-**Plain English:** "Which of our platinum customers are the best bets to sell more to, ranked by upsell score? And how is a platinum customer defined?"
-
-Returns platinum-segment customers ordered by upsell score. Backed by term "Platinum Customer" (TERM-01) and rule RULE-01 (`customer.segment = 'platinum'`). Facts come from `customers`, including the derived `upsellScore` ML feature.
+Genie One first resolves the governed definition of a Critical Supplier from the graph:
 
 ```cypher
-MATCH (c:Customer {segment: 'platinum'})
-RETURN c.id AS customerId, c.name AS name, c.upsellScore AS upsellScore
-ORDER BY c.upsellScore DESC
+MATCH (term:BusinessTerm {name: 'Critical Supplier'})-[:DEFINED_BY]->(rule:BusinessRule)
+MATCH (thr:Threshold)-[:APPLIES_TO]->(term)
+RETURN term.definition AS definition, rule.expression AS rule,
+       thr.name AS threshold, thr.value AS cutoff
 ```
 
-Find the customers whose segment is platinum, and list them highest upsell score first.
+The definition is "the narrowest bridge on a business unit's multi-tier supply paths," parameterized by the Supply Concentration Threshold (THR-03), a betweenness cutoff of 6.5. It then walks the multi-tier chain into the Americas and collapses the five bottle suppliers onto their shared source:
 
-Why the graph: `upsellScore` is an ML feature engineered in Databricks. The graph consumes it and joins it to the governed definition of a platinum customer, so feature engineering stays in the lakehouse while the definition stays governed.
+```cypher
+MATCH (bu:BusinessUnit {name: 'Americas'})
+MATCH (tier2:Supplier)-[:SUPPLIES]->(tier1:Supplier {subcategory: 'glass bottles'})-[:SUPPLIES]->(bu)
+WITH tier2, count(DISTINCT tier1) AS bottleSuppliersReached,
+     collect(DISTINCT tier1.name) AS throughSuppliers
+WHERE bottleSuppliersReached >= 2
+RETURN tier2.id AS supplierId, tier2.name AS name,
+       tier2.subcategory AS subcategory, tier2.riskScore AS riskScore,
+       tier2.betweenness AS betweenness,
+       bottleSuppliersReached, throughSuppliers
+ORDER BY tier2.betweenness DESC
+```
 
-Expected: 15 customers, led by CUST-065 Orchid Retail (100), CUST-019 Alder Drinks Co (99), CUST-011 Ridgeline Trading (98).
+One row comes back: Cascade Glassworks (SUP-901), raw glass, riskScore 65, reaching all five bottle suppliers into the Americas. Its precomputed betweenness is the strict maximum in the supplier network, so it is the one node every Americas bottle path runs through. Applying the governed cutoff confirms it is the only Critical Supplier:
 
-### Multi-hop provenance and explainability (Q4 to Q6)
+```cypher
+MATCH (thr:Threshold {name: 'Supply Concentration Threshold'})
+MATCH (s:Supplier)
+WHERE s.betweenness >= thr.value
+RETURN s.id AS supplierId, s.name AS name,
+       s.betweenness AS betweenness, thr.value AS cutoff
+ORDER BY s.betweenness DESC
+```
 
-These three questions answer the deeper ask: not just "return the rows" but "explain which definitions and data sources were used". Each traversal reaches across the two layers and returns the reasoning alongside the result.
+Cascade clears the cutoff; no other supplier does. Its own risk score of 65 sits below the 70 High-Risk threshold, so no score sort would ever surface it.
 
-#### Q4 — High-risk suppliers
+### Beat 4, the exposure
 
-**Plain English:** "Which suppliers are risky enough that we should worry about relying on them? And what is the supplier risk threshold currently set as?"
+The flag gets a euro figure: the Americas' recognized revenue for the most recent quarter, read from the same lakehouse data through the graph.
 
-Reads the supplier risk threshold from the rule behind the High-Risk Supplier term, then returns suppliers at or above it. Backed by rule RULE-03 and term "High-Risk Supplier" (TERM-03); the threshold of 70 is stored on the rule and also as Threshold "Supplier Risk Threshold" (THR-02). Facts come from `suppliers`.
+```cypher
+MATCH (bu:BusinessUnit {name: 'Americas'})-[:RECOGNIZES]->(re:RevenueEntry)
+WHERE re.period IN ['2026-04', '2026-05', '2026-06']
+RETURN bu.name AS businessUnit,
+       round(sum(re.amount), 2) AS lastQuarterRevenue
+```
+
+Result: about 4.2M EUR (4,222,032.81) of Americas revenue for 2026-Q2 sits behind this one hidden glassworks. Plain BI can read the same revenue, but it cannot tie a single euro to a supplier it cannot see.
+
+### Beat 5, the decision
+
+Qualify a second glass source to protect a 4.2M-EUR-per-quarter flow. The rough cost of a second source is presenter framing on a slide, not a data answer. Genie One's data answer ends at the flag and the exposure.
+
+### Graph mechanics
+
+A variable-length traversal walks the multi-tier chain. `SUPPLIES` points from a supplier toward what it feeds, so the path is `(Cascade)-[:SUPPLIES]->(bottle supplier)-[:SUPPLIES]->(Americas)`. The one GDS piece is `gds.betweenness`, precomputed by `gds.py` as a `betweenness` property on every Supplier node, confirming Cascade as the narrowest bridge. The cutoff THR-03 is set from the score distribution so only Cascade clears it.
+
+## Story 2: the clean payer in a bad family
+
+A customer pays every bill on time, yet the family that owns it also owns two companies that already went bankrupt, so it is far riskier than its own record shows.
+
+```text
+                      Kestrel Holdings
+                     /       |        \
+                OWNED_BY  OWNED_BY  OWNED_BY
+                   /         |         \
+    Marlin Wholesale  Pelican Beverage  Jade Beverage
+        Drinks            Retail        Distribution
+      DEFAULTED         DEFAULTED     (spotless record)
+
+ BI sees:    an on-time payer, nothing to flag
+ Graph sees: two defaults one hop away, flag it
+```
+
+### Beat 1, the ask
+
+Put to both engines:
+
+> "Which customers should credit review look at next?"
+
+### Beat 2, the miss
+
+The lakehouse-only engine returns the late payers, the customers more than 60 days late on each of their last three invoices. Jade Beverage Distribution is nowhere on the list. Its own payment record is spotless.
+
+```sql
+WITH ranked AS (
+  SELECT i.customerId, i.daysLate,
+         ROW_NUMBER() OVER (PARTITION BY i.customerId ORDER BY i.issueDate DESC) AS rn
+  FROM invoices i
+)
+SELECT customerId
+FROM ranked
+WHERE rn <= 3
+GROUP BY customerId
+HAVING COUNT(*) = 3 AND MIN(daysLate) > 60
+ORDER BY customerId;
+```
+
+Result: 15 delinquent customers. Jade (CUST-904) is not among them, because it is never late. A correct read of every invoice, and it misses the account credit review should worry about most.
+
+### Beat 3, the flag
+
+Genie One resolves the governed definition of Ownership Risk from the graph:
+
+```cypher
+MATCH (term:BusinessTerm {name: 'Ownership Risk'})-[:DEFINED_BY]->(rule:BusinessRule)
+MATCH (thr:Threshold)-[:APPLIES_TO]->(term)
+RETURN term.definition AS definition, rule.expression AS rule,
+       thr.name AS threshold, thr.value AS cutoff
+```
+
+The definition is "a customer inside an ownership group that contains a defaulted member, so its risk exceeds its own record," parameterized by the Ownership Contagion Threshold (THR-04), a PageRank cutoff of 0.123197. It then returns the clean customers whose propagated risk clears the cutoff, with the ownership chain as the stated reason:
+
+```cypher
+MATCH (thr:Threshold {name: 'Ownership Contagion Threshold'})
+MATCH (c:Customer)-[:OWNED_BY]->(parent:Customer)<-[:OWNED_BY]-(sibling:Customer)
+WHERE c.defaultedPeriod IS NULL
+  AND sibling.defaultedPeriod IS NOT NULL
+  AND c.pagerank >= thr.value
+RETURN c.id AS customerId, c.name AS name, c.segment AS segment,
+       round(c.pagerank, 4) AS pagerank, parent.name AS parent,
+       collect(sibling.name) AS defaultedSiblings
+ORDER BY c.pagerank DESC
+```
+
+Jade Beverage Distribution (CUST-904) comes back: a platinum account, owned by Kestrel Holdings, whose siblings Marlin Wholesale Drinks and Pelican Beverage Retail both defaulted in 2026-Q2. The propagated risk lit Jade up over the `OWNED_BY` edges even though Jade itself never missed a payment. No filler customer clears the cutoff, because no filler family contains a defaulted member.
+
+### Beat 4, the exposure
+
+The flag gets a euro figure: Jade's open invoice balance plus its credit line, read from the lakehouse.
+
+```cypher
+MATCH (jade:Customer {id: 'CUST-904'})
+OPTIONAL MATCH (jade)-[:HAS_INVOICE]->(inv:Invoice)
+WHERE inv.status <> 'paid'
+WITH jade, round(sum(inv.amount), 2) AS openBalance
+RETURN jade.name AS name, openBalance,
+       jade.creditLimit AS creditLimit,
+       openBalance + jade.creditLimit AS totalExposure
+```
+
+Result: about 800K EUR (800,448.11) of live exposure, an open balance of 252,448.11 across four open invoices plus a 548,000 credit line. Jade is also a Strategic Account, so the line lands hard: the biggest clean customer is one step away from two companies that just went under.
+
+### Beat 5, the decision
+
+Cut Jade's credit line and require prepayment now, capping the exposure at about 800K EUR.
+
+### Graph mechanics
+
+Personalized `gds.pageRank`, seeded on the two defaulted siblings and propagated over the `OWNED_BY` edges, precomputed by `gds.py` as a `pagerank` property on every Customer node. Risk flows from the siblings up to the shared parent and back down onto Jade. The cutoff THR-04 is set from the score distribution so Jade clears it and no filler family does.
+
+## Why the arc works
+
+- **The miss is the proof.** No prediction, no proof by clock. The lakehouse-only engine reading every column correctly and still missing the risk is the whole argument, demonstrated live, twice.
+- **Beat 5 stays open on purpose.** Handing the room a live decision with a euro figure attached converts the contrast into urgency, and it costs nothing to build.
+- **Genie One's answers read like actions.** It composes its reason from the path itself and closes with the recommended action, something a risk officer acts on rather than provenance trivia.
+
+## The fairness rebuttal: show the GDS run once
+
+A savvy room will ask whether plain Genie was denied the scores. Show the `gds.py` run once, about 30 seconds, then make the rebuttal: BI cannot compute betweenness or personalized PageRank from the raw tables at all. They are graph metrics, not columns.
+
+- Betweenness and PageRank are precomputed as Neo4j node properties (`Supplier.betweenness`, `Customer.pagerank`) and never run live on stage.
+- Neither property is ever synced to Delta. Writing them into a gold table would recreate the exact write-back leakage the sharpened demo removes, and the lakehouse-only engine would tie again.
+- The two graph-native thresholds are set from the score distributions after the algorithms run, so Cascade clears the concentration cutoff and Jade clears the contagion cutoff while filler entities do not.
+
+## The background contrast: governed definitions the columns can carry
+
+The two stories are the payoff. The four column-findable terms make the contrast honest by showing what the lakehouse-only engine can govern, so the gap is clearly the two it cannot. Use one as a warm-up if the room needs it.
+
+Ask both engines: "Which suppliers are high-risk?" The lakehouse-only engine has the `riskScore` column but no governed threshold, so it guesses a cutoff, often a top-N or a round number, and can miscount. Genie One reads the governed threshold off the rule:
 
 ```cypher
 MATCH (term:BusinessTerm {name: 'High-Risk Supplier'})-[:DEFINED_BY]->(rule:BusinessRule)
+MATCH (thr:Threshold)-[:APPLIES_TO]->(term)
 MATCH (s:Supplier)
-WHERE s.riskScore >= rule.threshold
+WHERE s.riskScore >= thr.value
 RETURN s.id AS supplierId, s.name AS name, s.riskScore AS riskScore,
-       rule.threshold AS threshold
+       thr.value AS threshold
 ORDER BY s.riskScore DESC
 ```
 
-In plain English: walk from the High-Risk Supplier term to the rule that defines it, and read the threshold number off that rule. Then keep every supplier whose risk score is at least that number, riskiest first.
+Every supplier at or above 70, the governed cutoff, consistent no matter who asks. This is the honest baseline: with a column and a governed number, BI can close most of the gap. The two stories are exactly the cases where there is no such column.
 
-Why the graph: the rule and its threshold are data, so procurement can change the policy without anyone rewriting a query.
+## What else Genie One can answer
 
-Written back at load time: `load.py` evaluates this same rule and writes a `CLASSIFIED_AS` edge from each qualifying supplier to the High-Risk Supplier term, with the threshold comparison recorded as the edge `reason`. Expanding the term in Neo4j Browser reaches its 5 suppliers, and the label flows into the `classifications` gold table with `source` of `rule`.
+The knowledge layer answers questions that span definitions, which the fact side finds awkward or cannot express.
 
-Expected: 5 suppliers, SUP-024 (94), SUP-010 (90), SUP-003 (86), SUP-007 (85), SUP-001 (77).
-
-#### Q5 — Risky customers: more than 60 days late on each of their last 3 invoices
-
-**Plain English:** "Which customers have been more than the late-payment threshold days late on each of their last three invoices? And what is the late payment threshold currently set as?"
-
-For each customer, takes the three most recent invoices by issue date and keeps only customers whose all three are more than the Late Payment Threshold days late. Backed by rule RULE-04, term "Risky Customer" (TERM-04), and Threshold "Late Payment Threshold" (THR-03, 60). Facts come from `invoices`.
+- **Impact analysis.** "If we lower the Late Payment Threshold to 45 days, which terms, rules, and tables change?" A traversal from `Threshold` through `APPLIES_TO`, `DEFINED_BY`, and `EVALUATES` to the affected entities and their Unity Catalog tables.
+- **Policy scope.** "Which policies govern customer data?" Follow `CONSTRAINS` from each `Policy` to its `Entity`. The Credit Risk Policy and the Compliance (KYC) Policy both constrain the Customer entity.
+- **Provenance.** "Show the full lineage behind Jade's Strategic Account label." Walk instance to term to rule to entity to the physical table:
 
 ```cypher
-MATCH (thr:Threshold {name: 'Late Payment Threshold'})
-MATCH (c:Customer)-[:HAS_INVOICE]->(inv:Invoice)
-WITH c, thr.value AS lateThreshold, inv
-ORDER BY inv.issueDate DESC
-WITH c, lateThreshold, collect(inv)[0..3] AS lastThree
-WHERE size(lastThree) = 3
-  AND all(i IN lastThree WHERE i.daysLate > lateThreshold)
-RETURN c.id AS customerId, c.name AS name,
-       [i IN lastThree | {invoiceId: i.id, daysLate: i.daysLate}] AS lastThree
-ORDER BY c.id
-```
-
-Read the late-payment threshold, then for each customer pull all their invoices sorted newest first, and take just the top three into a list. Drop any customer without a full three, then keep only the customers where all three of those recent invoices were more than the threshold days late. Return each surviving customer with those three invoices and how late each was.
-
-Why the graph: this is a per-customer, ordered, last-three-of-N pattern. It reads cleanly in one traversal and returns the supporting invoices, not just the verdict.
-
-Written back at load time: `load.py` evaluates this same rule and writes a `CLASSIFIED_AS` edge from each of these customers to the Risky Customer term, recording the reason on the edge. These rule-based edges carry no `source` and land in the `classifications` gold table as `source` of `rule`, distinct from the `source` of `gds` edges the kNN pass adds to the same term.
-
-Expected: 5 customers, CUST-015, CUST-020, CUST-036, CUST-067, CUST-091.
-
-#### Q6 — Strategic accounts at risk
-
-**Plain English:** "Which strategic accounts are at risk on every dimension — declining profitability, high churn risk, at least one overdue invoice, and at least one open compliance finding? And how is a strategic account defined?"
-
-A strategic account that is also trending down on every risk dimension: profitability declining, churn risk high, at least one overdue invoice, and at least one open compliance finding. Backed by term "Strategic Account" (TERM-02), whose `CLASSIFIED_AS` edges are pre-planted. Facts come from `customers`, `invoices`, and `compliance_findings`.
-
-```cypher
-MATCH (c:Customer)-[:CLASSIFIED_AS]->(:BusinessTerm {name: 'Strategic Account'})
-WHERE c.profitabilityTrend = 'declining' AND c.churnRisk = 'high'
-  AND EXISTS { (c)-[:HAS_INVOICE]->(:Invoice {status: 'overdue'}) }
-  AND EXISTS { (c)-[:HAS_FINDING]->(:ComplianceFinding {status: 'open'}) }
-RETURN c.id AS customerId, c.name AS name,
-       c.profitabilityTrend AS profitabilityTrend, c.churnRisk AS churnRisk
-ORDER BY c.id
-```
-
-Start with the customers already classified as Strategic Accounts. Keep the ones whose profitability is declining and whose churn risk is high, and that also have at least one overdue invoice and at least one open compliance finding. All four conditions, expressed as one pattern.
-
-Why the graph: strategic, declining, high churn, overdue, and an open finding, all checked in a single readable pattern.
-
-Expected: 3 customers, CUST-019, CUST-065, CUST-067. CUST-067 also appears in Q2 and Q5; the cohorts overlap by design.
-
-#### Q6 explanation query — the explainability payoff
-
-For any strategic-at-risk customer, this returns the business terms it is classified as, plus the full lineage from term to backing rule to entity to the real Unity Catalog table. Every answer can be traced from instance to definition to data source.
-
-```cypher
-MATCH (c:Customer {id: 'CUST-019'})-[cls:CLASSIFIED_AS]->(term:BusinessTerm)
+MATCH (c:Customer {id: 'CUST-904'})-[cls:CLASSIFIED_AS]->(term:BusinessTerm)
 MATCH (term)-[:DEFINED_BY]->(rule:BusinessRule)-[:EVALUATES]->(entity:Entity)-[:MAPS_TO]->(ds:DataSource)
-RETURN term.name AS term, cls.reason AS reason,
-       rule.name AS rule, entity.name AS entity, ds.table AS dataSource
+RETURN term.name AS term, cls.reason AS reason, rule.name AS rule,
+       entity.name AS entity, ds.table AS dataSource
 ORDER BY term, entity
 ```
 
-Pick one customer, follow every "classified as" edge to the business terms it carries, and read the reason recorded on each edge. From each term, keep walking the same chain every time: term to the rule that defines it, rule to the entity it evaluates, entity to the physical table it maps to. The result is one row per classification showing what it is, why it applies, and where the data lives.
+Returns the Strategic Account term, the reason recorded on the edge, the Strategic Account Rule, the Customer entity, and the `supplier_risk.customers` table.
 
-For CUST-019 this returns the Platinum Customer and Strategic Account terms, their rules RULE-01 and RULE-02, the Customer entity, and the `supplier_risk.customers` table. This traceability is the core of what the demo proves, and it is what a text or RDF glossary cannot query.
+- **Queryable glossary.** The knowledge layer is the catalog. List every governed term and its definition, which threshold parameterizes which term, or which policy owns which rule.
 
-## The two graph analytics extensions
-
-Q4 is a plain Cypher exposure aggregation; Q5/Q6 is the one genuine GDS algorithm, kNN. Both ran during setup and wrote their results back into the graph, so they join the same provenance story and flow into Unity Catalog. They are deterministic given the fixed-seed data.
-
-### Q4 exposure — supplier risk to business unit exposure
-
-The flat rule finds individually risky suppliers but says nothing about aggregate exposure. `gds.py` aggregates supplier risk over the `Supplier-SUPPLIES->BusinessUnit` edges and writes the mean supplying-supplier risk onto each `BusinessUnit` as `supplierExposureScore`. This result is materialized to the `business_unit_exposure` gold table by `upload.py`.
-
-The flat rule finds the 5 obvious suppliers and misses BU-03:
-
-```cypher
-MATCH (s:Supplier)
-WHERE s.riskScore >= 70
-RETURN s.id AS supplierId, s.name AS name, s.riskScore AS riskScore
-ORDER BY s.riskScore DESC
-```
-
-The mean-exposure aggregation surfaces BU-03 Americas at the top, even though none of its suppliers cross 70:
-
-```cypher
-MATCH (bu:BusinessUnit)
-RETURN bu.id AS businessUnitId, bu.name AS name,
-       bu.supplierExposureScore AS supplierExposureScore
-ORDER BY bu.supplierExposureScore DESC
-```
-
-The first query is the flat rule again, listing suppliers over 70. The second reads the exposure score the analytics pass already wrote onto each business unit and sorts the most exposed first. That score is the average risk of the suppliers feeding a unit, so a unit can rank high even when no single supplier trips the rule.
-
-Expected top result: BU-03 Americas. It is served by 4 mid-risk suppliers with an average risk of 64.2 and no single score over 67, so the flat filter never sees it. Demo line: the rule finds risky suppliers; the graph finds risky exposure.
-
-### Q5 / Q6 similarity — the next risky customers
-
-`gds.py` runs GDS kNN over the payment-behavior features `avgDaysLate`, `overdueShare`, `churnRisk`, and `profitabilityTrend` to build the similarity graph, then classifies the non-flagged customers most similar to the known risky cohort. It writes `CLASSIFIED_AS {source: 'gds', algorithm: 'knn', score, evaluatedAt, reason}` edges from those candidates to the "Risky Customer" term, where `score` is the kNN similarity to the nearest risky member. These flow into the `classifications` gold table via `upload.py`.
-
-```cypher
-MATCH (c:Customer)-[cls:CLASSIFIED_AS {source: 'gds'}]->(:BusinessTerm {name: 'Risky Customer'})
-RETURN c.id AS customerId, c.name AS name,
-       cls.algorithm AS algorithm, cls.score AS score, cls.reason AS reason
-ORDER BY cls.score DESC
-```
-
-This reads back what the algorithm already decided. It finds every "classified as" edge that the GDS pass wrote to the Risky Customer term, and returns those customers with the algorithm name, similarity score, and reason, closest to the risky cohort first.
-
-Expected: 4 candidates, the non-flagged customers the kNN run ranks most similar to the risky cohort. None trips the last-3-invoices rule, but each sits close to the known risky cohort. The specific four emerge from the run rather than a planted list; check the `gds.py` output for the current set. Demo line: rule-based classification finds the ones already defined; GDS finds the next ones.
+The two graph-native terms, Critical Supplier and Ownership Risk, are never pre-planted as `CLASSIFIED_AS` edges. Genie One resolves each from its definition and applies it live using the precomputed betweenness and PageRank properties, so those labels never exist as a materializable row and can never leak into a gold table.
 
 ## Expected results
 
-From `ground_truth.json`, so you can verify a load worked.
+Validated against the generated data, so you can confirm a load and compute worked.
 
-| Question | Result | Count |
-|---|---|---|
-| Q1 unreconciled business units | BU-04, BU-02 | 2 |
-| Q2 open KYC violators | CUST-016, CUST-017, CUST-024, CUST-040, CUST-067, CUST-080 | 6 |
-| Q3 platinum by upsell | led by CUST-065, CUST-019, CUST-011 | 15 |
-| Q4 high-risk suppliers | SUP-024, SUP-010, SUP-003, SUP-007, SUP-001 | 5 |
-| Q5 risky customers | CUST-015, CUST-020, CUST-036, CUST-067, CUST-091 | 5 |
-| Q6 strategic at risk | CUST-019, CUST-065, CUST-067 | 3 |
-| GDS Q4 exposed business unit | BU-03 Americas (top by exposure) | 1 |
+| Check | Result |
+|---|---|
+| Story 1, glass-bottle suppliers into the Americas | 5: SUP-902, SUP-903, SUP-904, SUP-905, SUP-906, all riskScore below 40 |
+| Story 1, Critical Supplier | SUP-901 Cascade Glassworks, riskScore 65, strict betweenness maximum, only supplier over THR-03 (6.5) |
+| Story 1, Americas 2026-Q2 revenue | 4,222,032.81 EUR (about 4.2M) |
+| Story 2, delinquent customers | 15, Jade (CUST-904) not among them |
+| Story 2, Ownership Risk flag | CUST-904 Jade, platinum, owned by CUST-901 Kestrel, siblings CUST-902 and CUST-903 defaulted 2026-Q2, clears THR-04 (0.123197) |
+| Story 2, Jade exposure | 800,448.11 EUR (about 800K): 252,448.11 open plus 548,000 credit |
 
-The GDS Q5/Q6 similarity candidates are not listed here: they emerge from the kNN run rather than a frozen key, so `gds.py` checks only their shape (four non-flagged customers, each near the risky cohort) and prints the current set.
+The exact betweenness and PageRank scores print from the `gds.py` run at setup. The two euro figures come straight from the generated data, not a slide.
 
-## How Genie consumes the graph semantics
+## Genie space and MCP setup
 
-Genie is the consumer of what the graph produces, not a competing answer path.
-
-- **Governed definitions:** the graph supplies the definitions that make Genie answers accurate, cheaper, and explainable.
-- **Write-back:** classifications land in Delta, so Genie answers over gold tables that already carry the graph's meaning.
-- **Meaning, not guesswork:** when a user asks "which business units have material unreconciled revenue" or "who are our high-risk suppliers", the meaning of "material" and "high-risk" lives in the knowledge layer as thresholds and rules, not an ad hoc SQL guess.
-- **Resolved once:** the graph resolves the definition once, points at the real Unity Catalog tables through `MAPS_TO` lineage, and both rule-based and GDS-scored classifications flow back into Delta so Databricks users see the graph value in their own tables.
-
-For the one-time setup that creates and configures the Genie space, see [`README.md`](README.md).
-
-### Sample Genie questions
-
-Asked in the Genie space, these return answers that line up with the Cypher results, because both read from the same governed definitions.
-
-- "Which customers are classified as risky, and what rule or model classified them and why?" Genie reads `classifications` and returns the `source` and `reason`, including the GDS-sourced candidates.
-- "Which business units carry the highest supplier risk exposure, and what business rule categorizes them and why?" Genie reads `business_unit_exposure` and returns BU-03 at the top, matching the GDS result, with the exposure score as the reason.
-- "List our platinum customers ranked by upsell score, and what rule defines a platinum customer?" Matches Q3; Genie returns the ranking and the governed Platinum Customer label from `classifications`.
-- "Which suppliers are high risk, and what rule categorizes them as high-risk and why?" Genie reads the governed `classifications` labels and their `reason` rather than guessing a threshold.
-- "How many strategic accounts have an open compliance finding, and what rule classifies them as strategic accounts?" Genie joins `classifications` (term = Strategic Account) to `customers` on `entity_id = id`, then to `compliance_findings` on `customerId`, and returns the classification `reason`.
-
-### Why the graph makes Genie better
-
-Without the graph, Genie has to infer what "risky" or "material" or "high-risk" means from column names. With the graph, those definitions are governed once, written back into Delta, and Genie answers over them. It is the same Genie, now accurate, consistent, and explainable, and cheaper because the meaning is resolved once in the graph instead of re-derived on every prompt.
-
-The difference is visible in a side-by-side comparison. A "risky customers" question asked against the raw instance tables alone forces Genie to guess a definition. The same question asked against a space that includes `classifications` returns the governed reason and matches the Cypher exactly.
-
-## A multi-agent supervisor over Genie and the graph
-
-Expose the Neo4j instance as an MCP server and a supervisor agent can pair it with the Genie space to answer questions and explain their provenance from the knowledge layer. The two agents have complementary jobs, and the split matches the two layers this demo already builds.
-
-- **Genie agent (facts):** scans, aggregations, and joins over the gold tables. It answers how much, how many, and which rows over `customers`, `invoices`, `business_unit_exposure`, and `classifications`.
-- **Neo4j MCP agent (meaning):** holds what Genie cannot infer from column names. Business term definitions, rule expressions, threshold values, policy scope, and the `MAPS_TO`, `REALIZED_AS`, and `CLASSIFIED_AS` lineage.
-- **Supervisor:** routes and stitches. It resolves the definition in the graph first, hands Genie a precise parameterized query, then asks the graph for the provenance chain behind the answer Genie produced.
-
-An off-the-shelf Neo4j Cypher MCP server exposes read-only, parameterized Cypher as tools, so the MCP layer does not have to be built from scratch. Keep it read-only so the agent cannot mutate the graph.
+For the one-time setup that creates the Genie space and confirms the two gold tables are kept out of it, see [`README.md`](README.md). The two blocks below are the descriptions the supervisor reads to route between the two engines.
 
 ### What to put in the MCP server description
 
@@ -291,16 +302,23 @@ The supervisor decides when to call the graph from the server description alone,
 
 ```text
 This server exposes a Neo4j knowledge graph for the supplier and customer risk
-domain. Use it to resolve governed business definitions and to explain the
-provenance behind an answer. Databricks Genie owns the raw facts and
-aggregations; this graph owns their meaning and lineage.
+domain of a global beverage producer. Use it to resolve governed business
+definitions, to apply the two graph-native definitions that have no lakehouse
+column, and to explain the provenance behind an answer. Databricks Genie owns
+the raw facts and aggregations; this graph owns their meaning and lineage.
 
 Use this server to:
-- Resolve what a business term means before querying facts. Terms: Platinum
-  Customer, Strategic Account, High-Risk Supplier, Risky Customer, Unreconciled
-  Revenue.
-- Read a governed threshold value instead of assuming one. Thresholds:
-  Materiality Threshold, Supplier Risk Threshold, Late Payment Threshold.
+- Resolve what a business term means before querying facts. Terms: Strategic
+  Account, Defaulted Customer, Delinquent Customer, High-Risk Supplier,
+  Critical Supplier, Ownership Risk.
+- Apply the two graph-native terms that no column can express. Critical Supplier
+  is the narrowest bridge on a business unit's multi-tier supply paths, read from
+  the precomputed Supplier.betweenness property. Ownership Risk is a clean
+  customer inside an ownership group that contains a defaulted member, read from
+  the precomputed Customer.pagerank property.
+- Read a governed threshold value instead of assuming one. Thresholds: Supplier
+  Risk Threshold, Late Payment Threshold, Supply Concentration Threshold,
+  Ownership Contagion Threshold.
 - Explain why a record was classified, tracing it to the rule, entity, and
   source table behind it.
 - Answer policy, governance, and impact questions that span definitions.
@@ -319,13 +337,16 @@ Key relationships:
 - (:Policy)-[:CONSTRAINS]->(:Entity): policy scope, the entity a policy governs.
 - (:Policy)-[:GOVERNS]->(:BusinessRule): the rules a policy operationalizes. Read
   this to find a policy's rules; do NOT infer them from a shared Entity. The
-  KYC Policy constrains the Customer entity but governs no rule (it is
-  operationalized through ComplianceFinding records), even though the Platinum,
-  Strategic, and Risky Customer rules also evaluate the Customer entity.
+  Compliance (KYC) Policy constrains the Customer entity but governs no rule (it
+  is operationalized through ComplianceFinding records).
 - (:Entity)-[:MAPS_TO]->(:DataSource): semantic mapping (lineage); DataSource.table
   is the real Unity Catalog table.
+- (:Supplier)-[:SUPPLIES]->(:Supplier): supplier-to-supplier supply, the
+  multi-tier chain. (:Supplier)-[:SUPPLIES]->(:BusinessUnit): a vendor feeds a unit.
+- (:Customer)-[:OWNED_BY]->(:Customer): ownership, child points at parent.
 - (:Customer|:Supplier)-[:CLASSIFIED_AS]->(:BusinessTerm): a classification. The
-  edge carries reason, source of 'rule' or 'gds', algorithm, and score.
+  edge carries reason, evaluatedAt, and ruleVersion. Only the four column-findable
+  terms carry these edges; Critical Supplier and Ownership Risk are resolved live.
 
 To explain any classification, walk:
   instance -[:CLASSIFIED_AS]-> term -[:DEFINED_BY]-> rule
@@ -337,160 +358,98 @@ Conventions:
 - All properties are camelCase.
 - Node ids are stable prefixes: ENT-0x, TERM-0x, RULE-0x, POL-0x, THR-0x, DS-0x,
   CUST-0xx, SUP-0xx, BU-0x.
+- gds.py writes Supplier.betweenness and Customer.pagerank as node properties.
+  These live only in the graph and are never in Unity Catalog.
 - The graph is read-only. Emit read Cypher only, and prefer parameters over
   string interpolation.
 ```
 
 ### What to put in the Genie space description
 
-The supervisor routes fact and count questions to Genie, so its description has to say what Genie owns and, just as important, what it does not. Paste the block below into the Genie space instructions or the tool `description` the supervisor sees.
+The supervisor routes fact and count questions to Genie, so its description has to say what Genie owns and what it does not. Paste the block below into the Genie space instructions or the tool `description` the supervisor sees.
 
 ```text
 This Genie space answers questions over the supplier and customer risk data in
-Unity Catalog schema supplier_risk. Use it for facts and for the governed labels
-the graph wrote back. The Neo4j graph owns definitions, relationships, and
-provenance; this space owns the numbers.
+Unity Catalog schema supplier_risk, for a global beverage producer. Use it for
+facts. The Neo4j graph owns definitions, relationships, and provenance; this
+space owns the numbers.
 
 Use this space to:
-- Return rows, counts, totals, and rankings from a single table: customers by
-  segment, suppliers by risk, invoices by status.
-- Read graph-derived labels from classifications and exposure scores from
-  business_unit_exposure. Prefer these governed tables over recomputing a
-  definition from raw columns.
+- Return rows, counts, totals, and rankings from a single table or a join or
+  two: customers by segment, suppliers by risk, invoices by status, revenue by
+  business unit and period.
 - Apply a threshold the graph already resolved. Pass the concrete value in the
   question.
 
 Do NOT use this space to:
-- Invent what a business term means. If a question depends on material,
-  high-risk, risky, strategic, or platinum, resolve it in the graph first.
-- Trace long provenance chains. A join or two is fine here; anything deeper, or
-  any why-was-this-classified question, belongs to the graph.
+- Invent what a business term means. If a question depends on high-risk,
+  delinquent, strategic, critical, or ownership risk, resolve it in the graph
+  first.
+- Judge diversification or single points of failure from the supply links, or
+  ownership risk from parentCustomerId. Those are graph traversals; send them to
+  the graph.
 
 Tables and joins:
 - Instance tables, primary key id, camelCase columns: customers, suppliers,
-  business_units, invoices, compliance_findings.
-- Foreign keys on the instance tables: invoices.customerId and
-  compliance_findings.customerId join to customers.id; customers.businessUnitId
-  joins to business_units.id.
-- classifications (gold, snake_case): entity_id, entity_type, term, source,
-  algorithm, score, reason, evaluated_at, rule_version. source is 'rule' or
-  'gds'; reason explains each label. Join entity_id back to a customer or
-  supplier id. Use this, not ad hoc heuristics, to decide who is a Risky
-  Customer, High-Risk Supplier, Strategic Account, or Platinum Customer.
-- business_unit_exposure (gold, snake_case): business_unit_id, name,
-  supplier_exposure_score, supplier_count, avg_supplier_risk, max_supplier_risk.
-  Use supplier_exposure_score for aggregate exposure, not raw supplier scores.
+  business_units, invoices, revenue_entries, compliance_findings.
+- supply_relationships (fromSupplierId, toSupplierId): raw supplier-to-supplier
+  links. Visible, but a single point of failure across tiers is a graph question.
+- supplier_business_units (supplierId, businessUnitId): the many-to-many
+  supplier-to-unit bridge.
+- Foreign keys: invoices.customerId and compliance_findings.customerId join to
+  customers.id; customers.businessUnitId and revenue_entries.businessUnitId join
+  to business_units.id; customers.parentCustomerId self-references customers.id.
 
 Conventions:
-- Instance-table columns, including the foreign keys, are camelCase: riskScore,
-  upsellScore, daysLate, issueDate, customerId. The two gold tables are
-  snake_case.
+- All instance-table columns are camelCase: riskScore, subcategory, daysLate,
+  creditLimit, parentCustomerId, defaultedPeriod.
 - The primary key on every instance table is id.
 ```
 
-### Provenance the supervisor can explain
-
-For any answer it can walk the same chain the Q6 explanation query uses and cite each hop:
-
-- **Instance to term:** a `Customer` or `Supplier` is `CLASSIFIED_AS` a `BusinessTerm`, with the `reason` recorded on the edge.
-- **Term to rule:** `BusinessTerm` `DEFINED_BY` `BusinessRule`, the actual expression.
-- **Rule to entity:** `BusinessRule` `EVALUATES` `Entity`.
-- **Entity to source:** `Entity` `MAPS_TO` `DataSource.table`, the real Unity Catalog table the number came from.
-
-So the answer to Q2 is not just "6 customers". It is 6 customers because the KYC Policy POL-01 constrains the Customer entity ENT-01, which maps to `supplier_risk.compliance_findings`, filtered to `type = KYC` and `status = open`.
-
-### What else it can combine from the knowledge layer
-
-- **Definition resolution before querying:** the supervisor asks the graph what "material", "high-risk", or "risky" means, reads the `Threshold` off the rule, and only then queries Genie. Meaning is resolved once, not re-guessed per prompt.
-- **Impact analysis:** because `Threshold` `APPLIES_TO` `BusinessTerm` `DEFINED_BY` `BusinessRule` `EVALUATES` `Entity` `MAPS_TO` `DataSource`, the agent can answer "if I raise the Late Payment Threshold THR-03, which terms, rules, tables, and prior answers change". That traversal has no clean SQL equivalent.
-- **Policy and governance reasoning:** `CONSTRAINS` ties each `Policy` to an `Entity`, so the agent can answer which policies govern customer data or which answers touch a compliance-constrained entity.
-- **Queryable glossary:** the knowledge layer is the catalog. List every governed term and its definition, which thresholds parameterize which terms, or who owns a given number.
-- **Rule versus model provenance:** `CLASSIFIED_AS` carries `source`, `algorithm`, `score`, and `reason`, so the agent can separate policy-flagged accounts from kNN-similar ones and explain each, including the GDS candidates no rule caught.
-- **Multi-hop the fact side finds awkward:** supplier to business unit to customer exposure paths and similarity neighborhoods, the Q4 exposure and Q5/Q6 kNN stories.
-- **Consistency check:** both layers derive from one source, so the supervisor can cross-check Genie's Delta counts against the graph's classification counts and flag drift as a self-verification step.
-
-### Sample supervisor questions
-
-Each of these needs both agents. The graph supplies the definition or the provenance; Genie supplies the facts. All counts were verified against the loaded Aura instance.
-
-- **"Which customers have open KYC findings, and why are they flagged?"** The graph resolves the KYC Policy scope and the provenance chain; Genie returns the finding rows. The answer names policy POL-01, the Customer entity ENT-01, and the `compliance_findings` table. Returns the 6 Q2 customers.
-- **"What does high-risk supplier mean, and who qualifies?"** The graph reads the definition and the Supplier Risk Threshold off RULE-03; Genie scans `suppliers` against that threshold. Meaning is resolved once, not guessed.
-- **"If we lower the Late Payment Threshold to 45 days, which terms, rules, and answers change?"** A pure graph traversal from THR-03 through `APPLIES_TO`, `DEFINED_BY`, and `EVALUATES` to the affected entities and tables. Impact analysis with no clean SQL equivalent.
-- **"Which policies govern customer data?"** The graph follows `CONSTRAINS` from each `Policy` to its `Entity`, returning the KYC Policy over the Customer entity.
-- **"Who is classified as a Risky Customer, and was it a rule or the model?"** The graph reads `CLASSIFIED_AS` with its `source`, `algorithm`, `score`, and `reason`, separating the rule-flagged accounts from the 4 kNN-similar ones.
-- **"Show the full lineage behind CUST-019's Strategic Account label."** The graph walks instance to term to rule to entity to the `supplier_risk.customers` table, the Q6 explanation payoff.
-- **"Which business units carry the highest supplier-risk exposure?"** Genie reads `business_unit_exposure`; the graph explains that the score is the mean supplier risk over `SUPPLIES` edges, surfacing BU-03 that the flat rule misses.
-
-### The dependency that keeps it honest
-
-The provenance is only as trustworthy as the maintained edges.
-
-- **Keep write-back running:** the `classifications` and `business_unit_exposure` tables are what stop Genie and the graph from becoming two sources of truth.
-- **Change rules in both places:** if a rule changes in code, the `BusinessRule.expression` and `Threshold.value` in the graph must change with it, or the explanation will confidently cite the wrong definition.
-
-## Appendix: mapping to the Databricks integration modes
-
-The demo runs one mode, Multi-Hop Native with write-back, because it is offline and self-contained. In production each question would use whichever mode fits its data gravity and hop count. The table below maps each question to the mode it would use.
-
-| Mode | What it means | Where the data sits | Best-fit questions |
-|---|---|---|---|
-| **Virtual** | Neo4j queries Databricks directly, leaving the data in place. | Facts stay in Unity Catalog; the knowledge layer lives in Neo4j. | Q1 to Q3. Definition lookups over large, aggregation-friendly fact tables where the graph adds the governed threshold or term but the heavy scan stays in the lakehouse. |
-| **Federated** | The knowledge layer is native in Neo4j; instance facts are read from Databricks as needed. | Metadata native in Neo4j; facts federated from Unity Catalog. | Q4 and Q5. Rule-plus-threshold questions that traverse a few hops over the knowledge layer while still resolving facts against the warehouse. |
-| **Multi-Hop Native** | Instance data is mirrored into Neo4j; multi-hop and algorithm results are written back to Databricks. | Both layers native in Neo4j; results written back to Delta. | Q6 and the two graph analytics extensions. Deep provenance traversals and graph analytics that are expensive or awkward in SQL, with the classifications written back as gold tables for Genie and BI. |
-
-Per-question summary for the slide:
-
-- Q1, Q2, Q3: **Virtual**. The graph governs the definition; the lakehouse keeps the scan.
-- Q4, Q5: **Federated**. Multi-hop over the knowledge layer, facts from the warehouse.
-- Q6, GDS exposure, GDS similarity: **Multi-Hop Native**. Deep traversal and algorithms in Neo4j, results written back to Delta.
-
-The demo's write-back tables, `classifications` and `business_unit_exposure`, are the Multi-Hop Native story made concrete: graph-derived value landing back in Unity Catalog where Databricks users and Genie already work.
+> **Guardrail.** The two gold tables, `classifications` and `business_unit_exposure`, are produced by the pipeline but must never be added to the Genie space. They materialize the graph's answers into Delta, and adding them re-introduces write-back leakage: the lakehouse-only engine would read the graph's conclusions straight from a column and tie, which is the exact failure this demo is built to expose.
 
 ## Generating a dashboard with Neo4j AI
 
-Neo4j's "Create with AI" dashboard generator builds a dashboard from a prompt and the database schema. Naming the exact labels, relationships, and camelCase property names gets far closer than a generic "show me risk" prompt, because the generator leans on the schema you describe.
+Neo4j's "Create with AI" dashboard generator builds a dashboard from a prompt and the database schema. Naming the exact labels, relationships, and camelCase property names gets far closer than a generic "show me risk" prompt.
 
 ### Dashboard description
 
 Paste this into the **Dashboard description** box:
 
 ```text
-Build a supplier and customer risk dashboard for an enterprise that
+Build a supplier and customer risk dashboard for a global beverage producer that
 sells to Customers, buys from Suppliers, and rolls both up into internal
-BusinessUnits. Use the governed classifications the graph already carries:
-Customers and Suppliers are CLASSIFIED_AS BusinessTerms (Platinum Customer,
-Strategic Account, High-Risk Supplier, Risky Customer), where each edge
-records a reason and a source of either 'rule' or 'gds'.
+BusinessUnits. Suppliers feed each other and the business units via SUPPLIES;
+customers own each other via OWNED_BY.
 
 Include:
-- A KPI row: total customers, total suppliers, count of high-risk suppliers
-  (Supplier.riskScore >= 70), count of customers classified as Risky Customer,
-  and count of open ComplianceFindings.
-- High-risk suppliers ranked by riskScore, with their category.
-- Supplier-risk exposure per BusinessUnit using
-  BusinessUnit.supplierExposureScore, sorted highest first, so a unit can rank
-  high even when no single supplier crosses the threshold.
-- Customers with open KYC findings (ComplianceFinding {type:'KYC',
-  status:'open'}) via HAS_FINDING.
-- Strategic accounts at risk: Customers CLASSIFIED_AS 'Strategic Account'
-  whose profitabilityTrend='declining' and churnRisk='high' with at least one
-  overdue Invoice and one open ComplianceFinding.
-- Platinum customers ranked by upsellScore.
-- A lineage/provenance view: for a selected classified Customer, walk
+- A KPI row: total customers, total suppliers, count of High-Risk suppliers
+  (Supplier.riskScore >= 70), count of Delinquent customers, and count of open
+  ComplianceFindings.
+- High-risk suppliers ranked by riskScore, with their category and subcategory.
+- Critical Supplier view: suppliers ranked by Supplier.betweenness, highlighting
+  any above the Supply Concentration Threshold, with the business units their
+  multi-tier supply paths reach.
+- Ownership Risk view: customers ranked by Customer.pagerank, highlighting clean
+  customers (no defaultedPeriod) inside an ownership group that contains a
+  defaulted member, with their creditLimit and open invoice balance as exposure.
+- Strategic accounts (Customers CLASSIFIED_AS 'Strategic Account') with segment
+  and any ownership link.
+- A lineage view: for a selected classified Customer or Supplier, walk
   CLASSIFIED_AS -> BusinessTerm -DEFINED_BY-> BusinessRule -EVALUATES-> Entity
   -MAPS_TO-> DataSource, showing the term, the reason, the rule, and the
   physical DataSource.table.
 
 Prefer the governed CLASSIFIED_AS labels and BusinessRule thresholds over
 recomputing definitions from raw properties. All properties are camelCase.
+Supplier.betweenness and Customer.pagerank are precomputed graph properties.
 ```
 
 ### Optional focus
 
-Keep the focus field short:
-
 ```text
-Supplier and customer risk exposure, with governed classifications and provenance
+Supplier and customer risk exposure, with governed classifications, the two
+graph-native risks, and provenance
 ```
 
-The prompt assumes the graph as loaded by `load.py` plus `gds.py`, so it expects `supplierExposureScore` and the `gds`-sourced `CLASSIFIED_AS` edges to exist. If you only ran `load.py` and skipped `gds.py`, drop the exposure and rule-vs-gds bullets, since those edges and properties will not be present.
+The prompt assumes the graph as loaded by `load.py` plus `gds.py`, so it expects `Supplier.betweenness` and `Customer.pagerank` to exist. If you only ran `load.py` and skipped `gds.py`, drop the Critical Supplier and Ownership Risk views, since those properties will not be present.
