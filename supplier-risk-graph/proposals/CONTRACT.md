@@ -134,8 +134,8 @@ sequence in this demo, and a second one next to them is what made the script har
 | Step | Capability | What it does here |
 |---|---|---|
 | **Definition** | Ontology | What does "Critical Supplier" mean? RULE-05 says. The lakehouse has no answer to that question at all. |
-| **Discovery** | Graph algorithms | Which entity satisfies that definition? Betweenness names Cascade Glassworks, with nobody pointing at it. |
-| **Explanation** | Pattern matching | Why? Every Americas glass supplier converges on Cascade. |
+| **Discovery** | Graph algorithms | Which entities satisfy that definition? Betweenness and the governed threshold return the Critical Supplier cohort, Cascade among them, with nobody pointing at it. Cascade is not the top of the ranking, so no score sort finds it. |
+| **Explanation** | Pattern matching | Why Cascade out of the cohort? The Americas container-glass processors all draw their raw glass from one upstream furnace, Cascade. That convergence is what singles it out. |
 
 **The honest caveat, said out loud:** once someone knows to start from the tier-1 suppliers,
 "which supplier feeds all of these" is a single join, and Genie alone will write it. The graph-native
@@ -220,14 +220,30 @@ Asked verbatim. Changing these requires changing this file.
 How diversified is our glass bottle supply for the Americas?
 ```
 
-**Beat 3, to both engines:**
+**Beat 3, to both engines, the criticality side-by-side:**
 
 ```
 What is our single biggest point of failure in our supply base?
 ```
 
+**Beat 3 convergence, to Genie + Graph, the question that lands Cascade:**
+
+```
+Every container-glass processor that serves our Americas bottle makers buys its raw glass from somewhere. Is there a single upstream supplier they all depend on for it?
+```
+
+This is the Explanation step's question. The commodity-root re-probe asked it in four fresh
+conversations and Genie + Graph named Cascade Glassworks as the single upstream source every time,
+mostly with shallow queries rather than deep traversals. It is scoped to the processors' shared
+upstream on purpose. Scoped to the bottle makers instead, the shared upstream is the processor tier
+one hop up. Asked for the "source" or the "bottom" of the chain, the answer slides below the furnace
+into the feedstock of cullet, sand and soda ash. Only the processor-scoped form lands on Cascade and
+stops there.
+
 **The danger words are "depend on" and "common upstream."** Not "point of failure," which is safe
-and was probed. Beat 1 must never drift toward dependency phrasing.
+and was probed. Beat 1 must never drift toward dependency phrasing. Those same words are the
+intended phrasing of the Beat 3 convergence question above, which is exactly why they are banned at
+Beat 1: they belong to Beat 3's discovery, so using them earlier spends it.
 
 **The original reason for that rule is superseded, and the rule stays for a better one.** It was
 written to stop Beat 1 handing Genie alone the convergence query directly, on the belief that
