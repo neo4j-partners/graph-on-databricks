@@ -10,12 +10,14 @@ lakehouse column carries them, so plain Genie cannot see them.
      supplier-to-supplier network (Supplier nodes, SUPPLIES edges, undirected)
      and runs gds.betweenness. Supplier->BusinessUnit SUPPLIES edges fall out of
      the projection because the BusinessUnit endpoint is not a Supplier, so the
-     projection is the raw-material supply chain only. The network is two
-     cross-linked clusters joined at exactly one point, Cascade Glassworks
-     (SUP-901), so every path between them runs through it and it takes the
-     betweenness maximum by roughly a factor of two. It is NOT the most connected
-     supplier, and counting connections finds someone else entirely. Written back
-     as a betweenness property on every Supplier node.
+     projection is the raw-material supply chain only. The network is several
+     webbed regional clusters joined to each other by a number of bridges, with
+     Cascade Glassworks (SUP-901) sitting as a narrow waist between a wide
+     feedstock base and the processor tier that feeds the bottle makers. Removing
+     Cascade leaves the network in one piece, so whatever score it takes it takes
+     by position rather than by being the only way across. It is NOT the most
+     connected supplier, and counting connections finds someone else entirely.
+     Written back as a betweenness property on every Supplier node.
 
   2. Weighted ownership PageRank (Story 2, the clean payer in a bad group).
      Projects the ownership network (Customer nodes, OWNED_BY edges, undirected)
@@ -28,12 +30,15 @@ lakehouse column carries them, so plain Genie cannot see them.
      Written back as a pagerank property on every Customer node.
 
 Both algorithms then set the two graph-native thresholds that had no value until
-the scores existed: the Supply Concentration Threshold (THR-03) is placed
-between Cascade and the next supplier so only Cascade clears it, and the
-Ownership Contagion Threshold (THR-04) is placed between Jade and the next
-trading customer so only Jade clears it. Both are written onto the live
-Threshold nodes and back into data/thresholds.csv (graph-only, never uploaded to
-Unity Catalog), so a reload carries them.
+the scores existed, and they are set by opposite logic. The Supply Concentration
+Threshold (THR-03) resolves a governed percentile, fixed in the generator before
+any score existed, against the distribution this run produced; it catches a
+cohort, and how many suppliers are in it is an output. The Ownership Contagion
+Threshold (THR-04) is still placed between Jade and the next trading customer so
+only Jade clears it, because Story 2 is out of scope. Do not "align" THR-04 to
+THR-03: that is a redesign of Story 2 rather than a tidy-up. Both are written
+onto the live Threshold nodes and back into data/thresholds.csv (graph-only,
+never uploaded to Unity Catalog), so a reload carries them.
 
 Two knowledge-layer bindings follow, both from the same computed values. The
 cutoffs are backfilled onto RULE-05 and RULE-06 as an inline threshold property,
@@ -43,9 +48,10 @@ carries the metric, so the governed vocabulary travels with the score into any
 result set. Neither materializes a classification: every Supplier carries the
 same term string whether or not it clears the cutoff.
 
-The build fails loud if either plant is wrong: Cascade must be the strict
-betweenness maximum, and Jade must be the top trading customer by weighted
-contagion. PageRank convergence is checked before its scores are used, since
+The build fails loud if either plant is wrong: Cascade must clear THR-03 in a
+cohort with more than one member, and Jade must be the top trading customer by
+weighted contagion. Where Cascade ranks is reported and is not a pass
+condition. PageRank convergence is checked before its scores are used, since
 the contagion cutoff is placed from them to six decimal places. Deterministic
 given the fixed-seed data. Re-runnable: both graph
 projections are dropped on entry and exit, and the write-backs overwrite in
@@ -64,6 +70,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import sys
 from dataclasses import dataclass
@@ -72,6 +79,11 @@ from typing import Any, NamedTuple
 
 from dotenv import load_dotenv
 from graphdatascience import GraphDataScience
+
+# THR-03's governed input. It is imported rather than restated so there is one
+# place it can be changed and one commit that shows when it was fixed. The
+# generator is import-safe: everything below its main guard is data.
+from generate_data import SUPPLY_CONCENTRATION_PERCENTILE
 
 HERE = Path(__file__).parent
 
@@ -164,6 +176,21 @@ class Cutoff(NamedTuple):
     value: float
 
 
+class Cohort(NamedTuple):
+    """A governed percentile, resolved against a run's score distribution.
+
+    Distinct from Cutoff because the two are placed by opposite logic and mixing
+    them is how a percentile quietly becomes a one-winner threshold again. A
+    Cutoff is placed relative to a named node. A Cohort is placed relative to the
+    field and then asked who it caught, which is why `members` is a list and
+    nothing in it is required to have length one.
+    """
+
+    percentile: int
+    value: float
+    members: list[Score]
+
+
 def require_env(name: str, default: str | None = None) -> str:
     value = os.environ.get(name) or default
     if value is None:
@@ -216,19 +243,23 @@ def compute_betweenness(gds: GraphDataScience, protags: Protagonists) -> list[Sc
     The projection keeps Supplier nodes and SUPPLIES edges, undirected. The
     Supplier->BusinessUnit SUPPLIES edges drop out because their BusinessUnit
     endpoint is not in the node set, so what is left is the raw-material chain.
-    Cascade scores because it is the only link between the two halves of that
-    chain: remove it and the supplier network falls into two pieces. The busiest
-    suppliers sit inside those halves, where traffic routes around them, so they
-    win any count of connections and lose this.
+    Cascade scores because of where it sits in that chain: a wide feedstock base
+    on one side, the processor tier and the bottle makers on the other, and no
+    short way around it between them. Removing it does not disconnect the
+    network, which is what makes the score a statement about position rather
+    than about severance. The busiest suppliers sit inside the regional clusters,
+    where the web routes traffic around them, so they win any count of
+    connections and lose this.
     """
     header("Algorithm 1: supplier betweenness (Story 1, Critical Supplier)")
     drop_graph(gds, SUPPLIER_GRAPH)
     # UNDIRECTED is load-bearing: do not "correct" it to match edge semantics.
-    # SUPPLIES direction is deliberately reversed on Cascade's cluster-B edges, so
-    # a NATURAL (or REVERSE) projection cuts the only path between the two halves
-    # of the chain and collapses Cascade's betweenness. The story is that Cascade
-    # is the single articulation point of the supplier network, and only an
-    # undirected projection can see that. Changing this silently deletes Story 1.
+    # SUPPLIES runs the way the material does, so the feedstock edges point into
+    # Cascade and the processor edges point out of it. A NATURAL (or REVERSE)
+    # projection therefore sees only one side of the waist and collapses
+    # Cascade's betweenness. The claim is that Cascade sits between the upstream
+    # and downstream populations, and only an undirected projection can see both
+    # at once. Changing this silently deletes Story 1.
     projection = gds.run_cypher(
         "CALL gds.graph.project($graph, 'Supplier', "
         "{SUPPLIES: {orientation: 'UNDIRECTED'}}) "
@@ -241,13 +272,17 @@ def compute_betweenness(gds: GraphDataScience, protags: Protagonists) -> list[Sc
         # samplingSize is spelled out for the same reason PAGERANK_CONFIG pins
         # dampingFactor: at the node count this is GDS's default and the result is
         # exact Brandes over every source node, but the default is a value the
-        # library chooses, and THR-03 is placed off these scores to two decimals.
+        # library chooses, and THR-03 is resolved off these scores to two decimals.
+        # concurrency is pinned alongside it for symmetry with PAGERANK_CONFIG.
+        # Exact Brandes is already deterministic, so unlike the PageRank case this
+        # costs nothing and proves nothing; do not generalize the reasoning.
         # Anything below the node count silently switches to sampled betweenness,
         # which is non-deterministic without a samplingSeed and would put the
         # cutoff on numbers that move between runs.
         rows = gds.run_cypher(
             """
-            CALL gds.betweenness.stream($graph, {samplingSize: $samplingSize})
+            CALL gds.betweenness.stream($graph,
+                 {samplingSize: $samplingSize, concurrency: 1})
             YIELD nodeId, score
             WITH gds.util.asNode(nodeId) AS s, score
             RETURN s.id AS supplierId, s.name AS name, score
@@ -486,16 +521,20 @@ def place_cutoff(
 ) -> Cutoff:
     """Place a threshold midway between the protagonist and the next node down.
 
-    Both graph-native thresholds are placed the same way, so they are placed by
-    the same code: find the protagonist's score, find the highest score below it
-    among the nodes the governing term can apply to, and cut between them. The
-    two callers differ only in how many decimals the cutoff keeps and whether the
-    field is filtered, and both of those differences are load-bearing. `digits`
-    is 2 for betweenness and 6 for contagion because the PageRank scores are
-    small enough that rounding to 2 would collapse the cutoff onto Jade's own
-    score. `eligible` is None for suppliers, where every supplier competes, and
-    the trading set for customers, where the holdcos outscore Jade by
-    construction and are not counterparties the rule can act on.
+    THR-04 only. This used to place both graph-native thresholds and now places
+    one, because THR-03 resolves a governed percentile instead: see
+    concentration_cutoff for why placing a threshold relative to the node it is
+    going to catch is a post-hoc threshold however principled the arithmetic.
+
+    That reasoning applies to THR-04 too and is deliberately not acted on here.
+    Story 2 is out of scope, and converting it to a percentile by analogy would
+    be a redesign of Story 2 dressed as consistency. It needs that decision
+    reopened rather than worked around.
+
+    `digits` is 6 rather than 2 because the PageRank scores are small enough that
+    rounding to 2 would collapse the cutoff onto Jade's own score. `eligible` is
+    the trading set, because the holdcos outscore Jade by construction and are
+    not counterparties the rule can act on.
     """
     by_id = score_index(scores)
     top = require_score(by_id, top_id, what)
@@ -510,9 +549,30 @@ def place_cutoff(
     return Cutoff(top_id, top, runner_up, round((top + runner_up) / 2, digits))
 
 
-def concentration_cutoff(scores: list[Score], protags: Protagonists) -> Cutoff:
-    """THR-03: midway between Cascade's betweenness and the next supplier's."""
-    return place_cutoff(scores, protags.cascade_id, "Cascade", digits=2)
+def concentration_cutoff(scores: list[Score]) -> Cohort:
+    """THR-03: the governed percentile, resolved against this run's distribution.
+
+    The percentile is the input and it is fixed in the generator before any score
+    exists. Resolving it is the only part that cannot be known in advance, and
+    that is all this does.
+
+    Nothing here takes a protagonist, and the missing parameter is the point. The
+    previous version placed the cutoff midway between Cascade's score and the
+    next supplier's, which meant the threshold was defined in terms of the
+    supplier it was going to catch. That is a post-hoc threshold however
+    principled the arithmetic, and it also made the answer a single name by
+    construction. A percentile catches whoever is in the tail, and how many that
+    is is a fact about the network rather than a decision.
+    """
+    ranked = sorted(s.value for s in scores)
+    # Nearest-rank: the smallest score with at least P percent of the field at or
+    # below it. No interpolation, so the cutoff is always a score some supplier
+    # actually has and "at or above the 95th percentile" means what a risk
+    # committee reading it would think it means.
+    index = math.ceil(SUPPLY_CONCENTRATION_PERCENTILE / 100 * len(ranked)) - 1
+    value = round(ranked[max(index, 0)], 2)
+    members = [s for s in scores if s.value >= value]
+    return Cohort(SUPPLY_CONCENTRATION_PERCENTILE, value, members)
 
 
 def trading_customers(gds: GraphDataScience) -> set[str]:
@@ -795,23 +855,47 @@ def check_three_legs(gds: GraphDataScience, protags: Protagonists) -> None:
 
 
 def assert_betweenness(
-    scores: list[Score], conc: Cutoff, protags: Protagonists
+    scores: list[Score], conc: Cohort, protags: Protagonists
 ) -> None:
-    """Cascade must be the strict betweenness maximum in the supplier network."""
-    if conc.top_score <= conc.runner_up:
+    """Cascade must clear THR-03, and the cohort it clears with must not be alone.
+
+    Two asserts, and neither is about who wins. The old version required Cascade
+    to be the strict network maximum, which the demo does not need and which a
+    room is entitled to be suspicious of: a single supplier topping a ranking by
+    construction is a data plant wearing a graph algorithm. What the story claims
+    is that Cascade is a Critical Supplier under a governed definition, and
+    clearing the threshold is exactly that claim.
+
+    The cohort size assert runs the other way, against the failure where the
+    percentile catches Cascade and nothing else. That would be a one-winner
+    threshold reappearing by accident, and it would make RULE-05's "catches a
+    cohort rather than a single name" false on stage.
+
+    Where Cascade ranks is printed rather than asserted. It is worth knowing and
+    it is not a pass condition.
+    """
+    by_id = score_index(scores)
+    cascade = require_score(by_id, protags.cascade_id, "Cascade")
+    if cascade < conc.value:
         sys.exit(
-            f"Story 1 betweenness: Cascade ({protags.cascade_id})={conc.top_score} "
-            f"is not the strict network maximum (runner-up={conc.runner_up})."
+            f"Story 1 betweenness: Cascade ({protags.cascade_id})={cascade} does "
+            f"not clear the THR-03 cutoff {conc.value}, resolved from the "
+            f"{conc.percentile}th percentile of supply betweenness. Per "
+            f"proposals/CONTRACT.md section 7 the topology is what gets fixed, "
+            f"the percentile does not move, and there are two honest iterations "
+            f"before this becomes a finding rather than a bug."
         )
-    top = scores[0].node_id
-    if top != protags.cascade_id:
+    if len(conc.members) < 2:
         sys.exit(
-            f"Story 1 betweenness: top supplier is {top}, "
-            f"expected Cascade {protags.cascade_id}."
+            f"Story 1 betweenness: the THR-03 cohort has {len(conc.members)} "
+            f"member(s), so the threshold catches a single name and RULE-05's "
+            f"cohort language does not describe what the graph does."
         )
+    rank = [s.node_id for s in scores].index(protags.cascade_id) + 1
     print(
-        f"  assert OK: Cascade betweenness {conc.top_score} is the strict network "
-        f"maximum (next {conc.runner_up}); THR-03 cutoff {conc.value}"
+        f"  assert OK: Cascade betweenness {cascade} clears the THR-03 cutoff "
+        f"{conc.value} ({conc.percentile}th percentile), ranking {rank} of "
+        f"{len(scores)} in a cohort of {len(conc.members)}"
     )
 
 
@@ -870,7 +954,7 @@ def main() -> None:
         )
 
         betweenness = compute_betweenness(gds, protags)
-        conc = concentration_cutoff(betweenness, protags)
+        conc = concentration_cutoff(betweenness)
         assert_betweenness(betweenness, conc, protags)
         write_betweenness(gds, betweenness)
 

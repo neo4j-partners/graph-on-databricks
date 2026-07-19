@@ -1,5 +1,5 @@
 id,name,value,currency,basis
 THR-01,Supplier Risk Threshold,70,,
 THR-02,Late Payment Threshold,60,,
-THR-03,Supply Concentration Threshold,4879.7,,Review any supplier at or above the 95th percentile of supply betweenness.
-THR-04,Ownership Contagion Threshold,0.155448,,
+THR-03,Supply Concentration Threshold,1157.46,,Review any supplier at or above the 95th percentile of supply betweenness.
+THR-04,Ownership Contagion Threshold,0.168452,,

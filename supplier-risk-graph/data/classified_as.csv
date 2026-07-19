@@ -6,19 +6,19 @@ CUST-011,Customer,TERM-01,platinum segment and flagged strategic by account mana
 CUST-240,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-19T00:00:00Z,v1.0
 CUST-403,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-19T00:00:00Z,v1.0
 CUST-322,Customer,TERM-01,platinum segment and flagged strategic by account management,2026-07-19T00:00:00Z,v1.0
-CUST-034,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-070,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-090,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-094,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-107,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-119,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-294,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-349,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-364,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-369,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-409,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-412,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
-CUST-496,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-072,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-126,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-175,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-187,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-203,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-240,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-254,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-296,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-329,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-338,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-456,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-461,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
+CUST-491,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
 CUST-902,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
 CUST-903,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
 CUST-906,Customer,TERM-02,default period recorded in the snapshot,2026-07-19T00:00:00Z,v1.0
@@ -39,10 +39,10 @@ CUST-398,Customer,TERM-03,each of the last three invoices more than 60 days late
 CUST-470,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-19T00:00:00Z,v1.0
 CUST-475,Customer,TERM-03,each of the last three invoices more than 60 days late,2026-07-19T00:00:00Z,v1.0
 SUP-015,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
-SUP-031,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
-SUP-072,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
+SUP-056,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
+SUP-057,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
 SUP-073,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
-SUP-089,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
-SUP-093,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
+SUP-077,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
+SUP-084,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
 SUP-100,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
-SUP-116,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0
+SUP-138,Supplier,TERM-04,risk score at or above the supplier risk threshold,2026-07-19T00:00:00Z,v1.0

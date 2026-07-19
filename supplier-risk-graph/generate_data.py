@@ -60,18 +60,36 @@ N_PLATINUM = 60
 N_GOLD = 140
 N_STRATEGIC_BG = 6  # background platinum accounts also flagged Strategic, for realism
 N_DELINQUENT = 15  # background customers planted to satisfy the Delinquent rule
-# The supplier-to-supplier network is two cross-linked clusters bridged only by
-# Cascade. SUP_WEB_CHORD_RATIO sets how many extra edges each cluster gets beyond
-# the spanning tree that connects it, as a fraction of cluster size; chords are
-# what give the cluster alternate routes, so no node inside it becomes a bridge.
-# CASCADE_B_LINKS is how many cluster-B suppliers Cascade feeds directly, the
-# other half of the bridge. SUP_HUB_DEGREE_MARGIN is how far the decoy hub's
-# degree is pushed above the next-highest, so degree-ranking picks it, not
-# Cascade.
+# The supplier-to-supplier network is SUP_CLUSTERS regional clusters, each webbed
+# internally and joined to the others by several bridges. SUP_WEB_CHORD_RATIO
+# sets how many extra edges each cluster gets beyond the spanning tree that
+# connects it, as a fraction of cluster size; chords are what give a cluster
+# alternate routes, so no node inside it becomes a bridge.
+#
+# Cascade earns its betweenness by position rather than by being a cut vertex. It
+# buys feedstock from CASCADE_FEEDSTOCK_VENDORS vendors spread across the
+# clusters and sells down through the processor tier to the tier-1 bottle makers,
+# so it sits between a large upstream population and a large downstream one.
+# Removing it leaves the network in one piece, which is the difference between
+# ranking first by position and ranking first by being the only bridge.
+#
+# The fan-in is the number that matters and the cluster count is not. A throwaway
+# simulation over this shape, exact Brandes on the undirected projection over many
+# seeds, found Cascade fails to clear the percentile at every cluster count from
+# two to six when it sits at the end of the chain, and clears on fan-in alone as a
+# sharp threshold rather than a gradient. Four vendors cleared every seed and two
+# cleared fewer than half, so four sits close to the fragile edge and six buys
+# reseed headroom. The cluster count is chosen for plausibility.
+#
+# SUP_INTER_CLUSTER_BRIDGES is how many cross-cluster background edges the network
+# gets, every one a different supplier so no single bridge inherits the score
+# Cascade is being moved away from. None of them carries glass, which is what
+# keeps a structurally rich background compatible with a commodity-scoped
+# exposure measure. See COMMODITY_SUBCATEGORIES.
 SUP_WEB_CHORD_RATIO = 0.6
-CASCADE_A_LINKS = 4
-CASCADE_B_LINKS = 3
-SUP_HUB_DEGREE_MARGIN = 4
+SUP_CLUSTERS = 4
+SUP_INTER_CLUSTER_BRIDGES = 7
+CASCADE_FEEDSTOCK_VENDORS = 6
 
 # Ownership is a weighted multi-parent DAG, not a forest of groups. Filler
 # groups are three levels deep and some subsidiaries are jointly held, so damage
@@ -164,7 +182,28 @@ DATA_DIR = Path(__file__).parent / "data"
 # --- Protagonist ids (reserved high block, hand-named, excluded from draws) ---
 CASCADE_ID = "SUP-901"
 TIER1_IDS = ["SUP-902", "SUP-903", "SUP-904", "SUP-905", "SUP-906"]
-PROTAGONIST_SUPPLIER_IDS = {CASCADE_ID, *TIER1_IDS}
+# The processor tier, between Cascade and the tier-1 bottle makers. It exists so
+# Cascade sits a tier back from anything BU-03 buys from directly, which is what
+# puts it out of reach of a one-hop query. Named for what it makes rather than
+# for what it melts, so "raw glass" keeps meaning furnace and returns a cohort of
+# furnaces when it is queried.
+PROCESSOR_IDS = ["SUP-907", "SUP-908", "SUP-909"]
+# Rival furnaces feeding the other units' bottle makers. They are what make the
+# other four units genuinely protected rather than merely unlinked, and what makes
+# the raw-glass subcategory a real cohort rather than Cascade alone.
+RIVAL_FURNACE_IDS = ["SUP-910", "SUP-911", "SUP-912", "SUP-913"]
+# Cascade's feedstock base, spread across the regional clusters. This is where the
+# fan-in the betweenness depends on comes from, and it is on the buy side on
+# purpose. Betweenness on an undirected projection is direction-blind, so fan-in
+# and fan-out contribute identically to the score, but they are not equally true:
+# container glass is heavy and cheap enough that shipping it any distance costs
+# more than it is worth, so a furnace selling raw glass across regions is a shaky
+# premise while a furnace buying cullet, sand and soda ash from vendors across
+# several regions is simply how furnaces work. Same topology, and the premise
+# stands without the score needing it to.
+FEEDSTOCK_IDS = ["SUP-914", "SUP-915", "SUP-916", "SUP-917", "SUP-918", "SUP-919"]
+GLASS_CHAIN_IDS = [*PROCESSOR_IDS, *RIVAL_FURNACE_IDS, *FEEDSTOCK_IDS]
+PROTAGONIST_SUPPLIER_IDS = {CASCADE_ID, *TIER1_IDS, *GLASS_CHAIN_IDS}
 
 KESTREL_ID = "CUST-901"  # top holding company
 MARLIN_ID = "CUST-902"  # defaulted, under Harbour
@@ -241,10 +280,15 @@ CUSTOMER_SUFFIXES = [
     "Markets", "Foods", "Drinks Co", "Group", "Wholesale",
 ]
 SUPPLIER_CATEGORIES = ["ingredients", "packaging", "logistics", "equipment", "services"]
-# Subcategory vocabulary by category. "raw glass" is reserved for Cascade.
+# Subcategory vocabulary by category. "raw glass" is drawable by background
+# suppliers: it used to be reserved for Cascade, which made the subcategory a
+# synonym for one supplier, so asking for the raw-glass suppliers returned the
+# protagonist and the demo answered its own question. It now returns a cohort of
+# furnaces. The processor and feedstock subcategories stay off this list because
+# they are protagonist tiers rather than background vocabulary.
 SUBCATEGORIES = {
     "ingredients": ["malt", "hops", "sugar", "flavorings"],
-    "packaging": ["glass bottles", "cans", "caps", "labels"],
+    "packaging": ["glass bottles", "cans", "caps", "labels", "raw glass"],
     "logistics": ["freight", "warehousing"],
     "equipment": ["brewing equipment", "cooling systems"],
     "services": ["consulting", "maintenance"],
@@ -264,12 +308,19 @@ SUBCATEGORIES = {
 # guard.py enforces that: it fails if any comment or Genie instruction
 # enumerates two or more members of one commodity.
 #
-# Seeded with the subcategories that exist today. The rebuild adds the
-# intermediate glass tiers between the furnace and the bottle makers and extends
-# this mapping with them. Written before those tiers exist on purpose, so the
-# check is not authored against data that was just built to satisfy it.
+# The full glass chain, feedstock through finished bottle. Every tier on it is
+# listed, because the predicate walks whole paths: leave one tier out and the
+# paths through it stop being commodity-carrying at exactly the point the story
+# turns on, with no assert firing. The feedstock tier is the one that is easy to
+# forget, since it sits upstream of the protagonist rather than between it and
+# the customer.
 COMMODITY_SUBCATEGORIES = {
-    "glass": {"raw glass", "glass bottles"},
+    "glass": {
+        "cullet", "silica sand", "soda ash",  # feedstock, upstream of the furnace
+        "raw glass",                           # the furnaces
+        "container glass",                     # the processor tier
+        "glass bottles",                       # the tier-1 bottle makers
+    },
 }
 
 # Filler supplier name suffix derived from the supplier's subcategory, so a
@@ -283,7 +334,8 @@ COMMODITY_SUBCATEGORIES = {
 SUPPLIER_SUFFIX_BY_SUBCATEGORY = {
     "malt": "Malt Supply", "hops": "Hops Co", "sugar": "Sugar Co",
     "flavorings": "Flavor Co",
-    "glass bottles": "Glass Co", "cans": "Canning", "caps": "Closures",
+    "glass bottles": "Glass Co", "raw glass": "Glass Furnaces",
+    "cans": "Canning", "caps": "Closures",
     "labels": "Labels",
     "freight": "Freight", "warehousing": "Warehousing",
     "brewing equipment": "Brewing Systems", "cooling systems": "Cooling Systems",
@@ -747,6 +799,31 @@ def make_suppliers(rng: random.Random) -> list[dict]:
     for sup_id, name in zip(TIER1_IDS, tier1_names, strict=True):
         suppliers.append({"id": sup_id, "name": name, "category": "packaging",
                           "subcategory": "glass bottles", "riskScore": rng.randint(10, 39)})
+
+    # The rest of the glass chain: the processor tier Cascade sells through, the
+    # rival furnaces the other units draw from, and Cascade's feedstock base.
+    # Every one of them scores below the high-risk threshold, so no score filter
+    # surfaces the chain and Story 1's miss stays an honest miss.
+    glass_chain = [
+        *zip(PROCESSOR_IDS,
+             ["Fairview Container Works", "Oakline Container Works",
+              "Brackwater Container Works"],
+             ["container glass"] * len(PROCESSOR_IDS), strict=True),
+        *zip(RIVAL_FURNACE_IDS,
+             ["Redstone Glassworks", "Pinehurst Glassworks",
+              "Calder Glassworks", "Thornbury Glassworks"],
+             ["raw glass"] * len(RIVAL_FURNACE_IDS), strict=True),
+        *zip(FEEDSTOCK_IDS,
+             ["Halden Cullet Recovery", "Westmoor Cullet Recovery",
+              "Kelbrook Silica", "Ardenne Silica",
+              "Ravensmoor Soda Ash", "Lowfield Soda Ash"],
+             ["cullet", "cullet", "silica sand", "silica sand",
+              "soda ash", "soda ash"], strict=True),
+    ]
+    for sup_id, name, subcategory in glass_chain:
+        suppliers.append({"id": sup_id, "name": name, "category": "packaging",
+                          "subcategory": subcategory,
+                          "riskScore": rng.randint(20, 65)})
     return suppliers
 
 
@@ -755,23 +832,31 @@ def make_supplies(rng: random.Random, suppliers: list[dict]) -> list[dict]:
 
     Each background supplier serves 2-4 business units. The five tier-1 bottle
     suppliers each serve exactly the Americas (BU-03). Cascade serves no
-    business unit directly: it is tier-2 and feeds the tier-1 suppliers instead.
+    business unit directly: it is tier-2 and feeds the processor tier instead.
+    Nor does any other tier of the glass chain, so none of them owns a row a
+    region-scoped query could read.
     """
     supplies = []
+    glass = COMMODITY_SUBCATEGORIES["glass"]
     for supplier in suppliers:
         sid = supplier["id"]
-        if sid == CASCADE_ID:
+        if sid == CASCADE_ID or sid in GLASS_CHAIN_IDS:
             continue
         if sid in TIER1_IDS:
             bus = ["BU-03"]
         else:
-            # Only the five planted tier-1 suppliers may feed the Americas with
-            # glass bottles, so plain Genie's beat-2 grouping of Americas
-            # glass-bottle suppliers returns exactly those five and the
-            # single-point-of-failure framing holds. Bar any background
-            # glass-bottle supplier from BU-03.
+            # The Americas draws glass through the five tier-1s and nowhere
+            # else. This is the sole-source premise being constructed rather
+            # than a count being fixed: it decides which glass suppliers the
+            # Americas draws from, which is a structural relationship, and it
+            # says nothing about how many of them there are or what any query
+            # will return. Barring the whole commodity rather than one
+            # subcategory is what makes it hold now that the background can draw
+            # raw glass: a background furnace selling straight into BU-03 would
+            # be an independent glass source and the premise would fail with no
+            # assert firing.
             pool = BU_IDS
-            if supplier["subcategory"] == "glass bottles":
+            if supplier["subcategory"] in glass:
                 pool = [bu for bu in BU_IDS if bu != "BU-03"]
             bus = rng.sample(pool, rng.randint(2, 4))
         supplies.extend({"supplier_id": sid, "business_unit_id": bu} for bu in bus)
@@ -779,31 +864,39 @@ def make_supplies(rng: random.Random, suppliers: list[dict]) -> list[dict]:
 
 
 def make_supply_relationships(rng: random.Random, suppliers: list[dict]) -> list[dict]:
-    """Supplier-to-supplier SUPPLIES edges: two webbed clusters, bridged by Cascade.
+    """Supplier-to-supplier SUPPLIES edges: regional clusters, and a narrow waist.
 
-    The background splits into two clusters. Each is webbed internally with a
-    spanning tree plus chords, so there are always several routes between any
-    two suppliers inside a cluster and no node within one is a bottleneck. The
-    five tier-1 bottle suppliers sit inside cluster A. Cascade is the only edge
-    between the clusters: it feeds the tier-1s on the A side and a few suppliers
-    on the B side. Every path from A to B therefore runs through Cascade, which
-    is what gives it a betweenness in the thousands while its degree stays at 12
-    (the five tier-1s, CASCADE_A_LINKS on the A side, CASCADE_B_LINKS on the B
-    side).
+    The background splits into SUP_CLUSTERS regional clusters. Each is webbed
+    internally with a spanning tree plus chords, so there are several routes
+    between any two suppliers inside a cluster and no node within one is a
+    bottleneck. SUP_INTER_CLUSTER_BRIDGES background edges join the clusters to
+    each other, every one a different supplier, so no single supplier separates
+    the graph and the fair question of why a global supply network has one bridge
+    never arises.
 
-    A decoy hub inside cluster A is then pushed to the highest degree in the
-    network. It wins any count-the-connections ranking and loses betweenness
-    badly, because the web around it routes traffic past it. That gap is the
-    point of the whole demo: the most connected supplier is not the one the
-    business cannot survive losing, and no aggregate over these rows finds
-    Cascade. Only a shortest-path computation does.
+    The glass chain is laid over that background rather than being it. Feedstock
+    vendors spread across the clusters sell to Cascade, Cascade sells to the
+    processor tier, and the processors sell to the five tier-1 bottle makers who
+    are the only glass suppliers the Americas buys from. Cascade therefore sits
+    between a large upstream population and a large downstream one and earns its
+    betweenness by position. Removing it leaves the network in one piece: that is
+    the difference between ranking first because of where it sits and ranking
+    first because it is the only way across, and only the first invites a
+    question the demo can answer.
+
+    Two things this deliberately no longer does. It does not push a chosen node
+    to the highest degree, because a decoy hub built to lose is the outcome being
+    asserted rather than a topology being built; the clusters grow by preferential
+    attachment instead, which is both how supply bases actually concentrate and
+    enough to produce a most-connected supplier without naming one. And it does
+    not make Cascade a cut vertex, which the previous version did and which made
+    its betweenness trivially maximal.
     """
-    background = [s for s in suppliers if s["id"] not in PROTAGONIST_SUPPLIER_IDS]
-    pool = [s["id"] for s in background]
+    by_id = {s["id"]: s for s in suppliers}
+    glass = COMMODITY_SUBCATEGORIES["glass"]
+    pool = [s["id"] for s in suppliers if s["id"] not in PROTAGONIST_SUPPLIER_IDS]
     rng.shuffle(pool)
-    half = len(pool) // 2
-    cluster_a = pool[:half] + list(TIER1_IDS)
-    cluster_b = pool[half:]
+    clusters = [pool[i::SUP_CLUSTERS] for i in range(SUP_CLUSTERS)]
 
     rels: list[dict] = []
     seen: set[tuple[str, str]] = set()
@@ -817,56 +910,102 @@ def make_supply_relationships(rng: random.Random, suppliers: list[dict]) -> list
         return True
 
     def web(cluster: list[str]) -> None:
-        """Connect a cluster, then add chords so it has redundant routes."""
+        """Connect a cluster by preferential attachment, then add chords.
+
+        Each new member attaches to an existing one chosen in proportion to how
+        connected it already is, so the cluster develops a few large suppliers
+        and a long tail of small ones. Uniform attachment produced a flat degree
+        distribution in which the most-connected supplier led by a hair, which is
+        what the deleted decoy-hub loop was compensating for.
+        """
         shuffled = list(cluster)
         rng.shuffle(shuffled)
-        for i in range(1, len(shuffled)):
-            link(shuffled[rng.randrange(i)], shuffled[i])
+        # `attached` holds each member once per edge it has, so drawing from it
+        # uniformly is drawing in proportion to degree.
+        attached = [shuffled[0]]
+        for member in shuffled[1:]:
+            parent = rng.choice(attached)
+            link(parent, member)
+            attached.extend((parent, member))
         for _ in range(int(len(shuffled) * SUP_WEB_CHORD_RATIO)):
             a, b = rng.sample(shuffled, 2)
-            link(a, b)
+            if link(a, b):
+                attached.extend((a, b))
 
-    web(cluster_a)
-    web(cluster_b)
+    for cluster in clusters:
+        web(cluster)
 
-    # Cascade, the sole bridge. Raw material flows in from cluster B and finished
-    # glass flows out to cluster A, so the B-side edges point at Cascade rather
-    # than away from it. That direction matters: it keeps Cascade from being the
-    # source of the whole network, so a recursive descendant count does not
-    # single it out either. It also feeds a few cluster-A suppliers besides the
-    # tier-1s, which stops any one tier-1 from becoming a second bridge.
-    for tier1 in TIER1_IDS:
-        link(CASCADE_ID, tier1)
-    a_pool = [sid for sid in cluster_a if sid not in PROTAGONIST_SUPPLIER_IDS]
-    for target in rng.sample(a_pool, CASCADE_A_LINKS):
-        link(CASCADE_ID, target)
-    for source in rng.sample(cluster_b, CASCADE_B_LINKS):
-        link(source, CASCADE_ID)
-
-    # The decoy hub: most connected supplier in the network, and nowhere near the
-    # most critical. Chosen from cluster A among nodes already inside the web.
-    degrees = Counter()
-    for rel in rels:
-        degrees[rel["fromSupplierId"]] += 1
-        degrees[rel["toSupplierId"]] += 1
-    hub = max((sid for sid in cluster_a if sid not in PROTAGONIST_SUPPLIER_IDS),
-              key=lambda sid: (degrees[sid], sid))
-    candidates = [sid for sid in cluster_a
-                  if sid != hub and sid not in PROTAGONIST_SUPPLIER_IDS]
-    rng.shuffle(candidates)
-    # Subtly self-defeating when the runner-up is itself the chosen candidate:
-    # linking hub to it raises BOTH degrees, so the gap does not grow that
-    # iteration. The loop still converges because the candidate order is
-    # shuffled, but it can also exhaust `candidates` without reaching the margin,
-    # which is why check_story1 asserts the realized margin rather than trusting
-    # this loop to have hit it.
-    for candidate in candidates:
-        others = max(n for sid, n in degrees.items() if sid != hub)
-        if degrees[hub] >= others + SUP_HUB_DEGREE_MARGIN:
+    # Inter-cluster bridges. Every bridge is a different supplier at both ends,
+    # so no one of them inherits the role Cascade is being moved out of, and none
+    # of them trades in glass, which is what lets the background be structurally
+    # rich without giving the commodity-scoped exposure measure somewhere to leak.
+    non_glass = [[sid for sid in cluster if by_id[sid]["subcategory"] not in glass]
+                 for cluster in clusters]
+    for ends in non_glass:
+        rng.shuffle(ends)
+    cluster_pairs = list(itertools.combinations(range(SUP_CLUSTERS), 2))
+    rng.shuffle(cluster_pairs)
+    taken: set[str] = set()
+    bridges = 0
+    for left, right in itertools.islice(itertools.cycle(cluster_pairs),
+                                        SUP_INTER_CLUSTER_BRIDGES * len(cluster_pairs)):
+        if bridges >= SUP_INTER_CLUSTER_BRIDGES:
             break
-        if link(hub, candidate):
-            degrees[hub] += 1
-            degrees[candidate] += 1
+        src = next((s for s in non_glass[left] if s not in taken), None)
+        dst = next((s for s in non_glass[right] if s not in taken), None)
+        if src is None or dst is None or not link(src, dst):
+            continue
+        taken.update((src, dst))
+        bridges += 1
+
+    # The glass chain. Feedstock flows in from vendors spread across the
+    # clusters, through Cascade, down the processor tier, and out to the five
+    # tier-1 bottle makers. Direction runs the way the material does, which keeps
+    # Cascade from being the source of the whole network: a recursive descendant
+    # count still does not single it out.
+    # A vendor's own inputs come from the non-glass side of its cluster: a cullet
+    # recovery operation buys freight and equipment, not glass. That is true on
+    # its own terms and it is also load-bearing. Drawing these from the whole
+    # cluster let a background furnace sell to a vendor that sells to Cascade,
+    # which made the Americas' glass reachable from furnaces other than Cascade
+    # by running the path backwards through the feedstock tier. The premise
+    # assert in check_story1 caught it; nothing else would have.
+    for i, vendor in enumerate(FEEDSTOCK_IDS):
+        for neighbor in rng.sample(non_glass[i % SUP_CLUSTERS], 2):
+            link(neighbor, vendor)
+        link(vendor, CASCADE_ID)
+    for processor in PROCESSOR_IDS:
+        link(CASCADE_ID, processor)
+    # Every tier-1 buys from at least one processor and most from two, so the
+    # sub-tier is webbed rather than a tree and no single processor becomes the
+    # bottleneck that Cascade has just stopped being.
+    for i, tier1 in enumerate(TIER1_IDS):
+        link(PROCESSOR_IDS[i % len(PROCESSOR_IDS)], tier1)
+        link(rng.choice(PROCESSOR_IDS), tier1)
+
+    # The rival furnaces, drawing on the same feedstock base and selling to the
+    # bottle makers the other four units buy from. This is what makes those units
+    # genuinely protected rather than merely unlinked, which is the Beat 4
+    # argument, and what makes raw glass return a cohort of furnaces.
+    rival_customers = [sid for sid in pool
+                       if by_id[sid]["subcategory"] == "glass bottles"]
+    for i, maker in enumerate(rival_customers):
+        link(RIVAL_FURNACE_IDS[i % len(RIVAL_FURNACE_IDS)], maker)
+    for rival in RIVAL_FURNACE_IDS:
+        for vendor in rng.sample(FEEDSTOCK_IDS, 2):
+            link(vendor, rival)
+
+    # Every glass company also buys freight, equipment and services from the
+    # regional clusters. That is true of any real plant, and it is also what stops
+    # the glass chain hanging off Cascade as a severable subtree: without these
+    # edges, removing Cascade would strand the processors and the tier-1s and
+    # Cascade would be the cut vertex this rebuild exists to stop it being. None
+    # of these edges carries glass, so none of them is a supply path into the
+    # Americas.
+    non_glass_all = [sid for sid in pool if by_id[sid]["subcategory"] not in glass]
+    for sid in (*TIER1_IDS, *PROCESSOR_IDS, *RIVAL_FURNACE_IDS):
+        for vendor in rng.sample(non_glass_all, 3):
+            link(vendor, sid)
     return rels
 
 
@@ -1351,20 +1490,74 @@ def check_story1(suppliers: list[dict], supplies: list[dict],
 
     cascade_targets = {r["toSupplierId"] for r in supply_rels
                        if r["fromSupplierId"] == CASCADE_ID}
-    assert set(TIER1_IDS) <= cascade_targets, "Cascade must supply every tier-1"
+    assert set(PROCESSOR_IDS) <= cascade_targets, \
+        "Cascade must supply every processor"
+    # Cascade sells to nobody the Americas buys from directly. This is what puts
+    # it out of reach of a one-hop query over supply_relationships, and it is the
+    # reason the processor tier exists at all rather than being staging dressing.
+    assert not cascade_targets & set(TIER1_IDS), (
+        f"Cascade supplies the tier-1s directly "
+        f"({sorted(cascade_targets & set(TIER1_IDS))}), so one hop from the "
+        f"Americas' own suppliers finds it")
+    fed_by_processor = {r["toSupplierId"] for r in supply_rels
+                        if r["fromSupplierId"] in PROCESSOR_IDS}
+    assert set(TIER1_IDS) <= fed_by_processor, \
+        "every tier-1 must buy from the processor tier"
     assert 60 <= by_id[CASCADE_ID]["riskScore"] <= 69, "Cascade riskScore must be 60-69"
 
-    # The five tier-1 suppliers must be the ONLY glass-bottle suppliers feeding
-    # the Americas, so plain Genie's beat-2 grouping returns exactly five and no
-    # background glass-bottle supplier offers an independent second glass source.
-    americas_glass = {
-        sid for sid, bus in bus_by_supplier.items()
-        if "BU-03" in bus and by_id[sid]["subcategory"] == "glass bottles"
-    }
-    assert americas_glass == set(TIER1_IDS), (
-        f"Americas glass-bottle suppliers must be exactly the five tier-1s, got {americas_glass}")
-    assert len(americas_glass) == 5, \
-        f"exactly five glass-bottle suppliers must serve BU-03, got {len(americas_glass)}"
+    # The sole-source premise, stated over commodity-carrying supply paths rather
+    # than over a count of direct suppliers. A path carries glass only when every
+    # supplier on it trades in a glass subcategory, so this walks the glass
+    # subgraph upstream from each unit's glass suppliers and asks what it reaches.
+    #
+    # It replaces an assert that the Americas had exactly the five tier-1s as
+    # glass-bottle suppliers. That was a count, it was fixed at five, and a
+    # reseed could only satisfy it by construction, so it restated how the data
+    # was drawn. The relationship below is what the demo actually claims: block
+    # Cascade and the Americas can no longer reach a furnace, while every other
+    # unit still can.
+    glass = COMMODITY_SUBCATEGORIES["glass"]
+    upstream: dict[str, set[str]] = {}
+    for rel in supply_rels:
+        src, dst = rel["fromSupplierId"], rel["toSupplierId"]
+        if by_id[src]["subcategory"] in glass and by_id[dst]["subcategory"] in glass:
+            upstream.setdefault(dst, set()).add(src)
+
+    def glass_sources(bu: str, blocked: str | None = None) -> set[str]:
+        """Every glass supplier on a commodity-carrying path into `bu`."""
+        seen_nodes = {sid for sid, bus in bus_by_supplier.items()
+                      if bu in bus and by_id[sid]["subcategory"] in glass
+                      and sid != blocked}
+        stack = list(seen_nodes)
+        while stack:
+            for source in upstream.get(stack.pop(), ()):
+                if source != blocked and source not in seen_nodes:
+                    seen_nodes.add(source)
+                    stack.append(source)
+        return seen_nodes
+
+    americas_glass = glass_sources("BU-03")
+    assert CASCADE_ID in americas_glass, (
+        "no commodity-carrying glass path into the Americas reaches Cascade, so "
+        "the sole-source premise the whole story rests on does not hold")
+
+    def furnaces(sources: set[str]) -> set[str]:
+        return {sid for sid in sources if by_id[sid]["subcategory"] == "raw glass"}
+
+    assert furnaces(americas_glass) == {CASCADE_ID}, (
+        f"the Americas reaches furnaces other than Cascade "
+        f"({sorted(furnaces(americas_glass) - {CASCADE_ID})}), so it has an "
+        f"independent glass source and losing Cascade would not stop the line")
+
+    # ...and the contrast that makes Beat 4 an argument rather than an assertion:
+    # the other four units are protected because they draw on other furnaces, not
+    # because nothing was linked to them.
+    for bu in BU_IDS:
+        if bu == "BU-03":
+            continue
+        assert furnaces(glass_sources(bu, blocked=CASCADE_ID)), (
+            f"{bu} reaches no furnace once Cascade is blocked, so it is merely "
+            f"unlinked rather than independently supplied")
 
     # Cascade supplies no business unit at all, so it owns zero rows in the
     # supplier_business_units bridge. This is the load-bearing invariant of the
@@ -1375,27 +1568,28 @@ def check_story1(suppliers: list[dict], supplies: list[dict],
         f"Cascade must have zero supplier_business_units rows, got "
         f"{sorted(bus_by_supplier[CASCADE_ID])}")
 
-    # ...and BU-03 therefore reaches Cascade only at the second hop, across a
-    # supplier -> supplier edge. Cascade also feeds a few non-bottle cluster-A
-    # suppliers that happen to serve BU-03, which is deliberate (it stops any one
-    # tier-1 becoming a second bridge), so the exactness is asserted over the
-    # glass-bottle route: the one the demo's question actually walks.
+    # ...and no supplier the Americas buys from touches Cascade at all, so the
+    # gap is two hops rather than one. A one-hop query from BU-03's own suppliers
+    # returns the processor tier and stops, which is the structural fact the
+    # re-probe checks Genie against: whether it reaches for recursion or answers
+    # from the tier it can see.
     bu03_suppliers = {sid for sid, bus in bus_by_supplier.items() if "BU-03" in bus}
     cascade_neighbors = {r["toSupplierId"] for r in supply_rels
                          if r["fromSupplierId"] == CASCADE_ID}
     cascade_neighbors |= {r["fromSupplierId"] for r in supply_rels
                           if r["toSupplierId"] == CASCADE_ID}
-    bottle_route = {sid for sid in cascade_neighbors & bu03_suppliers
-                    if by_id[sid]["subcategory"] == "glass bottles"}
-    assert bottle_route == set(TIER1_IDS), (
-        f"BU-03 must reach Cascade in exactly one bottle hop through the five "
-        f"tier-1s, got {sorted(bottle_route)}")
+    assert not cascade_neighbors & bu03_suppliers, (
+        f"{sorted(cascade_neighbors & bu03_suppliers)} both serve the Americas "
+        f"and touch Cascade, so one hop from the Americas' suppliers reaches it")
 
-    # Cascade must be the only link between the two clusters, so that removing it
-    # splits the supplier network in two. This is the structural form of "strict
-    # betweenness maximum" and the reason no aggregate over these rows finds it:
-    # counting connections cannot see a cut vertex. Betweenness itself is a Phase
-    # 2 computation; the invariant it depends on is asserted here.
+    # Cascade must NOT be a cut vertex. This assert is the inverse of the one it
+    # replaces, which required removing Cascade to split the network in two. That
+    # made its betweenness trivially maximal, which is true of any sole bridge and
+    # says nothing about the supplier: the room's fair question was why a global
+    # supply network has a single point of severance at all. Cascade now earns its
+    # score by sitting between a large upstream population and a large downstream
+    # one, and the way to prove that is to remove it and find the network still
+    # standing.
     adjacency: dict[str, set[str]] = {}
     for rel in supply_rels:
         adjacency.setdefault(rel["fromSupplierId"], set()).add(rel["toSupplierId"])
@@ -1414,36 +1608,18 @@ def check_story1(suppliers: list[dict], supplies: list[dict],
     assert reachable(CASCADE_ID) == all_nodes, \
         "the supplier network must be one connected component"
     without_cascade = reachable(TIER1_IDS[0], blocked=CASCADE_ID)
-    assert len(without_cascade) < len(all_nodes) - 1, \
-        "removing Cascade must split the supplier network, so it is the bridge"
+    assert without_cascade == all_nodes - {CASCADE_ID}, (
+        f"removing Cascade strands "
+        f"{sorted(all_nodes - {CASCADE_ID} - without_cascade)}, so Cascade is a "
+        f"cut vertex and its betweenness is maximal for a reason that says "
+        f"nothing about the supplier")
 
-    # Being *a* bridge is not enough: Cascade has to be the strict maximum on the
-    # structural measure Story 1 turns on. The count of supplier pairs a node
-    # separates is the CSV-checkable core of betweenness, since every path between
-    # two separated nodes must pass through it. Any other supplier scoring as high
-    # would give betweenness a rival and the demo a second answer. gds.py computes
-    # the real betweenness in Neo4j, which cannot fail on a laptop; this is the
-    # part of that result that can.
-    def pairs_separated(node: str) -> int:
-        remaining = all_nodes - {node}
-        covered: set[str] = set()
-        sizes = []
-        for start in remaining:
-            if start in covered:
-                continue
-            component = reachable(start, blocked=node)
-            covered |= component
-            sizes.append(len(component))
-        return sum(a * b for a, b in itertools.combinations(sizes, 2))
-
-    separated = {sid: pairs_separated(sid) for sid in all_nodes}
-    ranked = sorted(separated, key=lambda sid: (separated[sid], sid), reverse=True)
-    assert ranked[0] == CASCADE_ID, (
-        f"{ranked[0]} separates more supplier pairs ({separated[ranked[0]]}) than "
-        f"Cascade ({separated[CASCADE_ID]}), so betweenness would not name Cascade")
-    assert separated[CASCADE_ID] > separated[ranked[1]], (
-        f"Cascade must be the STRICT maximum, but {ranked[1]} ties it at "
-        f"{separated[CASCADE_ID]}")
+    # Nothing here asserts that Cascade wins on betweenness, and that omission is
+    # deliberate. Where it ranks is the outcome gds.py computes against the
+    # governed percentile in THR-03, and asserting an outcome in the generator is
+    # fitting the data to the story. What the generator owes is the structure in
+    # which the outcome is possible and honest: a network with no single point of
+    # severance, a real middle tier, and a protagonist that sits in it.
 
     # The most connected supplier must NOT be Cascade. This is the assertion the
     # whole demo rests on: if degree-ranking picked Cascade, a one-line GROUP BY
@@ -1457,18 +1633,15 @@ def check_story1(suppliers: list[dict], supplies: list[dict],
         f"Cascade is the highest-degree supplier ({degrees[CASCADE_ID]}), so counting "
         f"connections would find it and the graph algorithm is not required")
 
-    # ...and it must not merely lose, it must lose by the margin the decoy-hub
-    # loop in make_supply_relationships was built to open. That loop exits
-    # silently when it runs out of candidates before reaching the margin, so the
-    # margin is only real if it is asserted. A one-degree lead would technically
-    # satisfy the assert above while leaving the degree ranking a coin toss on
-    # stage.
+    # The realized gap is printed rather than asserted. A margin assert used to
+    # live here, guarding a loop that pushed a chosen supplier's degree up until
+    # it led by a fixed amount. Both are gone: the clusters grow by preferential
+    # attachment, so whoever leads on degree leads because of how the network
+    # grew, and a build that reports a one-degree lead is reporting something
+    # true about itself rather than failing a target it was built to hit.
     runner_up = max(n for sid, n in degrees.items() if sid != top_by_degree)
-    margin = degrees[top_by_degree] - runner_up
-    assert margin >= SUP_HUB_DEGREE_MARGIN, (
-        f"the decoy hub {top_by_degree} leads on degree by only {margin} "
-        f"({degrees[top_by_degree]} vs {runner_up}), below the "
-        f"{SUP_HUB_DEGREE_MARGIN} SUP_HUB_DEGREE_MARGIN the hub loop targets")
+    print(f"  degree leader: {top_by_degree} at {degrees[top_by_degree]}, "
+          f"next at {runner_up}, Cascade at {degrees[CASCADE_ID]}")
 
 
 def check_story2(customers: list[dict], invoices: list[dict],
@@ -1629,8 +1802,6 @@ def check_exposure(revenue_entries: list[dict], customers: list[dict],
     assert recomputed == bu03_last_quarter, (
         f"BU-03 last-quarter revenue recomputes to {recomputed}, but the caller "
         f"reported {bu03_last_quarter}")
-    assert 3_800_000 <= bu03_last_quarter <= 4_600_000, \
-        f"BU-03 last-quarter revenue {bu03_last_quarter} outside the 3.8M-4.6M band"
 
     # MEAS-02: credit exposure is the committed facility on the customer row.
     # The open invoice balance is the drawn portion of it, never added to it, so

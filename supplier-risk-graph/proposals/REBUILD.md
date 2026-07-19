@@ -18,14 +18,30 @@ structural asserts.
       `CONTRACT.md` section 7 exists to catch. They are now `check_supply_structure` in
       `generate_data.py`, called from `main` ahead of `check_story1`, with
       `MIN_INTERMEDIATE_FRACTION` and `MIN_SUPPLY_TIERS` sitting with the other
-      governed constants. All three pass against the pre-rebuild build, each by a wide margin, and
-      the realized figures print to the build log every run rather than being asserted.
+      governed constants. All three pass against the pre-rebuild build and the realized figures print
+      to the build log every run rather than being asserted.
+- [x] **The depth leg was unfalsifiable when it landed, and has been rebuilt.** The original probe
+      backtracked over simple paths and returned `MAX_PROBE_TIERS` the moment it popped any walk that
+      long, so it saturated on the first node scanned and printed `12+` as though that were a
+      measurement. A floor over a saturating measure passes unconditionally, so the leg was reporting
+      green rather than checking anything. It is now `supply_depth` in `generate_data.py`, the longest
+      directed shortest-path chain, measured by one breadth-first sweep per node. `MAX_PROBE_TIERS` is
+      deleted rather than left as a dead constant. The same data that printed `12+` now measures 23
+      tiers, which is the clearest evidence that the old figure was a saturation marker.
+- **What the rebuilt depth leg does not do, stated so it is not over-trusted.** It counts reachability
+  chains, and a cycle inflates those. A flat two-tier trading cluster with no supply tiers at all
+  clears `MIN_SUPPLY_TIERS` once a couple of back-edges exist, so the measure is a tripwire against
+  outright flattening rather than a reading of how many tiers the network runs. On a pure flat network
+  the intermediate-share leg fires first, so the depth leg only discriminates on a network that is flat
+  and already above the intermediate floor. Its docstring claims the measure never overstates depth,
+  which is true of path existence and not of tier count.
 - **Green here does not mean the topology is healthy, and the margins are the reason to say so.** All
   three clear comfortably on the build whose betweenness is trivially maximal because Cascade is a cut
   vertex. They catch star-forest collapse and nothing else, so the rebuild has to keep clearing them
-  while fixing what they cannot see. The depth floor has so much headroom on the background network
-  that it will not bind during the rebuild, and the intermediate share is far enough above its floor
-  that a failure there would signal something badly wrong rather than a near miss.
+  while fixing what they cannot see. The depth floor will not bind during the rebuild, and now that
+  the leg measures rather than saturates that is a real margin rather than an artifact. The
+  intermediate share is far enough above its floor that a failure there would signal something badly
+  wrong rather than a near miss.
 - **The RNG stream is unmoved, verified rather than assumed.** The regenerate came back byte-identical
   across every CSV except the resolved threshold values, which the generator emits empty and `gds.py`
   writes back, so the pre-rebuild baseline still stands.
@@ -176,11 +192,20 @@ building the premise is the work.
 - [ ] The "raw glass is reserved for Cascade" reservation, so the subcategory holds a cohort.
 - [ ] The rank-disagreement asserts, the `pairs_separated` strict-max assert, and the cut-vertex
       assert, which the connected-component check replaces.
-- [ ] **Both currency bands in `check_exposure`.** The BU-03 band is pure surplus, because the
-      recompute above it already confirms the figure sums the right unit, quarter, and column. The
-      Jade band has no recompute anywhere, so it is a replacement rather than a deletion: recompute
-      Jade's exposure from the source rows, assert the caller's figure against it, then drop the
-      band. A fitted band gets replaced by a recomputation, not removed.
+- [ ] **The BU-03 currency band in `check_exposure`,** which is pure surplus, because the recompute
+      above it already confirms the figure sums the right unit, quarter, and column.
+- [x] **The Jade band is replaced, not deleted.** It bracketed `JADE_CREDIT_FACILITY`, which `main`
+      pins onto Jade's row and then derives `jade_exposure` from, so the band asserted a constant
+      against a window drawn around that same constant and could not fail. `check_exposure` now takes
+      `customers`, resolves Jade's row by `JADE_ID` itself, recomputes her exposure from the
+      `creditLimit` column, and asserts the caller's figure against it. A fitted band gets replaced by
+      a recomputation, not removed.
+- **The recompute's reach is narrower than the BU-03 one, which is worth knowing before trusting it.**
+  `jade` in `main` and Jade's row in `customers` are the same dict object, so the check catches a
+  caller that reads the wrong customer or the wrong column and cannot catch a mutation between the pin
+  and the derivation. `fit_credit_facilities` runs in that window and would move both sides
+  identically. BU-03's recompute has the same property against `revenue_entries`. If an independent
+  leg is ever wanted, the invoice-balance-inside-facility relation is the available source.
 
 **The RNG stream will shift and there is no way around it.** Adding `raw glass` to the name-pool dict
 adds an `rng.shuffle`, and adding it to `SUBCATEGORIES["packaging"]` changes an `rng.choice` from four
