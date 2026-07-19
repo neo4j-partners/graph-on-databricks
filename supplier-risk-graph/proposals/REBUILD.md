@@ -10,11 +10,26 @@ the pre-flight section to `DEMO.md`, since those two checks run on every demo da
 Guards are landed and green: `guard.py`, the structural asserts, the three-legs check, the quarter
 assert, the Story 2 landmine asserts. One guards item is still open, below.
 
-- [ ] **Run B routing probe.** Ask the Beat 1 and Beat 3 questions through Genie One against the
-      current build and record whether the routing actually reaches the graph rather than falling
-      through to the lakehouse. Routing is a property of the MCP wiring, not the data, so the answer
-      survives the rebuild. A routing defect is the one Run B result that stops the demo, which is
-      why it runs before the rebuild is paid for and not after.
+- [x] **Run B routing probe. Done, and the gate is cleared: routing is not a defect.** Run B is the
+      MAS serving endpoint, which carries the Story 1 Genie space, the Neo4j MCP tools, and a Python
+      exec tool. Beat 3, asked verbatim, went to Genie first and then made repeated
+      `read_neo4j_cypher` calls that returned rows from the loaded graph, including a
+      `CLASSIFIED_AS` traversal to a `BusinessTerm` node and a `SUPPLIES` traversal to business
+      units. Definition-first resolution was observed rather than assumed. Beat 1, asked verbatim in
+      two fresh invocations, produced only Genie calls and never reached the graph. That is the
+      designed behavior, not a fault: `CONTRACT.md` section 5 makes Beat 1 the "Ask" beat put to both
+      runs, makes its ambiguity the demonstration, and has Beat 4 route Run B to the lakehouse on
+      purpose. The beat that must be grounded is grounded.
+- **Two staging facts recorded with it.** Every Neo4j call arrives as an approval request and the
+  endpoint blocks until it is answered, so whoever drives Beat 3 approves several tool calls
+  mid-answer, and whether the UI prompts or auto-approves is unestablished. Separately, registration
+  of the Python exec tool failed intermittently with `INVALID_PARAMETER_VALUE` and killed the whole
+  turn when it did. Neither blocks the rebuild. Both belong in a dry run.
+- **`guard.py` was run live after the probe and is clean,** across Unity Catalog tables and columns,
+  the full Genie space definition, and the banned gold tables parsed out of the space's data sources.
+  The live space still carries an auto-generated description rather than the authored one, which is a
+  priming problem and not a vocabulary leak. `DEMO.md` now says what to put in both the description
+  and the instructions fields.
 
 ## The rebuild
 
@@ -31,6 +46,42 @@ topology iterations, the percentile does not move, and `MIN_INTERMEDIATE_FRACTIO
 rather than a dial. It is repeated as a pointer because the loop below is exactly where it gets
 violated. If Cascade fails to clear THR-03 twice, check whether the sole-source assert passes and
 escalate. Do not take a third run at the topology.
+
+### Topology proposal, under review, not yet agreed
+
+The bullets below state what the topology must satisfy without resolving the numbers. Those numbers
+decide whether Cascade clears the percentile, and finding out by building costs one of the two
+permitted iterations, so they get argued here first. Nothing in this block is settled. When it is,
+the numbers move into the bullets and this section goes.
+
+**The sizing fact everything else hangs off.** The network holds the filler suppliers plus the six
+protagonists, and `SUPPLY_CONCENTRATION_PERCENTILE` is set at ninety-five. So the cohort clearing
+THR-03 is roughly the top twentieth of the supplier network by betweenness. Cascade has to land
+inside that band, not at the top of it, and the band is wide enough that a cohort of more than one
+member falls out naturally rather than being arranged.
+
+| Decision | Proposed | Why |
+|---|---|---|
+| Regional clusters | Four | Two is the current cut-vertex shape. Four gives six cluster pairs to bridge, so no single supplier separates the graph, while still leaving each cluster thick enough that betweenness has a real distribution inside it. |
+| Inter-cluster bridges | Six to eight, every one a different supplier | Enough to cover most cluster pairs. Spreading them across distinct suppliers is what stops one bridge inheriting the maximal betweenness Cascade is being moved away from. |
+| Bridge commodities | Freight, equipment, and ingredients, never glass | Required by the bullet below. Three groups rather than one so the exposure measure has several places to leak and commodity scoping is doing visible work. |
+| Intermediate glass subcategories | Two: `glass cullet` and `container glass` | Real tiers between a furnace and a bottle maker. Two is the minimum that gives the sub-tier its own cohort while keeping the chain shallow. |
+| Sub-tier vendors | Three, each feeding one or two of the tier-1 bottle makers | Convergence the room can read. One vendor would recreate a cut vertex one tier down. |
+| Other raw-glass furnaces | Three or four, feeding the other units' bottle makers | This is what makes `WHERE subcategory = 'raw glass'` return a cohort instead of Cascade alone, and what makes the other units genuinely independent rather than merely unlinked. |
+
+**The risk to name now rather than at iteration two.** Bridges must be non-glass, so Cascade's
+betweenness comes from the glass chain alone while the background network is deliberately built to be
+structurally rich. Those pull in opposite directions and the honest possibility is that Cascade lands
+below the percentile on the first build. If that happens the fix must change which structural
+relationship is true, for example a chain too shallow to accumulate path counts or a background too
+thin to spread betweenness. If the only available fix is nudging bridge counts or link counts until
+Cascade clears, that is the banned bar wearing new clothes: stop, report, and do not spend the second
+iteration on it.
+
+**`MIN_INTERMEDIATE_FRACTION` does not exist yet.** The stopping rule above and `CONTRACT.md` both
+govern it as though it were in the generator, and it is not in the code. `simplified-plan.md` records
+the intended floor on how many suppliers appear as intermediates rather than as endpoints. Creating
+it is rebuild work with no checkbox, so it gets one when this proposal is agreed.
 
 ### Generator, `make_supply_relationships`
 

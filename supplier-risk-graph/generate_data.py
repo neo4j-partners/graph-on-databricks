@@ -93,6 +93,37 @@ FILLER_STAKE_RANGE = (0.03, 0.18)
 SUPPLIER_RISK_THRESHOLD = 70  # riskScore on a 0-100 scale
 LATE_DAYS_THRESHOLD = 60  # days
 
+# The floor on how many suppliers are intermediate, meaning they appear on both
+# sides of supply_relationships. On a star forest every centrality measure
+# collapses into degree, betweenness becomes a group-by, and the graph adds
+# nothing; that is the failure diagnosed in worklog/london-bridge-is-falling.md,
+# and it is invisible in the output unless something checks for it.
+#
+# It is a tripwire, not a dial. A real multi-tier chain clears 30 percent
+# easily and a star forest fails it badly, so the gap between those two is where
+# the floor sits and a reseed will not spuriously trip it. If a build fails it,
+# the topology is what gets fixed, under the same two-iteration stopping rule
+# that governs the percentile in proposals/CONTRACT.md section 7. A fraction
+# that gets loosened until the topology clears it is measuring nothing.
+MIN_INTERMEDIATE_FRACTION = 0.30
+
+# The floor on how many tiers the supply network runs deep, counted in nodes
+# along one directed chain. Four is the tripwire and five is the design target,
+# and they are deliberately different: forcing them to match would either weaken
+# the target or make the tripwire brittle under reseed.
+#
+# Depth here is a property of the background network, not of the glass chain.
+# Beat 3's convergence paths stay short on purpose so they are legible on a
+# screen, so the depth that gives betweenness a real distribution has to come
+# from somewhere else.
+MIN_SUPPLY_TIERS = 4
+
+# How far the depth probe walks before giving up. It reports the deepest chain
+# it found rather than the true longest path, which is NP-hard in general and
+# not worth computing for a tripwire. Anything at or above MIN_SUPPLY_TIERS
+# satisfies the assert, so the cap only bounds what gets printed.
+MAX_PROBE_TIERS = 12
+
 # THR-03, the Supply Concentration Threshold, as the governed parameter rather
 # than as a score. A risk committee writes "review any supplier at or above the
 # 95th percentile of supply betweenness"; it does not write a raw betweenness
@@ -1184,6 +1215,100 @@ def compute_delinquent(customers: list[dict], invoices: list[dict]) -> list[str]
 
 
 # --- Offline self-checks. Each fails loudly if a plant invariant drifts. ---
+def check_supply_structure(supply_rels: list[dict]) -> None:
+    """Fail the build if the supply network cannot tell betweenness from degree.
+
+    Three properties, none of which mentions a protagonist or a ranking. They
+    assert that the topology has the structure in which betweenness and degree
+    *can* diverge, which is a property of an honest multi-tier supply chain.
+    They deliberately do not assert that the two *do* diverge: that is the
+    outcome, and asserting the outcome is fitting the data to the story.
+
+    worklog/london-bridge-is-falling.md diagnosed the failure these replace. On
+    a star forest every centrality measure collapses into degree, so betweenness
+    becomes an expensive group-by and the graph adds nothing to the demo. Until
+    now that was caught by looking at the output and judging whether it seemed
+    plausible, which is not a check.
+    """
+    edges = {(r["fromSupplierId"], r["toSupplierId"]) for r in supply_rels}
+    nodes = {sid for edge in edges for sid in edge}
+
+    # 1. Not a forest. On a forest the edge count is exactly the node count
+    # minus the component count, so any excess is a cycle, and cycles are what
+    # give a cluster alternate routes. Counted undirected, because that is how
+    # the betweenness projection reads these rows.
+    undirected: dict[str, set[str]] = {}
+    for src, dst in edges:
+        undirected.setdefault(src, set()).add(dst)
+        undirected.setdefault(dst, set()).add(src)
+
+    components = 0
+    unvisited = set(nodes)
+    while unvisited:
+        components += 1
+        stack = [unvisited.pop()]
+        while stack:
+            for neighbor in undirected[stack.pop()]:
+                if neighbor in unvisited:
+                    unvisited.discard(neighbor)
+                    stack.append(neighbor)
+
+    forest_edges = len(nodes) - components
+    assert len(edges) > forest_edges, (
+        f"the supplier network is a forest: {len(edges)} edges over {len(nodes)} "
+        f"nodes in {components} components, so every centrality measure collapses "
+        f"into degree and betweenness finds nothing degree would not")
+
+    # 2. A substantial share of suppliers are intermediate, appearing on both
+    # sides of supply_relationships. The original diagnosis was that no supplier
+    # was ever both a source and a target, which is a supply chain with no middle.
+    sources = {src for src, _ in edges}
+    targets = {dst for _, dst in edges}
+    intermediate = sources & targets
+    fraction = len(intermediate) / len(nodes)
+    assert fraction >= MIN_INTERMEDIATE_FRACTION, (
+        f"only {len(intermediate)} of {len(nodes)} suppliers ({fraction:.0%}) are "
+        f"intermediate, below the {MIN_INTERMEDIATE_FRACTION:.0%} "
+        f"MIN_INTERMEDIATE_FRACTION floor, so the network has almost no middle "
+        f"tier for supply paths to route through")
+
+    # 3. Traversal reaches at least MIN_SUPPLY_TIERS tiers along one directed
+    # chain. Reports the deepest chain found rather than the true longest path,
+    # which is NP-hard and unnecessary for a tripwire.
+    outgoing: dict[str, set[str]] = {}
+    for src, dst in edges:
+        outgoing.setdefault(src, set()).add(dst)
+
+    def deepest_from(start: str) -> int:
+        """Longest simple directed chain out of one node, in nodes, capped."""
+        deepest = 1
+        stack = [(start, frozenset({start}))]
+        while stack:
+            node, walked = stack.pop()
+            if len(walked) >= MAX_PROBE_TIERS:
+                return MAX_PROBE_TIERS
+            for neighbor in outgoing.get(node, ()):
+                if neighbor not in walked:
+                    deepest = max(deepest, len(walked) + 1)
+                    stack.append((neighbor, walked | {neighbor}))
+        return deepest
+
+    tiers = 0
+    for node in sorted(nodes):
+        tiers = max(tiers, deepest_from(node))
+        if tiers >= MAX_PROBE_TIERS:
+            break
+
+    assert tiers >= MIN_SUPPLY_TIERS, (
+        f"the deepest supply chain runs {tiers} tiers, below the "
+        f"{MIN_SUPPLY_TIERS}-tier floor, so there is not enough depth for supply "
+        f"paths to converge anywhere")
+
+    print(f"  supply structure: {len(edges)} edges over {len(nodes)} suppliers in "
+          f"{components} component(s), {fraction:.0%} intermediate, "
+          f"{tiers}{'+' if tiers >= MAX_PROBE_TIERS else ''} tiers deep")
+
+
 def check_story1(suppliers: list[dict], supplies: list[dict],
                  supply_rels: list[dict]) -> None:
     by_id = {s["id"]: s for s in suppliers}
@@ -1779,6 +1904,7 @@ def main() -> None:
 
     # Self-checks (offline, fail loud).
     strategic_ids = {row["entity_id"] for row in classified_as if row["term_id"] == "TERM-01"}
+    check_supply_structure(supply_rels)
     check_story1(suppliers, supplies, supply_rels)
     check_story2(customers, invoices, findings, delinquent_set, strategic_ids)
     check_ownership(customers, owned_by)
