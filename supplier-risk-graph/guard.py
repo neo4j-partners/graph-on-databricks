@@ -10,7 +10,13 @@ against exactly that, and this file is the assert.
 
 Four surfaces can leak one: Unity Catalog table names, column names, table
 comments, and column comments, plus the Genie space text instructions and its
-example SQL. All six are checked here.
+example SQL. All six are checked here, along with the metric view YAML, whose
+comments and synonym lists are authored text on the same footing.
+
+One check here is not about vocabulary at all: the Genie space must not carry
+the two gold tables, which materialize the graph's answers. It fails the same
+claim by a different route and it is verified against the same fetched space,
+which is why it lives here rather than in a script of its own.
 
 Why this is a standalone script and not a flag on upload.py. The Genie space is
 hand-synced through the manage_genie MCP tool, so anyone who edits the space
@@ -466,6 +472,11 @@ def check_genie_space(
     landmine asserts exist to catch, so the emptiness check below is not
     defensive clutter: it is the difference between this function passing and
     this function meaning something.
+
+    banned_tables runs from the same fetch. It is a different failure from a
+    vocabulary leak, but it fails the same claim and it is checked against the
+    same surface at the same moment, so paying for a second round trip to keep
+    the two in separate scripts would buy nothing.
     """
     space = w.genie.get_space(cfg.genie_space_id, include_serialized_space=True)
     if not space.serialized_space:
@@ -484,7 +495,10 @@ def check_genie_space(
     )
     leaks += banned_tables(space.serialized_space, where)
     size = len(space.serialized_space or "")
-    print(f"  Genie space:   '{space.title}', {size} chars of definition scanned")
+    print(
+        f"  Genie space:   '{space.title}', {size} chars of definition scanned, "
+        "data sources checked against the banned gold tables"
+    )
     return leaks
 
 

@@ -25,7 +25,52 @@ this.
 
 ---
 
+## The plan in plain terms
+
+A scan layer for orientation, added because this document is dense by design. Nothing in this
+section is normative. It deliberately paraphrases, so if it ever disagrees with the contract or
+with a detailed section below, the summary is the thing that is wrong.
+
+**The demo, explained simply.** A company buys glass bottles from several suppliers and believes
+that supply is diversified. Every one of those suppliers, somewhere up the chain, buys from the
+same furnace. Counting suppliers says safe. Following the supply paths says the company is one
+furnace away from stopped shipments. The demo asks the same questions of two systems. Run A is
+Genie over the lakehouse, and it answers fluently from column names. Run B adds a knowledge graph
+holding the company's own written definitions. The point is never that Run A is wrong. The point
+is that Run A's answer is anchored to nothing, while Run B's answer is anchored to a definition a
+risk committee wrote down and can act on.
+
+**What is broken today, and the fix for each.**
+
+- The furnace, Cascade, sells directly to the bottle makers, so a connection count finds it and
+  there is nothing to discover. The fix moves it one tier back, behind sub-tier glass vendors, so
+  the dependency is real but visible only to a traversal.
+- The governed exposure measure counts every reachable business unit, so it sweeps up the whole
+  company and is useless as a number. The fix counts only supply paths that carry the commodity at
+  risk, which makes one unit genuinely sole-sourced and the others genuinely protected.
+- Several asserts encode the story's outcome rather than the topology's structure, which is the
+  fitted-data failure this project keeps repeating. The fix asserts structure and reads every
+  outcome from the build output.
+
+**Where the work stands.** Status lives in each phase's opening line; this table mirrors it and is
+updated in the same edit.
+
+| Phase | Status | Purpose |
+|---|---|---|
+| Phase 0, the Run A probe | Complete | Measure Genie's actual reflexes before building anything |
+| Phase 1, the governed wording | Complete, one alignment edit open | The four governed texts, approved and landed |
+| Phase 2, the guards | In progress | Every check written and proven green against the current build, plus the Run B routing probe |
+| Phase 2.5, the rebuild | Not started | The topology, the GDS rework, and the regenerate loop |
+| Phase 3, the re-probe | Not started | Ask everything again on rebuilt data and write the beats from transcripts |
+| Phase 4, the docs | Not started | Bring every document, diagram, and the Genie space in line with the transcripts |
+
+---
+
 ## What the probe established
+
+*In short: measured facts, not expectations. Genie never walked past one hop or wrote a recursive
+CTE on any probed question, the dangerous phrasings are identified, and no answer cited a governed
+definition.*
 
 `probe-run-a.md` holds the transcripts, the generated SQL, and the full findings from both halves of
 the Run A probe: a four-question reflex probe and a five-run spread measurement on the frozen Beat 1
@@ -58,6 +103,9 @@ over to the rebuilt topology. The specific answers do not, which is why the re-p
 
 ## The hidden choke point
 
+*In short: Cascade moves one tier back, feeding sub-tier vendors who feed the tier-1 bottle makers.
+Few connections, many paths, and it is not true of the data today.*
+
 A choke point that a connection count already names is not hidden, and there is no discovery step to
 demonstrate. So the topology requirement is this: **a connection count must not name Cascade.**
 
@@ -74,6 +122,10 @@ bridge-linking block of `make_supply_relationships`, which is most of its degree
 back one tier.
 
 ## Where the difference comes from, leg by leg
+
+*In short: the graph grounds the answer three ways. The definition leg is guaranteed by
+construction. Discovery and explanation are about what each engine reaches for naturally, and only
+the first cannot fail.*
 
 **Leg 1, definition.** Genie Agent on the lakehouse does not know what a Critical Supplier is, that a
 Supply Exposure measure exists, or what THR-03 governs. There is no table it could read to find out,
@@ -101,6 +153,9 @@ what "critical" means.
 
 ## The division of labor
 
+*In short: the graph decides which business units are exposed, the lakehouse computes the revenue,
+and saying so out loud is what settles the fairness question.*
+
 The graph is not a BI engine and the demo never implies it is. Revenue arithmetic belongs in the
 lakehouse, and conceding that makes the demo more credible: the moment the graph appears to be
 computing euros, a savvy room asks why you would sum revenue in Neo4j, and they would be right.
@@ -110,6 +165,10 @@ computed by the lakehouse, from a table both runs could read. Nothing was withhe
 special-cased. The only difference is that one run knew which number to ask for.
 
 ## The load-bearing fix: supply paths carry a commodity
+
+*In short: a supply path counts as a dependency only if every supplier on it trades in the
+commodity at risk. That one predicate rescues the exposure measure, constrains the rebuild, and
+gets its own guard extension.*
 
 Today Supply Exposure is defined as every business unit reached by the supplier's multi-tier
 `SUPPLIES` paths. That is unfiltered reachability, and it escapes through suppliers that carry nothing
@@ -184,6 +243,9 @@ and break the one-measure-per-term assert, which is the mechanical reason the sa
 
 ## Story 1 staging
 
+*In short: Beat 3 shows definition, then discovery, then explanation as three distinct outputs on
+screen, Beat 4 is the handoff made visible, and no beat scripts a Run A answer.*
+
 The five beats, the frozen question text, and the notes on how each beat is narrated are contract
 sections 5 and 6. What follows is only what a presenter needs that the contract does not carry.
 
@@ -221,6 +283,9 @@ rigged.
 
 ## The vocabulary guard
 
+*In short: a mechanical check over every surface Run A can see, run at build time and again on demo
+day, plus a human review for the paraphrases a mechanical check cannot catch.*
+
 Contract section 7 asserts that no governed vocabulary is visible to Run A. This is how.
 
 Four surfaces can leak one: Unity Catalog table and column names, table and column comments, the Genie
@@ -250,6 +315,10 @@ the finding. The B5 editorial rule already in `upload.py` stays as the human rev
 are not interchangeable and neither one covers the other.
 
 ## The structural asserts
+
+*In short: three asserts prove the network has the shape in which betweenness and degree can
+diverge. None of them mention Cascade or a ranking, because asserting the outcome is the banned
+move.*
 
 `london-bridge-is-falling.md` diagnosed the failure that killed two earlier passes: on a star forest
 every centrality measure collapses into degree, so betweenness becomes a group-by and the graph adds
@@ -286,9 +355,32 @@ protecting.
 
 ## Generator changes (`generate_data.py`)
 
+*In short: rebuild the supply network around one true fact, keep the premise construction distinct
+from the banned bar, delete every plant and outcome assert, and accept that the RNG shift moves
+every figure.*
+
 Rebuild `make_supply_relationships` around one true fact: one business unit's tier-1 bottle suppliers
 all trace back through the sub-tier to Cascade, and the other units' glass suppliers do not. That is
 the entire topology.
+
+**The sole-source premise and the banned bar, distinguished before code review collides with them.**
+Contract section 8 bans barring background suppliers from a business unit, and contract section 7
+asserts that every Americas glass bottle supplier traces to Cascade. Constructing that premise means
+the generator decides which glass suppliers the Americas draws from, and that code will look similar
+to the bar being deleted below. The distinction is settled here so the rebuild does not relitigate it
+midway:
+
+- **The banned bar controlled an answer.** It suppressed background glass-bottle suppliers so that
+  Beat 1's count came out fixed, a plant serving a predicted Run A answer.
+- **The premise construction controls a relationship.** The Americas unit's glass suppliers are
+  assigned from the pool the Cascade chain feeds, and every other unit is assigned at least one
+  independent glassworks. Who traces where is the authored premise, stated in the open in contract
+  section 7 and asserted at build time. How many suppliers each unit has, and everything Run A says
+  about any of them, is left to fall where the topology puts it.
+
+The test for any future edit in this area: if it fixes a count, a score, or a predicted answer, it
+is the bar wearing new clothes. If it fixes which structural relationship is true, it is the
+premise, and building the premise is the work.
 
 **Keep clustering and enrich it.** Betweenness needs structural holes to be meaningful, so the
 background becomes several regional clusters with multiple inter-cluster bridges rather than two
@@ -437,6 +529,10 @@ No minimum-cohort clause and no 80 percent rule.
 
 ## GDS changes (`gds.py`)
 
+*In short: keep betweenness and the projection check, resolve THR-03 from the governed percentile,
+assert cohort membership rather than a winner, and add the Story 2 checks that exist only in prose
+today.*
+
 - **Keep `compute_betweenness`.** Add `concurrency: 1` for symmetry with PageRank. Note that the reason
   it is currently unpinned is sound: `samplingSize` is already pinned to `nodeCount`, which makes it
   exact Brandes, and the existing comment block explains why that is already deterministic. PageRank
@@ -475,6 +571,9 @@ document.
   first place.
 
 ## Docs
+
+*In short: every document, diagram, and the Genie space gets reconciled to the rebuilt data, and
+each claim of done is verified against the live workspace rather than the worklog.*
 
 - `DEMO.md`: rewrite the Story 1 beats around the grounding spine. Beat 2 becomes a live repeated ask
   with no scripted Run A answer. Beat 3 stays a single beat and shows the three legs in the new order,
@@ -553,9 +652,11 @@ no assert needed relaxing, because RULE-05's expression still carries the litera
 and `SUPPLIES` strings the generator requires. The approved wording is recorded below under "The draft
 wording", which is now the landed wording rather than a proposal.
 
-One editorial item is outstanding and blocks nothing: `TERM-05` says paths carry a commodity "into the
-business" while `RULE-05` says "into a business unit". Per-unit is the correct scope and matches
-`MEAS-01`, so `TERM-05` is the one to align.
+One editorial item is outstanding: `TERM-05` says paths carry a commodity "into the business" while
+`RULE-05` says "into a business unit". Per-unit is the correct scope and matches `MEAS-01`, so
+`TERM-05` is the one to align. It lands before the rebuild starts, not after: this plan's own gate
+logic says the wording is an input to the topology, and a one-word alignment is not worth an
+exception to that.
 
 Draft the governed text for `TERM-05`, `RULE-05`, `MEAS-01` and `RULE-07`, get it approved, and land
 it. Nothing else.
@@ -652,6 +753,10 @@ commodity-scoped population predicate with grain and aggregation untouched.
 
 ### Phase 2, the guards
 
+*In short: every guard is written and proven green against the current build first, so when the
+rebuild breaks something the failure is unambiguously in the data. The Run B routing probe joins
+this phase because its worst outcome must not be discovered last.*
+
 **In progress.** The THR-03 percentile constant is committed on its own, ahead of any topology work,
 per the immovability guard in contract section 7. That is what makes "chosen before the run" a fact
 anyone can verify from git history rather than a claim in a document. A pre-rebuild baseline of the
@@ -683,16 +788,34 @@ Contents:
   than after.
 - The build-time quarter assert, and recording the build identity alongside the seed and the git sha.
 - The `basis` column on `thresholds.csv` and the matching `load.py` `NodeSpec` change.
+- **The Run B routing probe, against the current green build, recorded in `probe-run-b.md`.**
+  Contract section 5 makes a routing defect, meaning Run B never reaches the graph at all, the one
+  Run B result that stops the demo, and until now it was scheduled to be discovered last, after the
+  full cost of the rebuild was already paid. Routing is a property of the MCP wiring and Genie One's
+  tool selection, not of the data, so the answer survives the rebuild the same way the Phase 0
+  reflex findings do. This probe answers one question only: does Run B reach the graph. What Run B
+  says on the rebuilt data, and whether it cites the definition unprompted, stays in the re-probe
+  phase.
 
 **Exit criterion:** every item above passes against the current build, with `data/` otherwise
-unchanged. A guard that has never been seen to pass is not a guard.
+unchanged. A guard that has never been seen to pass is not a guard. For the routing probe, passing
+means a recorded transcript in which Run B reaches the graph.
 
 ### Phase 2.5, the rebuild
+
+*In short: one regenerate loop, run repeatedly until every assert is green. The hard judgment is
+telling a broken premise from a moved output when a Story 2 assert fails, and the decision rule
+below settles it in advance.*
 
 The generator changes, the GDS changes, `make demo`, and `make expected`, in one batch, run repeatedly
 until it comes out clean. Numbered 2.5 rather than 3 on purpose: this plan refers to phases by name
 because renumbering has broken cross-references here before, and inserting a phase would renumber the
 re-probe and the docs.
+
+**Precondition: a clean tree.** The guards and the wording land as commits before the first
+regenerate runs. `../worklog/lessons-learned.md` records a regenerate on a dirty tree destroying
+uncommitted data, and this phase is one long regenerate loop, so the rule is applied here rather
+than remembered.
 
 **Exit criterion:**
 
@@ -770,6 +893,9 @@ vocabulary guard clean.
 
 ### Phase 3, the re-probe
 
+*In short: re-ask every question on the rebuilt data, watch whether Genie recurses now that Cascade
+sits two tiers back, and write the beats from the transcripts, never before them.*
+
 Re-run all four probe questions against the rebuilt data, plus the Beat 1 spread run. Read the
 betweenness output. Then write the Story 1 beats from what came back.
 
@@ -783,13 +909,13 @@ then: a recursive answer still cites no governed definition.
 Also re-probe the exact phrase "common upstream supplier." If Genie responds by adding a second hop by
 hand rather than by recursing, the convergence caveat needs stating more carefully than "one join."
 
-**Probe Run B too, and record it in `probe-run-b.md`.** Run A has recorded transcripts and Run B has
-none, which means the half of the demo we are actually selling has never been tested the way the half
-we are contrasting against has. The plumbing is standing already, per contract section 8, so this is
-asking questions rather than building anything. Ask the Beat 1 and Beat 3 questions through Genie One
-and record what comes back, including whether the routing actually reaches the graph rather than
-falling through to the lakehouse. The question worth answering is whether Run B cites the definition
-unprompted or has to be steered into it.
+**Probe Run B on the rebuilt data, continuing `probe-run-b.md`.** The routing question, whether Run
+B reaches the graph at all, is answered in the guards phase, because it is the one Run B result that
+stops the demo and it must not be discovered last. What remains here is behavior on the rebuilt
+data. The plumbing is standing already, per contract section 8, so this is asking questions rather
+than building anything. Ask the Beat 1 and Beat 3 questions through Genie One and record what comes
+back. The question worth answering is whether Run B cites the definition unprompted or has to be
+steered into it, which per contract section 5 is a staging note rather than a failure.
 
 **The beats are written from the output, never before it.** There is no adjust-the-script escape hatch
 and there are no exceptions to it. If a run answers something other than what a beat expects, the beat
@@ -812,7 +938,8 @@ claim-integrity one.
 **Exit criterion:**
 
 - Transcripts for all four questions from the rebuilt data, plus a Beat 1 spread run.
-- A Run B probe recorded in `probe-run-b.md`.
+- The Run B behavior probe recorded in `probe-run-b.md`, continuing the routing probe captured in
+  the guards phase.
 - A betweenness top-N read and recorded.
 - Five beats written that match what the transcripts say and that contain no scripted Run A answer.
 - **The three legs produce three distinct visible outputs on screen in Beat 3.** The guards phase
@@ -831,6 +958,9 @@ worklog. The v1 and v2 transcripts are archived and the v3 set is captured and s
 identity.
 
 ## Checks that belong to no single phase
+
+*In short: the claims that must hold at any moment, plus the two pre-flight checks that only mean
+anything on the day.*
 
 Every other check in this plan is a phase exit criterion and is not repeated here. These are not.
 
