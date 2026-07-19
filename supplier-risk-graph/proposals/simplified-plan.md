@@ -59,7 +59,7 @@ updated in the same edit.
 |---|---|---|
 | Phase 0, the Run A probe | Complete | Measure Genie's actual reflexes before building anything |
 | Phase 1, the governed wording | Complete, one alignment edit open | The four governed texts, approved and landed |
-| Phase 2, the guards | In progress | Every check written and proven green against the current build, plus the Run B routing probe |
+| Phase 2, the guards | Code complete, Run B routing probe open | Every check written and proven green against the current build, plus the Run B routing probe |
 | Phase 2.5, the rebuild | Not started | The topology, the GDS rework, and the regenerate loop |
 | Phase 3, the re-probe | Not started | Ask everything again on rebuilt data and write the beats from transcripts |
 | Phase 4, the docs | Not started | Bring every document, diagram, and the Genie space in line with the transcripts |
@@ -456,12 +456,24 @@ Delete:
 - the rank-disagreement asserts.
 - the `pairs_separated` strict-max assert. It asserts the narrative before the algorithm runs.
 - the cut-vertex assert, replaced by the connected-component check.
-- **the hardcoded currency band in `check_exposure`.** It asserts BU-03's last-quarter revenue falls
-  inside a fixed range, which is exactly the shape contract section 9 bans: the first reseed that moves
-  revenue outside the band fires it spuriously, and the obvious "fix" is to widen the band, which
-  teaches the next person that asserts are negotiable. The recompute check immediately above it already
-  does the honest work, confirming the figure sums the right unit, the right quarter, and the right
-  column.
+- **both hardcoded currency bands in `check_exposure`.** There are two, and an earlier draft of this
+  list named only the first, which would have deleted one and left the other for the rebuild to trip
+  over.
+
+  The first asserts BU-03's last-quarter revenue falls inside a fixed range, which is exactly the shape
+  contract section 9 bans: the first reseed that moves revenue outside the band fires it spuriously, and
+  the obvious "fix" is to widen the band, which teaches the next person that asserts are negotiable. The
+  recompute check immediately above it already does the honest work, confirming the figure sums the
+  right unit, the right quarter, and the right column. Deleting it costs nothing.
+
+  **The second is the same shape but does not have the same escape, so it needs one built.** The Jade
+  exposure band is a bare range check with no recompute anywhere above it, so `jade_exposure` is the
+  only thing in this function checked by a band alone. Deleting it the way the BU-03 band gets deleted
+  would leave the figure with no check at all, which is a worse outcome than the fitted assert. So this
+  one is a replacement rather than a deletion: recompute Jade's exposure from the source rows the way
+  BU-03's is recomputed, assert the caller's figure against the recomputation, and drop the band. The
+  rule to carry out of this is the general one, that a fitted band is replaced by a recomputation rather
+  than removed, and the two entries differ only in whether the recomputation already exists.
 
 Add:
 
@@ -757,10 +769,18 @@ commodity-scoped population predicate with grain and aggregation untouched.
 rebuild breaks something the failure is unambiguously in the data. The Run B routing probe joins
 this phase because its worst outcome must not be discovered last.*
 
-**In progress.** The THR-03 percentile constant is committed on its own, ahead of any topology work,
-per the immovability guard in contract section 7. That is what makes "chosen before the run" a fact
-anyone can verify from git history rather than a claim in a document. A pre-rebuild baseline of the
-green build is captured in `../worklog/pre-rebuild-baseline.md`.
+**Code complete, 2026-07-19. Every check is landed and has been seen to pass. The Run B routing probe
+is the one item still open, and it is a probe rather than code.** The THR-03 percentile constant is
+committed on its own, ahead of any topology work, per the immovability guard in contract section 7.
+That is what makes "chosen before the run" a fact anyone can verify from git history rather than a
+claim in a document. A pre-rebuild baseline of the green build is captured in
+`../worklog/pre-rebuild-baseline.md`.
+
+**The exit criterion was met literally, not by inspection.** `guard.py` was run offline and against
+the live workspace and reported clean on both. The generator asserts were run inside
+`uv run generate_data.py`. The regenerate moved exactly one line in `data/`, the `git_sha` inside the
+`build_identity` block, with every CSV otherwise byte-identical, so the RNG stream is intact and the
+baseline stays valid.
 
 **Why this is a separate phase from the rebuild, given the plan previously refused to split.** The
 earlier draft split the work into generator changes, GDS changes, and reload, and that split was
@@ -781,14 +801,68 @@ back identical and the baseline stays valid.
 
 Contents:
 
-- The three Story 2 landmine asserts, written and confirmed passing against known-good data.
-- The three-legs resolution check against the currently loaded graph.
-- The vocabulary guard, built as something callable standalone, then run against live Unity Catalog and
-  the live Genie space. If it fails today, that is a finding worth having before the rebuild rather
-  than after.
-- The build-time quarter assert, and recording the build identity alongside the seed and the git sha.
-- The `basis` column on `thresholds.csv` and the matching `load.py` `NodeSpec` change.
-- **The Run B routing probe, against the current green build, recorded in `probe-run-b.md`.**
+- **Done. The three Story 2 landmine asserts,** written and confirmed passing against known-good data.
+  The holdco filter assert is in `trading_customers` in `gds.py` and states the relationship, that
+  somebody was excluded, rather than a count. The filler-default pairing assert is in `check_ownership`
+  in `generate_data.py`, and it keys on the real invariant rather than on `FILLER_STAKE_RANGE`, which
+  `pre-rebuild-baseline.md` had already falsified as an invariant of the emitted data: no filler default
+  lacks a defaulted counterparty, and the weakest default-to-default stake exceeds the strongest
+  default-to-clean stake. Both branches were negative-tested, so neither is vacuous.
+
+  **The third was already there, and the plan's wording for it was wrong.** This document asked for an
+  assert that `ranIterations` is below `maxIterations`. `check_pagerank_convergence` in `gds.py` already
+  yields `didConverge` from a `stats` run and exits on it. `didConverge` is the direct report of the
+  condition, false precisely when the run exhausts its iteration cap, so the requested assert is a proxy
+  for it rather than an additional check, and it is the worse of the two at the boundary: a run that
+  converges on its last permitted iteration is healthy and the proxy would fail it spuriously. Nothing
+  was added. Recorded here because the obvious future reading of this list is that an item was skipped.
+- **Done. The three-legs resolution check** against the currently loaded graph, as `check_three_legs`
+  in `gds.py`. Leg 1 walks term to rule to threshold by term name and requires the threshold's `basis`
+  and resolved `value` to both be present. Leg 2 asserts the protagonist carries a betweenness property
+  and never what the score is. Leg 3 uses a variable-length traversal, so the check survives the rebuild
+  moving Cascade a tier back rather than baking today's hop count in.
+- **Done. The vocabulary guard,** as `guard.py`, callable standalone and wired into `make check`
+  (offline), `make demo` (step 5), and `make guard` (the pre-flight re-run). It reports clean against
+  live Unity Catalog and the live Genie space today, so the finding this item hoped for is that there
+  was nothing to find.
+
+  **It gained two checks beyond what this section specified, and one of them belonged to Phase 2.5.**
+  The offline half now scans `METRIC_VIEW_YAML` as well as `upload.py`'s SEMANTICS, because the metric
+  view carries an authored comment and per-measure synonym lists whose whole purpose is giving Genie
+  more phrasings to match, which makes a governed name in a synonym list the most direct leak available.
+  And the guard now checks that the two gold tables are absent from the space's declared data sources,
+  read from `data_sources.tables` rather than by searching the blob, so an instruction that merely says
+  the word "classifications" cannot fire it. Phase 2.5's verify step asks for "banned tables absent" in
+  the same breath as "vocabulary guard clean"; it is now one call and 2.5 does not need to build it.
+
+  **The commodity extension enforces "together" rather than bare co-occurrence.** This document's
+  wording is that a comment *enumerates* two or more members of one commodity's subcategory set. On a
+  column comment the distinction barely matters, because the whole string is one place. On the Genie
+  space, scanned as a single blob of well over ten thousand characters, an unbounded test asks whether
+  two members appear anywhere in the entire space, which they eventually will for reasons that are not
+  an enumeration. This phase schedules a re-sync of the region and subcategory filters, which is exactly
+  the edit that scatters single-member values across the document. A guard that fires on that is a guard
+  someone learns to switch off, and the next real leak goes with it, so `COMMODITY_PROXIMITY` bounds the
+  gap between member hits.
+- **Done. The build-time quarter assert,** as `check_quarter` in `generate_data.py`, and the build
+  identity recorded in `ground_truth.json` alongside the seed, the as-of date, and the git sha. Note
+  that the sha carries a `-dirty` marker when the tree is not clean, which is honest and worth keeping.
+  A build identity recorded from a dirty tree cannot be traced to a commit, so a regenerate from a clean
+  tree is worth doing before the rebuild starts.
+- **Done, and it needed no `load.py` change.** The `basis` column is on `thresholds.csv` and in the
+  generator's `THRESHOLDS`. This document predicted that `load.py`'s threshold `NodeSpec` needs no type
+  entry because `value` remains the only numeric field, and that is confirmed rather than assumed:
+  `convert` applies a converter only when the key appears in the spec's `types` dict, so untyped columns
+  pass through as strings and an empty one lands as `None`, which is how `currency` already behaves on
+  the integer thresholds. `update_thresholds_csv` in `gds.py` round-trips the column safely because it
+  takes its fieldnames from the file it just read. The minimal correct change here was zero.
+
+  **The property only reaches the graph on a reload, which caught this out once.** The live graph was
+  from a load predating the column, so `check_three_legs` would have exited on leg 1's `basis` check
+  until the next `load.py`. It has since been reloaded and the property is on the node. Worth knowing
+  because the symptom looks like a broken check rather than a stale graph.
+- **Open. The Run B routing probe, against the current green build, recorded in `probe-run-b.md`.**
+  This is the only item in the phase still outstanding, and it is the reason the phase is not closed.
   Contract section 5 makes a routing defect, meaning Run B never reaches the graph at all, the one
   Run B result that stops the demo, and until now it was scheduled to be discovered last, after the
   full cost of the rebuild was already paid. Routing is a property of the MCP wiring and Genie One's
@@ -800,6 +874,18 @@ Contents:
 **Exit criterion:** every item above passes against the current build, with `data/` otherwise
 unchanged. A guard that has never been seen to pass is not a guard. For the routing probe, passing
 means a recorded transcript in which Run B reaches the graph.
+
+**Status against that criterion: met for every code item, open for the routing probe.** All five code
+items have been run and seen to pass. The phase closes when `probe-run-b.md` exists and records Run B
+reaching the graph.
+
+**One inconsistency this phase deliberately leaves standing, so it is not mistaken for a defect.**
+`SUPPLY_CONCENTRATION_PERCENTILE` is committed and is now quoted as authored language in THR-03's
+`basis`, which is on the live Threshold node. Nothing reads the constant yet: `gds.py` still resolves
+THR-03 the old one-winner way, because reworking that is Phase 2.5 work per the GDS changes section. So
+the graph currently states a governed percentile and computes a cutoff by another route. That is the
+intended ordering, since the constant had to land before the topology it will be applied to exists, but
+it is a live disagreement between what the graph says and what it does, and Phase 2.5 closes it.
 
 ### Phase 2.5, the rebuild
 
