@@ -15,16 +15,13 @@ assert, the Story 2 landmine asserts. One guards item is still open, below.
       through to the lakehouse. Routing is a property of the MCP wiring, not the data, so the answer
       survives the rebuild. A routing defect is the one Run B result that stops the demo, which is
       why it runs before the rebuild is paid for and not after.
-- [ ] **TERM-05 alignment.** It says paths carry a commodity "into the business" while RULE-05 says
-      "into a business unit". Per-unit matches MEAS-01 and is correct. One word, lands before the
-      rebuild starts, because the wording is an input to the topology.
 
 ## The rebuild
 
 One regenerate cycle, run repeatedly until clean. The generator changes, the GDS changes, `make
 demo`, `make expected`. Do not try to split it into stages.
 
-**Precondition: a clean tree.** The guards and the TERM-05 alignment land as commits before the first
+**Precondition: a clean tree.** The guards land as commits before the first
 regenerate runs. `worklog/lessons-learned.md` records a regenerate on a dirty tree destroying
 uncommitted data, and this is one long regenerate loop, so the rule is stated here rather than
 remembered.
