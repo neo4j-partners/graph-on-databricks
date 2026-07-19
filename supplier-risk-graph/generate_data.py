@@ -1367,6 +1367,47 @@ def check_ownership(customers: list[dict], owned_by: list[dict]) -> None:
     assert len(defaulted) >= 10, \
         f"defaults must be spread across the book, got {len(defaulted)}"
 
+    # Landmine assert: every filler default is paired with another default, and
+    # the pair holds each other far harder than any outsider holds either.
+    #
+    # A default with a single clean neighbour dumps all of its propagated mass
+    # onto that one account regardless of stake size, which hands the top score
+    # to whoever happens to sit next to it and defeats Story 2. The pairing is
+    # what stops that, and until now nothing checked it: the plant lived in
+    # `default_pair` and the reasoning lived in a comment.
+    #
+    # The band is asserted as a relationship rather than as numbers, per
+    # contract section 9. Weighted propagation reads RELATIVE stake, so what
+    # matters is not that a default-to-default stake is above some constant, it
+    # is that it dominates every default-to-clean stake. Asserting the literal
+    # 0.80-0.95 range would also fire spuriously on the over-100% proportional
+    # scaling in the counting decoy, which is legitimate and documented.
+    filler_defaults = defaulted - set(PROTAGONIST_CUSTOMER_IDS)
+    dd_stakes, dc_stakes = [], []
+    paired: set[str] = set()
+    for edge in owned_by:
+        child, parent = edge["customer_id"], edge["parent_customer_id"]
+        if child in PROTAGONIST_CUSTOMER_IDS or parent in PROTAGONIST_CUSTOMER_IDS:
+            continue
+        stake = float(edge["ownershipPct"])
+        if child in defaulted and parent in defaulted:
+            dd_stakes.append(stake)
+            paired.update({child, parent})
+        elif child in defaulted or parent in defaulted:
+            dc_stakes.append(stake)
+
+    unpaired = sorted(filler_defaults - paired)
+    assert not unpaired, (
+        f"filler defaults with no defaulted partner: {unpaired}. A lone default "
+        f"dumps its whole mass onto one clean neighbour, which is the proximity "
+        f"shortcut Story 2 exists to defeat.")
+    assert dd_stakes and dc_stakes, \
+        "expected both default-to-default and default-to-clean filler stakes"
+    assert min(dd_stakes) > max(dc_stakes), (
+        f"the closely-held band must dominate the token band: weakest pair stake "
+        f"{min(dd_stakes)} does not exceed strongest outside stake "
+        f"{max(dc_stakes)}, so damage leaks outward and proximity wins")
+
     adjacency: dict[str, set[str]] = {}
     for edge in owned_by:
         adjacency.setdefault(edge["customer_id"], set()).add(edge["parent_customer_id"])
@@ -1471,11 +1512,11 @@ def git_sha() -> str:
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, check=True, cwd=HERE,
+            capture_output=True, text=True, check=True, cwd=DATA_DIR.parent,
         ).stdout.strip()
         dirty = subprocess.run(
             ["git", "status", "--porcelain"],
-            capture_output=True, text=True, check=True, cwd=HERE,
+            capture_output=True, text=True, check=True, cwd=DATA_DIR.parent,
         ).stdout.strip()
         return f"{sha}-dirty" if dirty else sha
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -1767,6 +1808,7 @@ def main() -> None:
     check_exposure(revenue_entries, bu03_last_quarter, jade_exposure)
     check_referential(customers, suppliers, supply_rels, owned_by)
     check_ontology()
+    check_quarter(revenue_entries, LAST_QUARTER_PERIODS)
 
     print("Instance node / table CSVs:")
     write_csv("customers.csv",
@@ -1836,6 +1878,17 @@ def main() -> None:
         "schema_version": 2,
         "seed": SEED,
         "as_of_date": AS_OF.isoformat(),
+        # Which build this is, so a transcript can be traced back to the data it
+        # was captured against. `quarter` is the one the pre-flight compares
+        # against on the day: AS_OF is date.today() at generation, so if a
+        # calendar quarter rolls between building and demoing, "the most recent
+        # full quarter" resolves to a quarter nothing here ever asserted.
+        "build_identity": {
+            "seed": SEED,
+            "as_of_date": AS_OF.isoformat(),
+            "git_sha": git_sha(),
+            "quarter": DEFAULTED_PERIOD,
+        },
         "summary": {
             "customers": len(customers),
             "suppliers": len(suppliers),
