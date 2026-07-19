@@ -11,6 +11,47 @@ Guards are landed and green and the routing gate is cleared, so nothing in this 
 `guard.py`, the three-legs check, the quarter assert, the Story 2 landmine asserts, and now the three
 structural asserts.
 
+### Session status, 2026-07-19
+
+The rebuild and the re-probe are done and Story 1's logic is settled: Cascade stays the protagonist,
+and the wording that lands it is locked. What remains is one hands-on-the-space re-sync, one clean
+regenerate, and the transcript-driven writing.
+
+Landed this session, beyond the boxes below:
+
+- **Beat 3's landing wording is settled and locked.** The commodity-root re-probe found that a
+  question scoped to the container-glass processors' shared upstream names Cascade on every run,
+  while "source" and "bottom" framings slide below it into the feedstock. That verbatim question is
+  now frozen in `CONTRACT.md` section 6, and section 4's Discovery row no longer claims betweenness
+  names Cascade, because it names the cohort. See "The commodity-root re-probe" below.
+- **The classification asymmetry is half closed.** Critical Supplier is now written as
+  `CLASSIFIED_AS` edges by `gds.py` from the governed threshold, simulating a production batch job,
+  with the cohort derived rather than named. Ownership Risk still carries none, a known defect
+  belonging to Story 2. The docs claiming the two graph-native terms are never planted were corrected
+  in `DEMO.md`, `README.md`, `upload.py`, and `load.py`.
+- **A fairness defect was found and the docs fixed, the live space still owes the change.** The Genie
+  space is missing `compliance_findings` and `owned_by`, which `CONTRACT.md` section 3 requires both
+  engines to have. The docs across `README.md`, `DATA_ARCHITECTURE.md`, and `DEMO.md` now say both
+  are in. The live re-sync and the fanout guard it needs are folded into the Genie space item below.
+- **`guard.py` now scans row values** of the tables attached to the space, closing the hole where a
+  governed term name sitting in a column like `classifications.term` passed a guard that only read
+  `information_schema`. The commodity scan is deliberately not run over row values, since a single
+  commodity member is instance data.
+- **The seed is locked in the docs.** `SEED = 42` is fixed and `make demo` cannot change it, because
+  the generator has no seed flag. The generator, `README.md`, and `DEMO.md` now warn that editing the
+  seed is a reseed that moves rankings, not a refresh.
+- **`CONTRACT.md` sections 1, 4, 6, 7, and 10 were brought current** with what the re-probe found,
+  and the probe harness was rebuilt to write an audited, per-turn-flushed log.
+
+Remaining, in order:
+
+- **The live Genie space re-sync,** the one hands-on-the-workspace task, now also adding the two
+  tables and the fanout instruction. Folded into the Genie space item below.
+- **One clean `make demo`,** because `classifications` is stale from a standalone `gds.py` run.
+- **The transcript-driven writing,** which waits on a captured Genie + Graph transcript: the five
+  beats, the three-distinct-outputs check, the Beat 4 five-unit rewrite, the Story 1 diagram, and
+  archiving the old transcript PDFs.
+
 - [x] **The three structural asserts. Landed, and they were missing rather than green.** An earlier
       version of this line recorded them as landed alongside the other four. They were not in the
       code: no forest check, no intermediate-share check, no depth check, and no
@@ -512,7 +553,7 @@ stays open, because that work is not done.
       on, and both go. Carry the honest caveat that convergence is cheap in SQL once you know what to
       converge on, and add the note about inviting the convergence question rather than hoping nobody
       asks it. `CONTRACT.md` section 6 carries the verbatim phrasing.
-- [ ] **`DEMO.md`: delete the one-winner claims, which the item above does not cover.** Two passages
+- [x] **`DEMO.md`: the one-winner claims are deleted, verified 2026-07-19 by sweep.** For the record, two passages
       state the strict-max shape that `CONTRACT.md` section 7 replaces with cohort membership. Beat
       3's "The result" bullet says Cascade's precomputed betweenness is the strict maximum in the
       supplier network and that applying the governed cutoff confirms it is the only Critical
@@ -526,9 +567,10 @@ stays open, because that work is not done.
 - [ ] **The Story 1 diagram.** Redraw to show the independent glassworks feeding the protected units,
       because that contrast is now the Beat 4 argument, and to show Cascade one tier back from the
       bottle makers.
-- [ ] `README.md` and `DATA_ARCHITECTURE.md`: threshold semantics and the new exposure wording. Both
-      describe the two-cluster-bridge topology in prose in several places and go stale under the
-      rebuild.
+- [x] `README.md` and `DATA_ARCHITECTURE.md`, done 2026-07-19. The threshold semantics, exposure
+      wording, and multi-cluster topology prose were already in rebuilt form, confirmed by sweep. The
+      one change made was the table-fairness fix: both files now say `compliance_findings` and
+      `owned_by` are in the space, with the two gold tables still kept out.
 - [ ] **The Genie space,** which is hand-synced and not in this repo. The rebuild changes values
       rather than schema: no column is added or dropped, what moves is the set of subcategory values
       and the supply rows. So this is a filter-value re-sync rather than a schema migration, which
@@ -542,8 +584,13 @@ stays open, because that work is not done.
       Re-sync the region and
       subcategory filters, re-verify no example SQL primes Cascade, and
       re-read the subcategory column comment and the `supply_relationships` SEMANTICS entry to
-      confirm they stay neutral. Verify against the live workspace, not against a worklog: twice here
-      a change recorded as applied was absent from the deployed system.
+      confirm they stay neutral. **Add `compliance_findings` and `owned_by` to the space,** which
+      `CONTRACT.md` section 3 requires both engines to have and which the docs now assume are in.
+      Adding `compliance_findings` restores the fanout it was formerly kept out to prevent, so the
+      space instructions must gain the rule to aggregate each one-to-many branch to grain or read the
+      `customer_risk_exposure` metric view, and the "the metric view is the only place finding counts
+      are available" wording must go. Verify against the live workspace, not against a worklog: twice
+      here a change recorded as applied was absent from the deployed system.
 - [ ] **The transcript PDFs.** Move the v1 and v2 sets to `worklog/archive/transcripts/`. Every
       transcript from both stories is stale after the regenerate by definition, so the v3 set
       captured in the re-probe replaces them and is not compared against v2. Stamp each new

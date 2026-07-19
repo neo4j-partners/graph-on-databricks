@@ -1,6 +1,6 @@
 # Demo walkthrough
 
-This walkthrough assumes the one-time setup in the [`README.md`](README.md) is done: the data is generated, Neo4j is loaded, the GDS analytics have run, the Unity Catalog tables are uploaded, and the Genie space is created with the two gold tables and `compliance_findings` kept out of it.
+This walkthrough assumes the one-time setup in the [`README.md`](README.md) is done: the data is generated, Neo4j is loaded, the GDS analytics have run, the Unity Catalog tables are uploaded, and the Genie space is created with the two gold tables kept out of it and every instance table in it, `compliance_findings` and `owned_by` included.
 
 > **Data freshness.** The dataset is a forward-looking snapshot taken from the date it was generated. `generate_data.py` defaults `--as-of` to today, and Story 2 depends on Jade's invoices still reading as open and on time. Regenerate the data and rerun the pipeline shortly before any demo.
 >
@@ -334,10 +334,10 @@ A fourth, subtler one, if the generator is ever retuned: **the gap between Kestr
 This one is about the lakehouse engine rather than the data, so it is not a figure you can read off a file.
 
 - **The failure it guards against:** Genie once answered a combined exposure-and-findings question by joining the two one-to-many branches off `customers` in a single pass, so each branch multiplied the other and both numbers came back inflated by the other's row count.
-- **Guard one:** `compliance_findings` is out of the Genie space entirely, so a two-branch fanout is structurally impossible. The raw findings table is not there to join against.
-- **Guard two:** the `customer_risk_exposure` metric view declares each join `one_to_many`, so every measure aggregates at its own grain. It is the only place in the space where a finding count is available at all.
+- **Guard one:** the space instructions require each one-to-many branch off `customers`, invoices and `compliance_findings` alike, to be aggregated to customer grain in its own subquery before joining, or the metric view read instead. `compliance_findings` is in the space per the fairness rule, both engines get every table, so the protection is grain discipline rather than the raw table's absence.
+- **Guard two:** the `customer_risk_exposure` metric view declares each join `one_to_many`, so every measure aggregates at its own grain. It is the safe path to a finding count, and the instructions steer finding counts to it.
 - **How to run the check:** pick a customer with both open invoices and open findings, confirm the true figures against `data/invoices.csv` and `data/compliance_findings.csv`, then ask the space for that customer's open exposure and open findings together. Pick from the current data rather than reusing a name from a previous run, because which customers carry open findings is date-derived.
-- **How to read the result:** correct figures confirm both guards. Figures that are exact multiples of the true ones mean `compliance_findings` found its way back into the space, and the Story 2 miss will read as a broken BI tool rather than a blind one.
+- **How to read the result:** correct figures confirm both guards. Figures that are exact multiples of the true ones mean Genie joined the two one-to-many branches in a single pass without aggregating each to grain first, and the Story 2 miss will read as a broken BI tool rather than a blind one.
 
 ## Genie space and MCP setup
 
@@ -403,7 +403,7 @@ and rankings from the instance tables and the customer_risk_exposure metric view
 Nothing more. No capability list, no limitations list, no statement of what the space is good at. A capabilities list is a hint sheet: it tells the model which questions it is expected to be able to answer, and the demo turns on the model reaching its own conclusions about what it can see.
 
 - **Keep the space neutral.** It carries facts about the data, not routing rules. The same block serves beats 1 and 2 standalone and under Genie + Graph, so it must never tell the space which questions to refuse. Routing lives in the supervisor's Genie-tool description, given right after the block.
-- **The table set it assumes:** the instance tables plus the `customer_risk_exposure` metric view. Kept out are the two gold tables, `classifications` and `business_unit_exposure`, and the raw `compliance_findings` table. Findings reach the space only as the metric view's `open_finding_count` measure, which makes a two-branch fanout impossible rather than merely discouraged.
+- **The table set it assumes:** the instance tables, `compliance_findings` and `owned_by` among them, plus the `customer_risk_exposure` metric view. Kept out are only the two gold tables, `classifications` and `business_unit_exposure`, because they materialize the graph's conclusions. Findings reach the space both as the raw `compliance_findings` table and as the metric view's `open_finding_count` measure, so a two-branch fanout is guarded by the metric view's grain declaration and the instruction to aggregate each branch, rather than made structurally impossible.
 - **Schema facts only:** grain, units, join paths, and what a coded value means. No analytical conclusions. The demo turns on Genie reading every column correctly and still missing what only the graph can see, so an instruction that hints at a multi-tier traversal or pre-judges what a metric implies would hand over the answer. `upload.py` applies the same rule to the comments it writes into Unity Catalog.
 
 ```text
