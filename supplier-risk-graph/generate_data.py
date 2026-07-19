@@ -116,13 +116,13 @@ MIN_INTERMEDIATE_FRACTION = 0.30
 # Beat 3's convergence paths stay short on purpose so they are legible on a
 # screen, so the depth that gives betweenness a real distribution has to come
 # from somewhere else.
+#
+# check_supply_structure measures this as the longest directed shortest-path
+# chain rather than the longest path, which is NP-hard. See supply_depth() for
+# why that substitution is safe in the direction a floor cares about. There is
+# no probe cap: the earlier MAX_PROBE_TIERS existed only to bound a
+# backtracking walk, and the measure that replaced it terminates on its own.
 MIN_SUPPLY_TIERS = 4
-
-# How far the depth probe walks before giving up. It reports the deepest chain
-# it found rather than the true longest path, which is NP-hard in general and
-# not worth computing for a tripwire. Anything at or above MIN_SUPPLY_TIERS
-# satisfies the assert, so the cap only bounds what gets printed.
-MAX_PROBE_TIERS = 12
 
 # THR-03, the Supply Concentration Threshold, as the governed parameter rather
 # than as a score. A risk committee writes "review any supplier at or above the
@@ -1215,6 +1215,52 @@ def compute_delinquent(customers: list[dict], invoices: list[dict]) -> list[str]
 
 
 # --- Offline self-checks. Each fails loudly if a plant invariant drifts. ---
+def supply_depth(outgoing: dict[str, set[str]], nodes: set[str]) -> int:
+    """Longest directed shortest-path chain in the network, counted in nodes.
+
+    The honest question is how many tiers the network actually runs deep, and
+    the exact answer is the longest simple directed path, which is NP-hard. This
+    substitutes the longest of all shortest paths: a breadth-first walk from
+    every node, taking the furthest node it reaches.
+
+    The substitution is safe in the one direction a floor cares about. A
+    shortest path is always a simple path, so whatever this returns is a chain
+    that genuinely exists in the data and the measure never overstates depth. It
+    can understate it, because a shortcut edge collapses the distance across a
+    chain that is really longer, which makes the floor conservative rather than
+    unfalsifiable.
+
+    That is the property the walk this replaces did not have. It backtracked
+    over simple paths and returned a cap the moment it popped any walk that
+    long, so on any network with a modest cycle it saturated instantly and could
+    not distinguish a deep chain from an early exit. A floor over a saturating
+    measure passes unconditionally.
+
+    Cost is one breadth-first sweep per node. The supplier network is small
+    enough that this is not worth bounding, and bounding it is what broke the
+    previous version.
+    """
+    deepest = 0
+    for start in nodes:
+        seen = {start}
+        frontier = {start}
+        tiers = 1
+        while frontier:
+            following = {
+                neighbor
+                for node in frontier
+                for neighbor in outgoing.get(node, ())
+                if neighbor not in seen
+            }
+            if not following:
+                break
+            seen.update(following)
+            frontier = following
+            tiers += 1
+        deepest = max(deepest, tiers)
+    return deepest
+
+
 def check_supply_structure(supply_rels: list[dict]) -> None:
     """Fail the build if the supply network cannot tell betweenness from degree.
 
@@ -1272,32 +1318,15 @@ def check_supply_structure(supply_rels: list[dict]) -> None:
         f"MIN_INTERMEDIATE_FRACTION floor, so the network has almost no middle "
         f"tier for supply paths to route through")
 
-    # 3. Traversal reaches at least MIN_SUPPLY_TIERS tiers along one directed
-    # chain. Reports the deepest chain found rather than the true longest path,
-    # which is NP-hard and unnecessary for a tripwire.
+    # 3. The network runs at least MIN_SUPPLY_TIERS tiers deep along one
+    # directed chain. supply_depth() measures a chain that demonstrably exists
+    # and never overstates one, so the figure printed below is a measurement
+    # rather than the marker of a probe that gave up.
     outgoing: dict[str, set[str]] = {}
     for src, dst in edges:
         outgoing.setdefault(src, set()).add(dst)
 
-    def deepest_from(start: str) -> int:
-        """Longest simple directed chain out of one node, in nodes, capped."""
-        deepest = 1
-        stack = [(start, frozenset({start}))]
-        while stack:
-            node, walked = stack.pop()
-            if len(walked) >= MAX_PROBE_TIERS:
-                return MAX_PROBE_TIERS
-            for neighbor in outgoing.get(node, ()):
-                if neighbor not in walked:
-                    deepest = max(deepest, len(walked) + 1)
-                    stack.append((neighbor, walked | {neighbor}))
-        return deepest
-
-    tiers = 0
-    for node in sorted(nodes):
-        tiers = max(tiers, deepest_from(node))
-        if tiers >= MAX_PROBE_TIERS:
-            break
+    tiers = supply_depth(outgoing, nodes)
 
     assert tiers >= MIN_SUPPLY_TIERS, (
         f"the deepest supply chain runs {tiers} tiers, below the "
@@ -1306,7 +1335,7 @@ def check_supply_structure(supply_rels: list[dict]) -> None:
 
     print(f"  supply structure: {len(edges)} edges over {len(nodes)} suppliers in "
           f"{components} component(s), {fraction:.0%} intermediate, "
-          f"{tiers}{'+' if tiers >= MAX_PROBE_TIERS else ''} tiers deep")
+          f"{tiers} tiers deep")
 
 
 def check_story1(suppliers: list[dict], supplies: list[dict],
@@ -1577,14 +1606,22 @@ def check_ownership(customers: list[dict], owned_by: list[dict]) -> None:
         f"per group would find her"
 
 
-def check_exposure(revenue_entries: list[dict], bu03_last_quarter: float,
-                   jade_exposure: float) -> None:
+def check_exposure(revenue_entries: list[dict], customers: list[dict],
+                   bu03_last_quarter: float, jade_exposure: float) -> None:
     """Story 1's revenue figure and Story 2's credit exposure.
 
-    The BU-03 total is recomputed from revenue_entries here rather than taken on
+    Both figures are recomputed from the source rows here rather than taken on
     trust from the caller. Asserting the caller's number against a band only
-    restates how it was drawn; recomputing it makes the check catch a caller that
-    sums the wrong business unit, the wrong quarter, or the wrong column.
+    restates how it was drawn; recomputing it makes the check catch a caller
+    that reads the wrong business unit, the wrong quarter, the wrong customer,
+    or the wrong column.
+
+    Jade's leg used to be a band bracketing JADE_CREDIT_FACILITY, which main
+    pins onto her row and then derives jade_exposure from, so the band asserted
+    a constant against a window drawn around that same constant and could not
+    fail. The recompute below replaces it: it resolves Jade's row and her
+    exposure column independently of how the caller reached them, which is what
+    makes a wrong lookup in main visible.
     """
     recomputed = round(
         sum(r["amount"] for r in revenue_entries
@@ -1594,8 +1631,19 @@ def check_exposure(revenue_entries: list[dict], bu03_last_quarter: float,
         f"reported {bu03_last_quarter}")
     assert 3_800_000 <= bu03_last_quarter <= 4_600_000, \
         f"BU-03 last-quarter revenue {bu03_last_quarter} outside the 3.8M-4.6M band"
-    assert 750_000 <= jade_exposure <= 850_000, \
-        f"Jade exposure {jade_exposure} outside the 800K band"
+
+    # MEAS-02: credit exposure is the committed facility on the customer row.
+    # The open invoice balance is the drawn portion of it, never added to it, so
+    # creditLimit on Jade's row is the whole of the figure and recomputing it
+    # means resolving that row and that column here.
+    jade_rows = [c for c in customers if c["id"] == JADE_ID]
+    assert len(jade_rows) == 1, (
+        f"expected exactly one customer row for Jade ({JADE_ID}), found "
+        f"{len(jade_rows)}")
+    jade_recomputed = round(float(jade_rows[0]["creditLimit"]), 2)
+    assert jade_recomputed == jade_exposure, (
+        f"Jade credit exposure recomputes to {jade_recomputed} from her "
+        f"customer row, but the caller reported {jade_exposure}")
 
 
 def check_referential(customers: list[dict], suppliers: list[dict],
@@ -1908,7 +1956,7 @@ def main() -> None:
     check_story1(suppliers, supplies, supply_rels)
     check_story2(customers, invoices, findings, delinquent_set, strategic_ids)
     check_ownership(customers, owned_by)
-    check_exposure(revenue_entries, bu03_last_quarter, jade_exposure)
+    check_exposure(revenue_entries, customers, bu03_last_quarter, jade_exposure)
     check_referential(customers, suppliers, supply_rels, owned_by)
     check_ontology()
     check_quarter(revenue_entries, LAST_QUARTER_PERIODS)

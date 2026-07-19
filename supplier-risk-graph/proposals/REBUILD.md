@@ -15,9 +15,9 @@ structural asserts.
       version of this line recorded them as landed alongside the other four. They were not in the
       code: no forest check, no intermediate-share check, no depth check, and no
       `MIN_INTERMEDIATE_FRACTION` for the stopping rule to govern, which is the failure mode
-      `CONTRACT.md` section 10 exists to catch. They are now `check_supply_structure` in
+      `CONTRACT.md` section 7 exists to catch. They are now `check_supply_structure` in
       `generate_data.py`, called from `main` ahead of `check_story1`, with
-      `MIN_INTERMEDIATE_FRACTION`, `MIN_SUPPLY_TIERS` and `MAX_PROBE_TIERS` sitting with the other
+      `MIN_INTERMEDIATE_FRACTION` and `MIN_SUPPLY_TIERS` sitting with the other
       governed constants. All three pass against the pre-rebuild build, each by a wide margin, and
       the realized figures print to the build log every run rather than being asserted.
 - **Green here does not mean the topology is healthy, and the margins are the reason to say so.** All
@@ -59,7 +59,8 @@ demo`, `make expected`. Do not try to split it into stages.
 **Precondition: a clean tree.** The guards land as commits before the first
 regenerate runs. `worklog/lessons-learned.md` records a regenerate on a dirty tree destroying
 uncommitted data, and this is one long regenerate loop, so the rule is stated here rather than
-remembered.
+remembered. It is also not a one-time check: the loop below regenerates repeatedly, so commit
+between iterations and re-read this line each time rather than treating it as closed.
 
 **The stopping rule governs this whole section.** `CONTRACT.md` section 7 holds it: two honest
 topology iterations, the percentile does not move, and `MIN_INTERMEDIATE_FRACTION` is a tripwire
@@ -103,9 +104,10 @@ no graph, so it spent no part of the two-iteration budget. What it found:
 | Intermediate processor tiers | One, unless the room needs the extra realism | Costs nothing in score either way, so it is decided on whether Beat 3's convergence stays legible on screen. |
 | Rival furnaces | Three or four, feeding the other units' bottle makers | Makes the raw-glass subcategory return a real cohort, and makes the other four units genuinely protected rather than merely unlinked. |
 
-**Cascade ranks first at the agreed fan-in, and that is permitted.** The contract requires the cohort
-to have more than one member, and it holds at nine across every configuration tested. `assert_betweenness`
-reports the ranking and does not assert who wins. The original objection was never that Cascade ranks
+**Ranking first by position is permitted. Ranking first by being the only bridge is not.** The
+contract requires the cohort to have more than one member, and every configuration tested returned a
+cohort with more than one member. `assert_betweenness` reports the ranking and does not assert who
+wins. The original objection was never that Cascade ranks
 first, it was that it ranked first *because it was the only bridge*, which is trivially true and
 invites a fair question from the room. The cut-vertex test above is what separates those two, and it
 is the check to re-run against the real build rather than trusting the simulation.
@@ -225,10 +227,18 @@ re-rolls the filler groups Jade is ranked against. The landmine asserts are cons
 failure means fix the generator. `assert_pagerank` is not: it asserts Jade is top by weighted
 PageRank, so "fix the generator" there can mean tuning filler stakes until Jade wins, which is
 banned. The real test is whether some clean trading account other than Jade came to sit under
-concentrated ownership of failure. If one did, the filler generator broke its own premise and fixing
+concentrated ownership of failure. Three relationships held on the green build and are what that test
+reads against: fat stakes run only between two defaulted parties, a clean owner's stake over a
+defaulted subsidiary stays small, and no controlling chain terminates at a clean trading account
+other than Jade's. If one broke, the filler generator broke its own premise and fixing
 it is the work. If none did and Jade still lost, weighted PageRank is not measuring what Story 2
 claims on this network, which is a finding. Two honest iterations, then escalate. Suspect the
 joint-stake block first.
+
+**If the fix requires moving THR-04 to a cohort percentile, stop and escalate.** That is the THR-03
+fix applied to Story 2 by analogy, and it looks principled. THR-04's one-winner shape survives only
+because Story 2 is out of scope, so changing it is a redesign of Story 2, which `CONTRACT.md` section
+8 bans. It needs that line reopened rather than worked around.
 
 ## Re-probe, after the rebuild
 
@@ -240,6 +250,11 @@ joint-stake block first.
       answer still cites no governed definition.
 - [ ] Re-probe the exact phrase "common upstream supplier." If Genie adds a second hop by hand rather
       than recursing, the convergence caveat needs stating more carefully than "one join."
+- [ ] **Re-ask the convergence question the presenter invites, verbatim:** "do all our Americas glass
+      bottle suppliers share a common upstream supplier?" This is the frozen phrasing for the question
+      `CONTRACT.md` section 4 says to invite rather than hope nobody asks. Run A answered it correctly
+      while Cascade sat one hop away, so what the re-probe establishes is whether that still holds
+      with Cascade two tiers back.
 - [ ] **Ask the two cohort questions directly.** A connection count over `supply_relationships` does
       not name Cascade, and `WHERE subcategory = 'raw glass'` returns a cohort of furnaces rather
       than Cascade alone. The build asserts the first and the second falls out of the intermediate
@@ -254,7 +269,7 @@ joint-stake block first.
       isolation. Nothing checks that the same name carries across all three, and a story that
       discovers Cascade then reports a figure the room cannot attribute to it has broken between
       beats rather than inside one.
-- [ ] **Carry the criticality side-by-side in Beat 3.** `CONTRACT.md` section 4 makes it scripted
+- [ ] **Carry the criticality side-by-side in Beat 3.** `CONTRACT.md` section 5 makes it scripted
       rather than optional: ask "what is our single biggest point of failure in our supply base?" of
       both runs. It is safe to ask precisely because no beat depends on Run A answering any
       particular way. Record both, script neither.
@@ -269,7 +284,7 @@ joint-stake block first.
       the old TERM-05 "narrowest bridge" phrasing twice, including once as the finding Beat 3 lands
       on, and both go. Carry the honest caveat that convergence is cheap in SQL once you know what to
       converge on, and add the note about inviting the convergence question rather than hoping nobody
-      asks it. `CONTRACT.md` section 4 carries the verbatim phrasing.
+      asks it. `CONTRACT.md` section 6 carries the verbatim phrasing.
 - [ ] **`DEMO.md`: delete the one-winner claims, which the item above does not cover.** Two passages
       state the strict-max shape that `CONTRACT.md` section 7 replaces with cohort membership. Beat
       3's "The result" bullet says Cascade's precomputed betweenness is the strict maximum in the
