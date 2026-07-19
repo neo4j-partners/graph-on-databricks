@@ -105,8 +105,12 @@ def governed_vocabulary() -> list[str]:
         names.append(row["name"])
     for row in g.GRAPH_METRICS:
         names.append(row["name"])
-    # Longest first, so a report names "Critical Supplier Rule" rather than the
-    # "Critical Supplier" nested inside it.
+    # Longest first. This ordering is not cosmetic: scan_vocabulary claims the
+    # span of every name it reports and skips a later name whose only match sits
+    # inside a claimed span, so the longer name has to be tried first for the
+    # suppression to pick the right one of a nested pair. Half of this list
+    # nests: every rule name ends in " Rule" and contains the term name it is
+    # built from, so without the ordering a single leak reads as two.
     return sorted(set(names), key=len, reverse=True)
 
 
@@ -129,20 +133,99 @@ def excerpt(text: str, match_start: int, match_end: int, width: int = 60) -> str
 def scan_vocabulary(
     text: str | None, surface: str, location: str, names: list[str]
 ) -> list[Leak]:
-    """Governed names and identifiers appearing literally in one string."""
+    """Governed names and identifiers appearing literally in one string.
+
+    Nested names are reported once, as the longest name that covers the text.
+    "Critical Supplier Rule" in a comment is one leak, not that leak plus a
+    second report of the "Critical Supplier" inside it. Both are governed and
+    both would be found, but they are the same string on the same surface and
+    fixing one fixes the other, so reporting both only pads the count and buries
+    the distinct leaks in a run that has several. The mechanism is a claimed-span
+    list rather than the sort alone: `names` arrives longest first, each reported
+    hit claims its span, and a name is skipped when every match of it lies inside
+    a span already claimed. A name that also occurs somewhere else in the text on
+    its own is still reported from that other position, which is the case that
+    matters, because there the shorter name is a leak in its own right.
+
+    Only the first unclaimed match of a name is reported. Repeat occurrences of
+    one name on one surface are the same fix.
+    """
     if not text:
         return []
     leaks: list[Leak] = []
+    claimed: list[tuple[int, int]] = []
+
+    def inside_claimed(span: tuple[int, int]) -> bool:
+        return any(start <= span[0] and span[1] <= end for start, end in claimed)
+
     for match in IDENTIFIER_PATTERN.finditer(text):
+        claimed.append(match.span())
         leaks.append(
             Leak(surface, location, match.group(0), excerpt(text, *match.span()))
         )
     for name in names:
         pattern = re.compile(rf"\b{re.escape(name)}\b", re.IGNORECASE)
-        match = pattern.search(text)
-        if match:
+        for match in pattern.finditer(text):
+            if inside_claimed(match.span()):
+                continue
+            claimed.append(match.span())
             leaks.append(Leak(surface, location, name, excerpt(text, *match.span())))
+            break
     return leaks
+
+
+# How far apart two members of one commodity may sit and still read as an
+# enumeration rather than as two unrelated mentions. Measured as the gap between
+# the end of one member and the start of the next, so it does not shift when a
+# member name gets longer.
+#
+# The number is chosen against the thing being protected, which is a single
+# authored sentence or list. "Suppliers of raw glass, glass bottles, and cullet"
+# has a gap of two. The loosest form still plainly an enumeration is a member
+# named in one sentence and the next member named in the sentence after it, and
+# the authored comments in upload.py's SEMANTICS run well under 200 characters
+# per sentence, so 200 spans a full sentence of separation with room over.
+# Anything tighter would miss "The commodity is raw glass. Downstream this
+# becomes glass bottles." Anything much looser starts reaching across unrelated
+# fields of the serialized Genie space, which is the fragility this constant
+# exists to remove. It is deliberately not scaled to the length of the scanned
+# text: the unit of authorship is a sentence whether the surface is a 90
+# character column comment or a 14000 character space export.
+COMMODITY_PROXIMITY = 200
+
+
+def nearby_group(
+    hits: list[tuple[int, int, str]],
+) -> tuple[int, int, list[str]] | None:
+    """The first run of member hits close enough to read as one enumeration.
+
+    Takes hits sorted by position and walks forward from each in turn, extending
+    while the next hit opens within COMMODITY_PROXIMITY of where the run
+    currently ends. Chaining on the running end rather than on the first hit is
+    what lets a three member list qualify without the window having to be wide
+    enough to hold the whole list in one span. Returns the run's span and the
+    distinct members in it, or None when no run holds two distinct members.
+
+    The returned span stops at the last hit that introduced a new member, not at
+    the end of the chain. A repeated member can legitimately bridge the run
+    forward, but it is not part of what makes the run an enumeration, and
+    including the tail would hand the report an excerpt padded with text that
+    shows nothing.
+    """
+    for index, (start, end, value) in enumerate(hits):
+        present = {value}
+        span_end = end
+        chain_end = end
+        for next_start, next_end, next_value in hits[index + 1 :]:
+            if next_start - chain_end > COMMODITY_PROXIMITY:
+                break
+            chain_end = max(chain_end, next_end)
+            if next_value not in present:
+                present.add(next_value)
+                span_end = max(span_end, next_end)
+        if len(present) >= 2:
+            return start, span_end, sorted(present)
+    return None
 
 
 def scan_commodity_grouping(
@@ -159,25 +242,43 @@ def scan_commodity_grouping(
     that scopes Supply Exposure. One member on its own is instance data and
     fine: 'glass bottles' is a value in a column Run A can already read. It is
     the enumeration that is the authored judgment.
+
+    "Together" is enforced, not assumed. The plan's wording is that a comment
+    ENUMERATES two or more members, meaning in one place, and on a table or
+    column comment the distinction barely matters because the whole string is
+    one place. On the Genie space it decides the check. The space is scanned as
+    a single serialized blob of well over ten thousand characters, so an
+    unbounded co-occurrence test asks whether the two members appear anywhere in
+    the entire space, which they eventually will for reasons that are not an
+    enumeration: "raw glass" in one example SQL and "glass bottles" in an
+    unrelated column config are two independent instance values, not the
+    authored grouping. The plan schedules a re-sync of the region and
+    subcategory filters, and a subcategory filter is exactly the kind of edit
+    that scatters single member values across the document. A guard that fires
+    on that is a guard someone learns to switch off, and the next real leak goes
+    with it.
     """
     if not text:
         return []
     leaks: list[Leak] = []
     for commodity, values in commodities.items():
-        present = sorted(
-            value
-            for value in values
-            if re.search(rf"\b{re.escape(value)}\b", text, re.IGNORECASE)
-        )
-        if len(present) >= 2:
-            leaks.append(
-                Leak(
-                    surface,
-                    location,
-                    f"{commodity} grouping: {', '.join(present)}",
-                    excerpt(text, 0, min(len(text), 80)),
-                )
+        hits: list[tuple[int, int, str]] = []
+        for value in values:
+            for match in re.finditer(rf"\b{re.escape(value)}\b", text, re.IGNORECASE):
+                hits.append((match.start(), match.end(), value))
+        hits.sort()
+        window = nearby_group(hits)
+        if window is None:
+            continue
+        start, end, present = window
+        leaks.append(
+            Leak(
+                surface,
+                location,
+                f"{commodity} grouping: {', '.join(present)}",
+                excerpt(text, start, end),
             )
+        )
     return leaks
 
 
@@ -297,6 +398,58 @@ def check_unity_catalog(
     return leaks
 
 
+# The two gold tables. upload.py's module docstring states they must never be
+# added to the Genie space: they materialize the graph's answers, so a space
+# that carries them lets Run A read the finding straight out of a table and tie.
+# That is not a vocabulary leak, it is the same claim failing by a different
+# route, and the plan's Phase 2.5 verify step asks for "banned tables absent" in
+# the same breath as "vocabulary guard clean". Both belong to whatever runs last
+# before the demo, which is this.
+BANNED_TABLES = frozenset({"classifications", "business_unit_exposure"})
+
+
+def banned_tables(serialized_space: str, location: str) -> list[Leak]:
+    """The gold tables, which must not be data sources of the Genie space.
+
+    Read from the space's declared data_sources rather than by searching the
+    blob for the table names. A substring search would fire on any example SQL
+    or instruction that merely says the word "classifications", which is a false
+    positive that costs the guard its credibility, and it would miss nothing
+    real: a table Genie can query is a table the space lists here.
+
+    The parse failing is treated the same way an empty serialized_space is,
+    because it has the same consequence. A guard that shrugs at a shape it does
+    not recognize and reports clean is worse than no guard, since someone read
+    the clean line and believed it.
+    """
+    import json
+
+    try:
+        parsed = json.loads(serialized_space)
+        sources = parsed["data_sources"]["tables"]
+    except (ValueError, KeyError, TypeError) as error:
+        sys.exit(
+            f"Genie space {location} serialized definition did not parse as a "
+            f"table list ({error}). The guard cannot tell whether the banned "
+            "gold tables are attached, so it is not reporting clean. If the "
+            "space export format changed, fix banned_tables to match it."
+        )
+    leaks: list[Leak] = []
+    for source in sources:
+        identifier = str(source.get("identifier", ""))
+        if identifier.split(".")[-1].strip("`") in BANNED_TABLES:
+            leaks.append(
+                Leak(
+                    "genie data source",
+                    location,
+                    identifier,
+                    "banned gold table: it materializes the graph's answer, so "
+                    "attaching it lets Run A read the finding out of a column",
+                )
+            )
+    return leaks
+
+
 def check_genie_space(
     w: Any, cfg: Config, names: list[str], commodities: dict[str, set[str]]
 ) -> list[Leak]:
@@ -329,6 +482,7 @@ def check_genie_space(
     leaks += scan(
         space.serialized_space, "genie definition", where, names, commodities
     )
+    leaks += banned_tables(space.serialized_space, where)
     size = len(space.serialized_space or "")
     print(f"  Genie space:   '{space.title}', {size} chars of definition scanned")
     return leaks
@@ -337,16 +491,34 @@ def check_genie_space(
 def check_authored_comments(
     names: list[str], commodities: dict[str, set[str]]
 ) -> list[Leak]:
-    """upload.py's SEMANTICS, before any of it reaches the workspace.
+    """upload.py's authored text, before any of it reaches the workspace.
 
     The offline half. Catching a leak in the repo is cheaper than catching it
     after upload, and this runs with no credentials so it can gate `make check`.
     It is not a substitute for the live scan: the Genie space is not in this
     repo at all, and the workspace can drift from what upload.py would send.
+
+    METRIC_VIEW_YAML is scanned alongside SEMANTICS because it is authored text
+    on a surface Run A reads. The metric view is a first-class object in the
+    Genie space, and the YAML carries a top-level comment, a comment on most
+    measures, and synonym lists whose whole purpose is to give Genie more
+    phrasings to match against. A governed name reaching a synonym list would be
+    the most direct leak on any surface here, and scanning only SEMANTICS missed
+    it entirely. Scanned as one blob rather than field by field for the same
+    reason the Genie space is: the guard should not need editing when the YAML
+    gains a field. That does mean a hit reports against the whole document
+    rather than a named measure, which the excerpt makes actionable enough.
     """
     import upload
 
     leaks: list[Leak] = []
+    leaks += scan(
+        upload.METRIC_VIEW_YAML,
+        "authored metric view",
+        upload.METRIC_VIEW_NAME,
+        names,
+        commodities,
+    )
     for table, semantics in upload.SEMANTICS.items():
         leaks += scan(
             semantics.comment, "authored table comment", table, names, commodities
@@ -359,7 +531,10 @@ def check_authored_comments(
                 names,
                 commodities,
             )
-    print(f"  upload.py:     {len(upload.SEMANTICS)} table specs scanned")
+    print(
+        f"  upload.py:     {len(upload.SEMANTICS)} table specs plus the "
+        f"{upload.METRIC_VIEW_NAME} metric view scanned"
+    )
     return leaks
 
 

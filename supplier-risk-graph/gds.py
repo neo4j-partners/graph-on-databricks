@@ -552,6 +552,27 @@ def trading_customers(gds: GraphDataScience) -> set[str]:
             "or has no invoice. The Story 2 assertion would pass having checked "
             "nothing, so the build stops here instead."
         )
+
+    # Landmine assert: the filter has to have actually excluded somebody.
+    #
+    # An empty result is caught above, but the dangerous failure is the opposite
+    # shape: a filter that matches every customer looks identical to a filter
+    # that works, and it would silently promote the holdcos back into the ranked
+    # set. Kestrel and the two intermediate holdcos outscore Jade by
+    # construction, so if they are not filtered out the demo names a holding
+    # company with no receivable and Story 2 collapses without anything failing.
+    #
+    # Stated as a relationship rather than a count, per contract section 9: some
+    # customers must be excluded, not a specific number of them.
+    total = int(gds.run_cypher("MATCH (c:Customer) RETURN count(c) AS n")["n"].iloc[0])
+    excluded = total - len(trading)
+    if excluded <= 0:
+        sys.exit(
+            f"The trading-customer filter excluded nobody: {total} customers in, "
+            f"{len(trading)} out. It has silently stopped working, which looks "
+            f"exactly like it working. The holdcos would re-enter the ranking."
+        )
+    print(f"  trading customers: {len(trading)} of {total} ({excluded} excluded)")
     return trading
 
 
@@ -684,6 +705,95 @@ def update_thresholds_csv(path: Path, cutoffs: dict[str, float]) -> None:
     print(f"  wrote {', '.join(sorted(cutoffs))} back into {path.name}")
 
 
+def check_three_legs(gds: GraphDataScience, protags: Protagonists) -> None:
+    """Beat 3's three legs resolve against the loaded graph.
+
+    CONTRACT.md section 4 says the graph grounds its answer through exactly
+    three capabilities, and section 7 asserts each of them resolves. Nothing
+    checked that until now. This file asserted the scores it computes, but
+    nothing walked the ontology to confirm the walk arrives anywhere, and leg 1
+    is the load-bearing leg of the load-bearing claim: if TERM-05 does not reach
+    RULE-05 and THR-03, Beat 3 opens on a broken query.
+
+    This is the mechanical half only. That the three produce three DISTINCT
+    visible outputs on a screen cannot be asserted by a build and is a re-probe
+    phase exit check instead.
+    """
+    header("Beat 3: the three legs resolve")
+
+    # Leg 1, definition. The full authored walk, term to rule to threshold,
+    # which is the path Beat 3 opens on. Matched by term NAME rather than by id,
+    # because the name is what a question arrives as.
+    leg1 = gds.run_cypher(
+        """
+        MATCH (t:BusinessTerm {name: $term})-[:DEFINED_BY]->(r:BusinessRule)
+        OPTIONAL MATCH (r)-[:USES_THRESHOLD]->(h:Threshold)
+        RETURN t.definition AS definition, r.id AS rule_id,
+               r.expression AS expression, h.id AS threshold_id,
+               h.basis AS basis, h.value AS value
+        """,
+        params={"term": CRITICAL_SUPPLIER_TERM},
+    )
+    if leg1.empty:
+        sys.exit(
+            f"Leg 1 does not resolve: no BusinessTerm named "
+            f"'{CRITICAL_SUPPLIER_TERM}' reaches a rule. Beat 3 opens by asking "
+            f"what a Critical Supplier is, and the graph cannot answer."
+        )
+    row = leg1.iloc[0]
+    for field, what in (
+        ("definition", "the term's definition"),
+        ("expression", "the rule's expression"),
+        ("threshold_id", "the governing threshold"),
+        ("basis", "the threshold's authored basis"),
+        ("value", "the threshold's resolved cutoff"),
+    ):
+        if not row[field] and row[field] != 0:
+            sys.exit(
+                f"Leg 1 resolves but {what} is empty ({field}). The room's next "
+                f"question after RULE-05 is what the threshold is, and leg 1 is "
+                f"the strongest artifact the demo has."
+            )
+    print(f"  leg 1 definition:  {row['rule_id']} -> {row['threshold_id']}, "
+          f"basis present, cutoff {row['value']}")
+
+    # Leg 2, discovery. The protagonist carries the precomputed score the demo
+    # reads. Presence only: what the score IS is read from the output and never
+    # asserted, per contract section 7.
+    leg2 = gds.run_cypher(
+        "MATCH (s:Supplier {id: $id}) RETURN s.betweenness AS betweenness",
+        params={"id": protags.cascade_id},
+    )
+    if leg2.empty or leg2["betweenness"].iloc[0] is None:
+        sys.exit(
+            f"Leg 2 does not resolve: {protags.cascade_id} carries no betweenness "
+            f"property. The discovery leg has nothing to show."
+        )
+    print(f"  leg 2 discovery:   {protags.cascade_id} carries betweenness")
+
+    # Leg 3, explanation. The convergence traversal returns at least one path.
+    # Variable-length so it survives the rebuild moving Cascade a tier back;
+    # asserting a hop count here would bake today's topology into the check.
+    leg3 = gds.run_cypher(
+        """
+        MATCH path = (c:Supplier {id: $cascade})-[:SUPPLIES*1..6]->(t:Supplier)
+        WHERE t.id IN $tier1
+        RETURN count(path) AS paths, count(DISTINCT t) AS reached
+        """,
+        params={"cascade": protags.cascade_id, "tier1": protags.tier1_ids},
+    )
+    paths = int(leg3["paths"].iloc[0])
+    reached = int(leg3["reached"].iloc[0])
+    if paths < 1:
+        sys.exit(
+            f"Leg 3 does not resolve: no SUPPLIES path from "
+            f"{protags.cascade_id} to any tier-1 supplier. The explanation leg "
+            f"has no path evidence to put on screen."
+        )
+    print(f"  leg 3 explanation: {paths} path(s) reaching "
+          f"{reached} of {len(protags.tier1_ids)} tier-1 suppliers")
+
+
 def assert_betweenness(
     scores: list[Score], conc: Cutoff, protags: Protagonists
 ) -> None:
@@ -788,6 +898,10 @@ def main() -> None:
 
         header("Governed vocabulary bound to the metrics (Neo4j only)")
         write_governed_terms(gds)
+
+        # Last, because leg 1 walks to the threshold value that only exists once
+        # the cutoffs above have been written.
+        check_three_legs(gds, protags)
 
     print(
         "\nGDS analytics complete: betweenness and pagerank written to Neo4j as "
