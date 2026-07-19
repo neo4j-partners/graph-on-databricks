@@ -82,7 +82,7 @@ Put to both engines:
 
 ### Beat 3, the flag
 
-- **The governed definition:** Genie One first resolves what a Critical Supplier means from the graph: "the narrowest bridge on a business unit's multi-tier supply paths," parameterized by the Supply Concentration Threshold, a betweenness cutoff.
+- **The governed definition:** Genie One first resolves what a Critical Supplier means from the graph: a supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it, and one that need not sell to that business unit directly. The Supply Concentration Threshold, a betweenness cutoff, parameterizes it.
 - **The walk:** it then walks the multi-tier chain into the Americas and collapses the five bottle suppliers onto their shared source.
 - **The result:** one row comes back, Cascade Glassworks, the hidden raw-glass supplier reaching all five bottle suppliers into the Americas. Its precomputed betweenness is the strict maximum in the supplier network, and applying the governed cutoff confirms it is the only Critical Supplier.
 - **Why no score sort finds it:** Cascade's own risk score sits below the High-Risk threshold, and plenty of suppliers score higher, so no score filter flags it as the one that matters.
@@ -108,7 +108,7 @@ Qualify a second glass source to protect the Americas quarterly revenue flow, qu
 *A traversal walks the graph relationship by relationship; a variable-length traversal keeps walking through any number of hops. GDS is Neo4j Graph Data Science, the library that computes graph algorithms such as betweenness.*
 
 - **The traversal:** a variable-length traversal walks the multi-tier chain. `SUPPLIES` points from a supplier toward what it feeds, so the path is `(Cascade)-[:SUPPLIES]->(bottle supplier)-[:SUPPLIES]->(Americas)`.
-- **The GDS piece:** `gds.betweenness`, precomputed by `gds.py` as a `betweenness` property on every Supplier node, confirming Cascade as the narrowest bridge.
+- **The GDS piece:** `gds.betweenness`, precomputed by `gds.py` as a `betweenness` property on every Supplier node, confirming the share of commodity-carrying supply paths into a business unit that run through Cascade.
 - **The cutoff:** the Supply Concentration Threshold is set from the score distribution so only Cascade clears it.
 
 ## Story 2: the clean payer in a bad group
@@ -319,7 +319,19 @@ Conventions:
   string interpolation.
 ```
 
-### What to put in the Genie space description
+### What to put in the Genie space description and instructions
+
+The space has two separate authored fields and they take different text. **Description** is the short blurb under the space title, on the About tab. **Instructions** is its own tab and holds the block below. Setting one and not the other is the failure mode: Genie ships an auto-generated description the moment a space is created, and that generated text stays until it is overwritten by hand.
+
+**Replace the generated description.** A newly created space describes itself with capability marketing, along the lines of "enables assessment of supplier risk and financial health" followed by Capabilities and Limitations lists. That text is not neutral, it was not authored against the vocabulary rules, and it drifts back if the space is recreated. Overwrite it with:
+
+```text
+Answers questions over the supplier and customer data in Unity Catalog schema
+supplier_risk, for a global beverage producer. It reports rows, counts, totals,
+and rankings from the instance tables and the customer_risk_exposure metric view.
+```
+
+Nothing more. No capability list, no limitations list, no statement of what the space is good at. A capabilities list is a hint sheet: it tells the model which questions it is expected to be able to answer, and the demo turns on the model reaching its own conclusions about what it can see.
 
 - **Keep the space neutral.** It carries facts about the data, not routing rules. The same block serves beats 1 and 2 standalone and under Genie One, so it must never tell the space which questions to refuse. Routing lives in the supervisor's Genie-tool description, given right after the block.
 - **The table set it assumes:** the instance tables plus the `customer_risk_exposure` metric view. Kept out are the two gold tables, `classifications` and `business_unit_exposure`, and the raw `compliance_findings` table. Findings reach the space only as the metric view's `open_finding_count` measure, which makes a two-branch fanout impossible rather than merely discouraged.
@@ -342,8 +354,8 @@ Use this space to:
   question.
 - Scope every answer to the region or business unit named in the question. When a
   question names a region or business unit, for example the Americas, filter to
-  that unit before you rank, count, or judge diversification, and never widen a
-  scoped question to the global population.
+  that unit before you rank, count, or aggregate, and never widen a scoped
+  question to the global population.
 
 Conventions:
 - Lateness is precomputed in the daysLate and status columns; never compute
@@ -361,6 +373,10 @@ Conventions:
 - Invoice status values are paid, open, and overdue; only open and overdue are
   live exposure. Compliance finding status values are open and closed.
 ```
+
+**Do not name the question's own vocabulary in the instructions.** The scoping bullet above says rank, count, or aggregate rather than naming the thing Beat 1 asks about. Repeating a beat's question word inside the instructions primes the axis Genie picks, and `CONTRACT.md` section 4 makes Beat 1's ambiguity the demonstration rather than a bug to fix. The instructions may say how to scope, how to join, and what a column means. They may not say what to conclude, and a question word carried across from a beat is halfway to a conclusion.
+
+**Check the deployed text against this block, not against a worklog.** The instructions field drifts: a deployed space has been found carrying an older, shorter variant missing the currency rendering rule, the `supplier_business_units` bridge rule, the `revenue_entries.period` rule, and the status value lists. Read the field back from the live space and compare it line by line.
 
 **Supervisor routing (Genie One only).** When Genie runs under the Genie One supervisor, the routing lives in the supervisor's description of the Genie tool, not in the neutral space above. Set that tool description to: Genie owns facts, counts, totals, and rankings over the instance tables; route anything that needs a business-term definition, a relationship judgment, or classification provenance to the graph tool instead.
 

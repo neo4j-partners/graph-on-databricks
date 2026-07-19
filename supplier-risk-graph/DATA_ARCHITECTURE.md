@@ -168,7 +168,7 @@ Each entity is a logical business object mapped to one Unity Catalog table by a 
 | Defaulted Customer | A customer with a recorded default in the snapshot | Fact, column-findable |
 | Delinquent Customer | A customer more than 60 days late on each of its last three invoices | Rule, column-findable |
 | High-Risk Supplier | A supplier whose procurement risk score meets or exceeds the threshold | Rule, column-findable |
-| Critical Supplier | A supplier the network disproportionately depends on: the narrowest bridge on a business unit's multi-tier supply paths | Graph-native, no column |
+| Critical Supplier | A supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it; it need not sell to that business unit directly, and often does not | Graph-native, no column |
 | Ownership Risk | An active, clean-record customer (its own invoices, no default, not delinquent) that absorbs more failure through its ownership stakes than any other trading customer, where risk propagates from every default in proportion to the size of each stake; defaulted members and invoice-less holding companies are excluded | Graph-native, no column |
 
 The two graph-native terms are the whole point. **Critical Supplier and Ownership Risk have no lakehouse column, and a governing cutoff that lives only in the graph.** Both algorithms are expressible in SQL. What no BI tool does is reach for an all-pairs shortest-path computation or an iterative weighted propagation, unprompted, from a business question, and the cutoff that decides each answer is a governed value in the graph rather than a column to sort on. Their definitions live in the graph. The four column-findable terms exist to make the contrast honest: they show what the lakehouse-only engine can govern, so the gap is clearly the two it cannot.
@@ -183,7 +183,7 @@ One rule defines each term, by a `DEFINED_BY` edge, and reads one or more entiti
 | Defaulted Customer Rule | Defaulted Customer | a default period is recorded | Customer |
 | Delinquent Customer Rule | Delinquent Customer | each of the last three invoices is more than 60 days late | Customer, Invoice |
 | High-Risk Supplier Rule | High-Risk Supplier | risk score is at least 70 | Supplier |
-| Critical Supplier Rule | Critical Supplier | highest-betweenness bridge on a business unit's multi-tier supply paths, at or above the supply concentration threshold | Supplier, SupplyRelationship, BusinessUnit |
+| Critical Supplier Rule | Critical Supplier | a disproportionate share of the supply paths carrying a commodity into a business unit run through the supplier, leaving the unit few alternatives if it stops; measured as supply betweenness over the multi-tier `SUPPLIES` network (walked transitively) at or above the supply concentration threshold, which catches a cohort rather than a single name | Supplier, SupplyRelationship, BusinessUnit |
 | Ownership Risk Rule | Ownership Risk | stake-weighted propagated risk over `OWNED_BY` (walked transitively, weighted by `ownershipPct`, propagated from every Defaulted Customer) at or above the ownership contagion threshold | Customer |
 | Supply Exposure Rule | Supply Exposure measure | sum of recognized revenue for the most recent full quarter, over every business unit the supplier's multi-tier `SUPPLIES` paths reach | RevenueEntry, BusinessUnit |
 | Credit Exposure Rule | Credit Exposure measure | the customer's total committed credit facility, reported alongside the open invoice balance drawn against it | Invoice, Customer |
@@ -236,10 +236,10 @@ The Compliance (KYC) Policy carries no rule. It is operationalized through compl
 |---|---|---|
 | Supplier Risk Threshold | 70 | High-Risk Supplier |
 | Late Payment Threshold | 60 days | Delinquent Customer |
-| Supply Concentration Threshold | a betweenness cutoff, set from the computed distribution | Critical Supplier |
+| Supply Concentration Threshold | a supply-betweenness cutoff, resolved from a percentile fixed before the run | Critical Supplier |
 | Ownership Contagion Threshold | a stake-weighted propagated-risk (weighted personalized PageRank) cutoff, set from the computed distribution | Ownership Risk |
 
-The two graph-native thresholds are set after the algorithms run, from the score distribution, so Cascade clears the concentration cutoff and Jade clears the contagion cutoff while no other supplier or trading customer does. They are governed values in the graph, never columns.
+The two graph-native thresholds are governed values in the graph, never columns, but they are set by different routes. The Supply Concentration Threshold states a percentile of supply betweenness, authored before the algorithm runs, and the run resolves that percentile into a value. Cascade clears it, and so do the other suppliers at or above the same percentile: it selects a cohort rather than a single name. The Ownership Contagion Threshold is placed after weighted personalized PageRank runs, from the score distribution, so that Jade clears it and no other trading customer does.
 
 `APPLIES_TO` runs from the threshold to the term, so a traversal that starts at a term and follows outbound edges reaches the rule and the tables but never the number. The `USES_THRESHOLD` edge from rule to threshold closes that gap, and the graph-native rules also carry the value inline on a `threshold` property the way the column-findable rules already do. The redundancy is deliberate.
 
@@ -338,7 +338,7 @@ The two graph-native terms are resolved with two Graph Data Science passes, prec
 ### Betweenness centrality (Critical Supplier)
 
 - **What it does:** computes betweenness over the multi-tier supplier network (`Supplier-SUPPLIES->Supplier` edges only; the `Supplier-SUPPLIES->BusinessUnit` edges fall out of the projection because their endpoint is not a Supplier), stored as a node property on suppliers.
-- **Why it matters:** a plain risk-score filter only finds individually risky suppliers. Betweenness finds the narrowest bridge: Cascade sits where five clean same-subcategory tier-1 suppliers feeding the Americas converge, so it carries the most supply flow while its own score stays middling.
+- **Why it matters:** a plain risk-score filter only finds individually risky suppliers. Betweenness finds the supplier that a disproportionate share of the commodity-carrying paths into a business unit run through: Cascade sits where five clean same-subcategory tier-1 suppliers feeding the Americas converge, so it carries the most supply flow while its own score stays middling.
 - **Story line:** the score filter finds risky suppliers; the graph finds the supplier the network cannot lose.
 
 ### Personalized PageRank (Ownership Risk)

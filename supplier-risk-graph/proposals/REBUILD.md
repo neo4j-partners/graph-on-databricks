@@ -48,7 +48,16 @@ sub-tier to Cascade, and the other units' glass suppliers do not. That is the en
       keeps those compatible.
 - [ ] **The glass chain is a chain of glass companies.** Every sub-tier vendor between Cascade and
       the tier-1 bottle makers must itself trade in a glass subcategory, or the path is not
-      commodity-carrying and the sole-source premise fails silently.
+      commodity-carrying and the sole-source premise fails silently. What counts as a glass
+      subcategory is defined by the `glass` entry in the generator's `COMMODITY_SUBCATEGORIES`, so
+      every new intermediate subcategory added below goes into that entry in the same edit. Its
+      comment block already anticipates this. Miss it and the new sub-tier vendors fail the commodity
+      test, the paths from Cascade to the bottle makers stop being commodity-carrying, and the
+      premise fails with no assert firing. Second-order consequence, worth knowing before it becomes
+      a debugging session: `guard.py` reads that dict through its `commodity_subcategories` helper,
+      so each new subcategory becomes newly scanned vocabulary and a comment or Genie instruction
+      that enumerates two members of the glass grouping starts failing the guard. That is the
+      intended behavior, not a regression.
 - [ ] **Real intermediate subcategories for the sub-tier,** not raw glass doing double duty as both
       Cascade's peers and its customers. Double duty breaks the cohort check, since `WHERE
       subcategory = 'raw glass'` is supposed to return other furnaces.
@@ -107,6 +116,13 @@ structural asserts, and re-verifying them is part of this step.
 - The three-legs check passes against the rebuilt graph.
 - Two consecutive runs produce the same betweenness ranking.
 - `guard.py` clean against live Unity Catalog and the live Genie space.
+- **The Unity Catalog semantics read back from `information_schema` match what `upload.py`'s
+  SEMANTICS dict meant to send.** This is not what `guard.py` checks. `check_unity_catalog` also
+  reads `information_schema`, but it scans for governed vocabulary, so a comment that failed to
+  apply at all reads as clean: absent text leaks nothing. Fidelity is the separate question, and it
+  is the one that caught a change recorded as applied but missing from the deployed system twice in
+  this project's history, once with the root cause never found. Compare the comment that came back,
+  not the statement that was issued.
 - Story 2 still holds: the Jade assert, THR-04 still between Jade and the next trading customer, and
   the three landmine asserts.
 
@@ -139,6 +155,15 @@ joint-stake block first.
 - [ ] Write the five beats from what the transcripts say. No scripted Run A answer.
 - [ ] Confirm the three legs land as three distinct visible outputs in Beat 3. No build can check
       that they read as three different things to a room. If two land as the same slide, restage.
+- [ ] **Walk Story 1 end to end and confirm Cascade is named in the finding, in the exposure
+      question, and in how the figure is presented.** Each of those is checked somewhere in
+      isolation. Nothing checks that the same name carries across all three, and a story that
+      discovers Cascade then reports a figure the room cannot attribute to it has broken between
+      beats rather than inside one.
+- [ ] **Carry the criticality side-by-side in Beat 3.** `CONTRACT.md` section 4 makes it scripted
+      rather than optional: ask "what is our single biggest point of failure in our supply base?" of
+      both runs. It is safe to ask precisely because no beat depends on Run A answering any
+      particular way. Record both, script neither.
 
 ## Docs, last
 
@@ -151,22 +176,36 @@ joint-stake block first.
       on, and both go. Carry the honest caveat that convergence is cheap in SQL once you know what to
       converge on, and add the note about inviting the convergence question rather than hoping nobody
       asks it. `CONTRACT.md` section 4 carries the verbatim phrasing.
+- [ ] **`DEMO.md`: delete the one-winner claims, which the item above does not cover.** Two passages
+      state the strict-max shape that `CONTRACT.md` section 7 replaces with cohort membership. Beat
+      3's "The result" bullet says Cascade's precomputed betweenness is the strict maximum in the
+      supplier network and that applying the governed cutoff confirms it is the only Critical
+      Supplier. The Graph mechanics "The cutoff" bullet says the Supply Concentration Threshold is
+      set from the score distribution so only Cascade clears it. The replacement for both is cohort
+      membership: Cascade clears THR-03, and the clearing cohort has more than one member. The
+      cutoff bullet is the more dangerous of the two, because "set so only Cascade clears it" is not
+      merely stale wording, it describes the post-hoc threshold banned in `CONTRACT.md` section 8,
+      so it must not survive in any reworded form. THR-03 is a hand-set percentile fixed before the
+      run, and the rewrite says so.
 - [ ] **The Story 1 diagram.** Redraw to show the independent glassworks feeding the protected units,
       because that contrast is now the Beat 4 argument, and to show Cascade one tier back from the
       bottle makers.
 - [ ] `README.md` and `DATA_ARCHITECTURE.md`: threshold semantics and the new exposure wording. Both
       describe the two-cluster-bridge topology in prose in several places and go stale under the
       rebuild.
-- [ ] **The Genie space,** which is hand-synced and not in this repo. Re-sync the region and
-      subcategory filters after the schema changes, re-verify no example SQL primes Cascade, and
+- [ ] **The Genie space,** which is hand-synced and not in this repo. The rebuild changes values
+      rather than schema: no column is added or dropped, what moves is the set of subcategory values
+      and the supply rows. So this is a filter-value re-sync rather than a schema migration, which
+      makes it smaller than it reads and lets it be scheduled on its own. Re-sync the region and
+      subcategory filters, re-verify no example SQL primes Cascade, and
       re-read the subcategory column comment and the `supply_relationships` SEMANTICS entry to
       confirm they stay neutral. Verify against the live workspace, not against a worklog: twice here
       a change recorded as applied was absent from the deployed system.
 - [ ] **The transcript PDFs.** Move the v1 and v2 sets to `worklog/archive/transcripts/`. Every
       transcript from both stories is stale after the regenerate by definition, so the v3 set
       captured in the re-probe replaces them and is not compared against v2. Stamp each new
-      transcript with its build identity, meaning seed, as-of date, and git sha, so which build a
-      transcript came from is never a question again.
+      transcript with the seed and the as-of date, both read from the top level of
+      `data/ground_truth.json`, so which build a transcript came from is never a question again.
 
 ## Pre-flight, on the day
 
@@ -177,9 +216,10 @@ everything else has passed, and they run on every demo day rather than once.
 - [ ] **The vocabulary guard, standalone against the live Genie space,** via `make guard`. The space
       is hand-synced and can change after a build. This protects the load-bearing claim, which is why
       it is the check that runs last rather than only first.
-- [ ] **Today's quarter still matches the quarter in the build identity.** `AS_OF` is the build date,
-      so a calendar quarter rolling between the build and the demo silently changes what "the most
-      recent full quarter" means in Beat 4. The build-time quarter assert cannot catch this. The fix
-      when it fails is a regenerate, which is one `make demo`.
+- [ ] **Today's quarter still matches the quarter the build was shaped around,** read from the "Last
+      full quarter" row that `expected_results.py` renders out of the `story1_hidden_glassworks`
+      block. `AS_OF` is the build date, so a calendar quarter rolling between the build and the demo
+      silently changes what "the most recent full quarter" means in Beat 4. The build-time quarter
+      assert cannot catch this. The fix when it fails is a regenerate, which is one `make demo`.
 
 Keep this section when the rest of the file is deleted. It moves to `DEMO.md` rather than going away.
