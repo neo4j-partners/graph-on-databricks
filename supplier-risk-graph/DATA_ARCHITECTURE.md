@@ -1,5 +1,7 @@
 # Data Architecture
 
+The demo models a global beverage producer. Its suppliers specialize by subcategory (glass bottles, malt, hops, cans, labels, and the raw glass behind the bottles), and its customers are the drinks trade: distributors, wholesalers, supermarket groups, and bar and hotel chains.
+
 The demo uses a dual data architecture. The Databricks lakehouse owns the instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
 
 The point of the demo is a contrast between two engines. A Databricks Genie Agent over the Unity Catalog Delta tables is the lakehouse-only engine: it sees the facts and nothing else. Genie paired with the read-only Neo4j knowledge graph is the second engine: it sees the same facts plus the governed meaning. Both engines answer the everyday risk questions. The payoff is the two graph-native questions the lakehouse-only engine cannot answer, because their definitions live only in the graph.
@@ -14,7 +16,7 @@ The dataset serves two contrasts. Each is a question the lakehouse-only engine g
 
 Cascade Glassworks is a mid-tier raw-glass supplier. Its own risk score sits in the middling band, below the risk threshold, so no risk-score sort ever surfaces it. Yet the Americas business unit depends on it disproportionately, because five clean tier-1 bottle suppliers all trace back to Cascade for their raw glass. If Cascade fails, all five paths into the Americas fail with it.
 
-The graph engine surfaces Cascade with betweenness centrality over the multi-tier supply graph, the metric behind the **Critical Supplier** term. Cascade is the narrowest bridge on the Americas' supply paths. Roughly 4.2M EUR per quarter of Americas revenue sits behind it. The lakehouse-only engine cannot find Cascade: there is no column that says "critical", and no threshold a BI tool could sort by.
+The graph engine surfaces Cascade with betweenness centrality over the multi-tier supply graph, the metric behind the **Critical Supplier** term. Cascade is the narrowest bridge on the Americas' supply paths. Roughly 4.2M EUR per quarter of Americas revenue sits behind it. The lakehouse-only engine cannot find Cascade: there is no column that says "critical", and its governing cutoff sits over a betweenness metric BI cannot compute.
 
 ### Story 2: the clean payer in a bad family
 
@@ -149,7 +151,7 @@ Each entity is a logical business object mapped to one Unity Catalog table by a 
 | Critical Supplier | A supplier the network disproportionately depends on: the narrowest bridge on a business unit's multi-tier supply paths | Graph-native, no column |
 | Ownership Risk | A customer inside an ownership group that contains a defaulted member, so its risk exceeds its own record | Graph-native, no column |
 
-The two graph-native terms are the whole point. **Critical Supplier and Ownership Risk have no lakehouse column, no threshold a BI tool could sort by, and no clean SQL the lakehouse-only engine would spontaneously write.** Their definitions live in the graph. The four column-findable terms exist to make the contrast honest: they show what the lakehouse-only engine can govern, so the gap is clearly the two it cannot.
+The two graph-native terms are the whole point. **Critical Supplier and Ownership Risk have no lakehouse column, a governing cutoff that lives only in the graph over a GDS metric BI cannot compute, and no clean SQL the lakehouse-only engine would spontaneously write.** Their definitions live in the graph. The four column-findable terms exist to make the contrast honest: they show what the lakehouse-only engine can govern, so the gap is clearly the two it cannot.
 
 ### Business rules
 
@@ -189,7 +191,7 @@ The two graph-native thresholds are set after the algorithms run, from the score
 
 ### Classifications
 
-Column-findable classifications are pre-planted as `CLASSIFIED_AS` edges carrying provenance (source, reason, evaluated-at, rule version): Jade to Strategic Account; Marlin and Pelican to Defaulted Customer; the background high-risk suppliers to High-Risk Supplier; the background late payers to Delinquent Customer. These are deterministic facts.
+Column-findable classifications are pre-planted as `CLASSIFIED_AS` edges carrying provenance (reason, evaluated-at, rule version): Jade to Strategic Account; Marlin and Pelican to Defaulted Customer; the background high-risk suppliers to High-Risk Supplier; the background late payers to Delinquent Customer. These are deterministic facts.
 
 **The two graph-native terms are resolved live, never pre-planted.** No `CLASSIFIED_AS` edge is created for Critical Supplier or Ownership Risk. The graph engine resolves the governed definition from the ontology, then walks the graph live using the precomputed betweenness and PageRank node properties to apply it. This keeps the flag a genuine live traversal and guarantees the two graph-native labels never exist as a materializable row anywhere, so they can never leak into a gold table.
 
@@ -246,7 +248,7 @@ RETURN a, r, b;
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
 | `REALIZED_AS` | `(:Entity)-[:REALIZED_AS]->(:Customer\|:Supplier\|:BusinessUnit\|:Invoice\|:RevenueEntry\|:ComplianceFinding)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The six instance entities (Customer, Supplier, BusinessUnit, Invoice, RevenueEntry, ComplianceFinding) are realized; SupplyRelationship has a table mapping but no realized instance nodes |
-| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {source, reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with a column-findable business term | Materialized classification with provenance; written back to the `classifications` Delta table. Only the four column-findable terms carry these edges. The two graph-native terms are never planted here |
+| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with a column-findable business term | Materialized classification with provenance; written back to the `classifications` Delta table. Only the four column-findable terms carry these edges. The two graph-native terms are never planted here |
 
 Sample the cross-layer edges that tie the knowledge layer to instances:
 
@@ -267,9 +269,10 @@ The `CLASSIFIED_AS` edge is the explainability payoff for the column-findable te
 Each node label and each relationship type loads from one CSV in `data/`. The six core instance node CSVs and `supply_relationships.csv`, plus the `supplier_business_units.csv` bridge, are uploaded to Unity Catalog as the tables above; the knowledge-layer CSVs stay graph-only.
 
 - Node CSVs: `customers.csv`, `suppliers.csv`, `business_units.csv`, `invoices.csv`, `revenue_entries.csv`, `compliance_findings.csv`, `entities.csv`, `business_terms.csv`, `business_rules.csv`, `policies.csv`, `thresholds.csv`, `data_sources.csv`
-- Relationship CSVs: `has_invoice.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `supply_relationships.csv`, `owned_by.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
+- Relationship CSVs: `has_invoice.csv`, `belongs_to.csv`, `recognizes.csv`, `supplies.csv`, `supply_relationships.csv`, `has_finding.csv`, `defined_by.csv`, `evaluates.csv`, `constrains.csv`, `governs.csv`, `applies_to.csv`, `maps_to.csv`, `realized_as.csv`, `classified_as.csv`
 - Loads on both sides: `supply_relationships.csv`. UC gets it as the `supply_relationships` table so the lakehouse-only engine can see the raw supplier-to-supplier links; Neo4j sources the supplier-to-supplier `SUPPLIES` edge from the same file.
 - Lakehouse-only CSV: `supplier_business_units.csv`, the camelCase bridge uploaded to UC but not loaded into Neo4j, where the supplier-to-unit `SUPPLIES` edge already carries the link.
+- Derived, no CSV: the customer-to-customer `OWNED_BY` edge is built from the `customers.parentCustomerId` column at load time, so there is no separate `owned_by.csv`. The column is the single source for both the graph edge and the raw ownership link plain Genie reads in the lakehouse.
 
 `classified_as.csv` carries the provenance columns `reason`, `evaluatedAt`, and `ruleVersion`, and targets both Customer and Supplier instances.
 

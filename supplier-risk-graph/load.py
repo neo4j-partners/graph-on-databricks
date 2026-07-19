@@ -10,7 +10,8 @@ loading, so it must be dedicated to this demo.
 The instance layer carries two same-graph edges beyond the customer/supplier/
 business-unit fan-out: supplier-to-supplier SUPPLIES (from supply_relationships.csv,
 Cascade feeding the tier-1 bottle suppliers) and customer-to-customer OWNED_BY
-(from owned_by.csv, the Kestrel ownership family). classified_as.csv now targets
+(derived from the customers.parentCustomerId column, the Kestrel ownership
+family). classified_as.csv now targets
 both Customer and Supplier, so it is split on its entity_label column into one
 CLASSIFIED_AS spec per label, the same way realized_as.csv is split on
 instance_label; the four column-findable terms (Strategic Account, Defaulted
@@ -134,10 +135,9 @@ REL_SPECS = [
     # SUP-901 supplies SUP-902, so the edge points fromSupplierId -> toSupplierId.
     RelSpec("supply_relationships.csv", "SUPPLIES", "fromSupplierId", "Supplier", "toSupplierId", "Supplier"),
     RelSpec("has_finding.csv", "HAS_FINDING", "customer_id", "Customer", "finding_id", "ComplianceFinding"),
-    # Customer-to-customer OWNED_BY: the child (customer_id) points at its parent
-    # (parent_customer_id). parentCustomerId also rides on customers.csv as a node
-    # property; the edge is sourced here from owned_by.csv.
-    RelSpec("owned_by.csv", "OWNED_BY", "customer_id", "Customer", "parent_customer_id", "Customer"),
+    # Customer-to-customer OWNED_BY is derived from the customers.parentCustomerId
+    # column by expand_owned_by(), not a separate CSV, so the column is the single
+    # source for both the graph edge and the lakehouse link plain Genie reads.
     # classified_as.csv targets both Customer and Supplier, so it is not a static
     # spec: expand_classified_as() splits it on its entity_label column, one
     # CLASSIFIED_AS spec per label. The two graph-native terms (Critical Supplier,
@@ -185,6 +185,23 @@ def read_rel_rows(data_dir: Path, spec: RelSpec) -> list[dict[str, Any]]:
         }
         rows.append({"src": raw[spec.src_col], "dst": raw[spec.dst_col], "props": props})
     return rows
+
+
+def expand_owned_by(data_dir: Path) -> list[tuple[RelSpec, list[dict[str, Any]]]]:
+    """Derive OWNED_BY edges from the customers.parentCustomerId column.
+
+    A customer with a non-empty parentCustomerId is owned by that parent, so the
+    edge points child -> parent. The column is the single source for both this
+    graph edge and the raw ownership link the lakehouse exposes to plain Genie;
+    there is no separate owned_by.csv.
+    """
+    rows = [
+        {"src": raw["id"], "dst": raw["parentCustomerId"], "props": {}}
+        for raw in read_csv(data_dir / "customers.csv")
+        if raw["parentCustomerId"]
+    ]
+    spec = RelSpec("customers.csv", "OWNED_BY", "id", "Customer", "parentCustomerId", "Customer")
+    return [(spec, rows)]
 
 
 def expand_realized_as(data_dir: Path) -> list[tuple[RelSpec, list[dict[str, Any]]]]:
@@ -331,6 +348,7 @@ def main() -> None:
     }
     rel_data = (
         [(spec, read_rel_rows(args.data_dir, spec)) for spec in REL_SPECS]
+        + expand_owned_by(args.data_dir)
         + expand_realized_as(args.data_dir)
         + expand_classified_as(args.data_dir)
     )

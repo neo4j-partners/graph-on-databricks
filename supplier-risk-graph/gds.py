@@ -1,32 +1,40 @@
-"""Phase 5 graph analytics for the supplier-risk-graph demo.
+"""Phase 2 graph analytics for the sharpened supplier-risk-graph demo.
 
-Runs two analytics passes over the graph with the graphdatascience Python client
-and writes the results back into Neo4j so they join the same provenance story as
-the rule-based classifications:
+Runs the two graph algorithms that the two demo stories turn on, with the
+graphdatascience Python client, and writes the results back into Neo4j as node
+properties only. Nothing here is ever synced to Delta: the whole point of the
+sharpened demo is that these graph-native signals live in the graph and no
+lakehouse column carries them, so plain Genie cannot see them.
 
-  1. Supplier risk exposure (extends Q4). Aggregates the supply network
-     Supplier-[:SUPPLIES]->BusinessUnit and computes each business unit's
-     exposure as the mean riskScore of the suppliers feeding it. This is a
-     one-hop aggregation, so a plain Cypher avg() computes it exactly, no GDS
-     algorithm required. Surfaces BU-03, exposed through four mid-band suppliers
-     that the flat riskScore >= 70 filter misses. Written back as a
-     supplierExposureScore property on every BusinessUnit node.
+  1. Supplier betweenness (Story 1, the hidden glassworks). Projects the
+     supplier-to-supplier network (Supplier nodes, SUPPLIES edges, undirected)
+     and runs gds.betweenness. Supplier->BusinessUnit SUPPLIES edges fall out of
+     the projection because the BusinessUnit endpoint is not a Supplier, so the
+     projection is the raw-material supply chain only. Cascade Glassworks
+     (SUP-901) is the star centre feeding the five tier-1 bottle suppliers, so it
+     lands as the strict betweenness maximum: the narrowest bridge in the
+     network. Written back as a betweenness property on every Supplier node.
 
-  2. Customer similarity (extends Q5/Q6). The one genuine GDS algorithm: runs
-     gds.knn over the payment-behavior features (avgDaysLate, overdueShare,
-     churnRisk, profitabilityTrend, the categorical fields encoded numerically;
-     upsellScore deliberately excluded) to build the similarity graph, then
-     surfaces the non-flagged customers with the highest similarity to any member
-     of the rule-defined risky cohort. The four nearest are classified as Risky
-     Customer (TERM-04) with a source:'gds' CLASSIFIED_AS edge. The candidates
-     emerge from the kNN run, not a planted set.
+  2. Ownership PageRank (Story 2, the clean payer in a bad family). Projects the
+     ownership network (Customer nodes, OWNED_BY edges, undirected) and runs
+     personalized gds.pageRank seeded on the two defaulted siblings. Risk
+     propagates from the siblings up to the shared parent (Kestrel) and back down
+     onto Jade, the clean payer, even though Jade's own record is spotless.
+     Written back as a pagerank property on every Customer node.
 
-Q4 exposure is asserted against data/ground_truth.json so a drift fails loud.
-Q5/Q6 has no exact-value ground truth: the answer emerges from the deterministic
-kNN run and is checked only for shape (four non-flagged candidates, each with a
-risky neighbor). Deterministic given the fixed-seed data. Re-runnable: the
-similarity projection is dropped on entry and exit, and prior source:'gds' edges
-are cleared before the similarity write-back.
+Both algorithms then set the two graph-native thresholds that had no value until
+the scores existed: the Supply Concentration Threshold (THR-03) is placed
+between Cascade and the next supplier so only Cascade clears it, and the
+Ownership Contagion Threshold (THR-04) is placed between Jade and the top filler
+customer so only the Kestrel family clears it. Both are written onto the live
+Threshold nodes and back into data/thresholds.csv (graph-only, never uploaded to
+Unity Catalog), so a reload carries them.
+
+The build fails loud if either plant is wrong: Cascade must be the strict
+betweenness maximum, and Jade must clear the contagion cutoff while no filler
+customer does. Deterministic given the fixed-seed data. Re-runnable: both graph
+projections are dropped on entry and exit, and the write-backs overwrite in
+place.
 
 Run from the project directory after load.py:
 
@@ -39,25 +47,59 @@ NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE.
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from dotenv import load_dotenv
 from graphdatascience import GraphDataScience
 
 HERE = Path(__file__).parent
 
-SIMILARITY_GRAPH = "customerSimilarity"
+SUPPLIER_GRAPH = "supplierNetwork"
+OWNERSHIP_GRAPH = "ownershipNetwork"
 
-RISKY_TERM_ID = "TERM-04"  # Risky Customer
-GDS_SOURCE = "gds"
-EVALUATED_AT = "2026-07-01T00:00:00Z"  # frozen as-of, matches the planted edges
-LATE_DAYS_THRESHOLD = 60  # Q5 last-3-invoices rule, identifies the risky cohort
-N_SIMILAR = 4  # candidates to surface near the risky cohort
-KNN_TOP_K = 10  # neighbors per node; wide enough to link candidates to the cohort
+CONCENTRATION_THRESHOLD_ID = "THR-03"  # Supply Concentration Threshold
+CONTAGION_THRESHOLD_ID = "THR-04"  # Ownership Contagion Threshold
+
+TOP_N_PRINT = 6  # how many ranked rows to echo for eyeballing on stage
+
+
+@dataclass(frozen=True)
+class Protagonists:
+    """The two stories' hand-named nodes, read from ground_truth.json."""
+
+    cascade_id: str
+    tier1_ids: list[str]
+    kestrel_id: str
+    jade_id: str
+    sibling_ids: list[str]
+
+    @classmethod
+    def from_ground_truth(cls, ground_truth: dict[str, Any]) -> Protagonists:
+        story1 = ground_truth["story1_hidden_glassworks"]
+        story2 = ground_truth["story2_clean_payer"]
+        return cls(
+            cascade_id=story1["cascade_id"],
+            tier1_ids=list(story1["tier1_ids"]),
+            kestrel_id=story2["kestrel_id"],
+            jade_id=story2["jade_id"],
+            sibling_ids=list(story2["sibling_ids"]),
+        )
+
+
+class Cutoff(NamedTuple):
+    """A graph-native threshold placed between the protagonist and the field."""
+
+    top_id: str
+    top_score: float
+    runner_up: float
+    value: float
 
 
 def require_env(name: str, default: str | None = None) -> str:
@@ -72,251 +114,251 @@ def header(title: str) -> None:
 
 
 def drop_graph(gds: GraphDataScience, name: str) -> None:
-    gds.run_cypher("CALL gds.graph.drop($name, false) YIELD graphName", params={"name": name})
+    gds.run_cypher(
+        "CALL gds.graph.drop($name, false) YIELD graphName", params={"name": name}
+    )
 
 
-def compute_exposure(gds: GraphDataScience) -> list[dict[str, Any]]:
-    """Algorithm 1: mean supplier risk per BusinessUnit.
+def compute_betweenness(
+    gds: GraphDataScience, protags: Protagonists
+) -> list[dict[str, Any]]:
+    """Algorithm 1: betweenness over the supplier-to-supplier network.
 
-    Each business unit's exposure is the mean riskScore of the suppliers feeding
-    it over the SUPPLIES edges. This is a one-hop aggregation, so a single Cypher
-    query with sum, count, and max computes the ranking rows exactly. The mean is
-    the metric that surfaces BU-03: several mid-band suppliers give it a high
-    average even though no single score crosses the flat riskScore >= 70 filter.
+    The projection keeps Supplier nodes and SUPPLIES edges, undirected. The
+    Supplier->BusinessUnit SUPPLIES edges drop out because their BusinessUnit
+    endpoint is not in the node set, so what is left is the raw-material chain.
+    Undirected orientation is what makes Cascade score: every shortest path
+    between two of its tier-1 bottle suppliers runs through it, so it is the
+    narrowest bridge, while filler tier-2 suppliers feed scattered nodes and
+    concentrate nothing.
     """
-    header("Algorithm 1: supplier risk exposure (Q4)")
+    header("Algorithm 1: supplier betweenness (Story 1, Critical Supplier)")
+    drop_graph(gds, SUPPLIER_GRAPH)
+    gds.run_cypher(
+        "CALL gds.graph.project($graph, 'Supplier', "
+        "{SUPPLIES: {orientation: 'UNDIRECTED'}})",
+        params={"graph": SUPPLIER_GRAPH},
+    )
     rows = gds.run_cypher(
         """
-        MATCH (s:Supplier)-[:SUPPLIES]->(b:BusinessUnit)
-        RETURN b.id AS bu, b.name AS name,
-               sum(s.riskScore) AS total_risk,
-               count(s) AS supplier_count,
-               max(s.riskScore) AS max_supplier_risk
-        """
+        CALL gds.betweenness.stream($graph)
+        YIELD nodeId, score
+        WITH gds.util.asNode(nodeId) AS s, score
+        RETURN s.id AS sid, s.name AS name, score
+        ORDER BY score DESC, sid
+        """,
+        params={"graph": SUPPLIER_GRAPH},
     )
+    drop_graph(gds, SUPPLIER_GRAPH)
 
-    exposure = sorted(
-        (
-            {
-                "business_unit_id": r["bu"],
-                "name": r["name"],
-                "supplier_count": int(r["supplier_count"]),
-                "avg_supplier_risk": round(
-                    float(r["total_risk"]) / int(r["supplier_count"]), 1
-                ),
-                "max_supplier_risk": int(r["max_supplier_risk"]),
-            }
-            for _, r in rows.iterrows()
-        ),
-        key=lambda r: r["avg_supplier_risk"],
-        reverse=True,
-    )
-
-    print("  BusinessUnit exposure ranking (mean supplying-supplier riskScore):")
-    for rank, row in enumerate(exposure, start=1):
-        print(
-            f"    {rank}. {row['business_unit_id']} {row['name']:<20} "
-            f"exposure={row['avg_supplier_risk']:>5}  "
-            f"suppliers={row['supplier_count']:>2}  max={row['max_supplier_risk']}"
-        )
-    return exposure
-
-
-def write_exposure(gds: GraphDataScience, exposure: list[dict[str, Any]]) -> None:
-    rows = [
-        {"bu": r["business_unit_id"], "score": float(r["avg_supplier_risk"])}
-        for r in exposure
+    scores = [
+        {
+            "supplier_id": r["sid"],
+            "name": r["name"],
+            "betweenness": round(float(r["score"]), 4),
+        }
+        for _, r in rows.iterrows()
     ]
+    print("  Supplier betweenness (top of the supplier-to-supplier network):")
+    for rank, row in enumerate(scores[:TOP_N_PRINT], start=1):
+        marker = "  <- Cascade" if row["supplier_id"] == protags.cascade_id else ""
+        print(
+            f"    {rank}. {row['supplier_id']} {row['name']:<24} "
+            f"betweenness={row['betweenness']:>8}{marker}"
+        )
+    return scores
+
+
+def write_betweenness(gds: GraphDataScience, scores: list[dict[str, Any]]) -> None:
+    rows = [{"sid": s["supplier_id"], "score": s["betweenness"]} for s in scores]
     result = gds.run_cypher(
         """
         UNWIND $rows AS row
-        MATCH (b:BusinessUnit {id: row.bu})
-        SET b.supplierExposureScore = row.score
-        RETURN count(b) AS written
+        MATCH (s:Supplier {id: row.sid})
+        SET s.betweenness = row.score
+        RETURN count(s) AS written
         """,
         params={"rows": rows},
     )
-    print(f"  wrote supplierExposureScore to {int(result['written'].iloc[0])} BusinessUnit nodes")
+    print(f"  wrote betweenness to {int(result['written'].iloc[0])} Supplier nodes")
 
 
-def find_risky_cohort(gds: GraphDataScience) -> list[str]:
-    """Customers whose last three invoices are each more than 60 days late."""
-    df = gds.run_cypher(
-        """
-        MATCH (c:Customer)-[:HAS_INVOICE]->(i:Invoice)
-        WITH c, i ORDER BY i.dueDate DESC
-        WITH c, collect(i)[..3] AS last3
-        WHERE size(last3) = 3 AND all(x IN last3 WHERE x.daysLate > $late)
-        RETURN c.id AS cid ORDER BY cid
-        """,
-        params={"late": LATE_DAYS_THRESHOLD},
-    )
-    return [r["cid"] for _, r in df.iterrows()]
+def compute_pagerank(
+    gds: GraphDataScience, protags: Protagonists
+) -> list[dict[str, Any]]:
+    """Algorithm 2: personalized PageRank over the ownership network.
 
-
-def compute_similarity(gds: GraphDataScience, risky: list[str]) -> list[dict[str, Any]]:
-    """Algorithm 2: GDS kNN similarity, ranked to the risky cohort.
-
-    Projects the customers with their encoded payment-behavior features, runs
-    gds.knn to build the similarity graph, then ranks the non-flagged customers
-    by their highest similarity to any member of the rule-defined risky cohort.
-    The four nearest are the emergent Q5/Q6 candidates: they come out of the kNN
-    run, not a planted set.
+    The projection keeps Customer nodes and OWNED_BY edges, undirected. Seeding
+    the restart distribution on the two defaulted siblings makes risk flow up to
+    the shared parent (Kestrel) and back down onto its other child, Jade. Only
+    nodes reachable from the seeds get mass, so the Kestrel family lights up and
+    every unrelated filler ownership group stays at zero.
     """
-    header("Algorithm 2: customer similarity (Q5/Q6)")
-    print(f"  risky cohort (last-3-invoices rule): {', '.join(risky)}")
-
-    names = {
-        r["id"]: r["name"]
-        for _, r in gds.run_cypher("MATCH (c:Customer) RETURN c.id AS id, c.name AS name").iterrows()
-    }
-
-    drop_graph(gds, SIMILARITY_GRAPH)
-    gds.graph.cypher.project(
-        """
-        MATCH (c:Customer)
-        RETURN gds.graph.project(
-            $graph_name, c, null,
-            {sourceNodeProperties: {features: [
-                CASE WHEN c.avgDaysLate / 100.0 > 1.0 THEN 1.0 ELSE c.avgDaysLate / 100.0 END,
-                c.overdueShare,
-                CASE c.churnRisk WHEN 'low' THEN 0.0 WHEN 'medium' THEN 0.5 ELSE 1.0 END,
-                CASE c.profitabilityTrend WHEN 'improving' THEN 0.0 WHEN 'stable' THEN 0.5 ELSE 1.0 END
-            ]}, targetNodeProperties: null}
-        )
-        """,
-        database=gds.database(),
-        graph_name=SIMILARITY_GRAPH,
+    header("Algorithm 2: ownership PageRank (Story 2, Ownership Risk)")
+    print(f"  seeded on the defaulted siblings: {', '.join(protags.sibling_ids)}")
+    drop_graph(gds, OWNERSHIP_GRAPH)
+    gds.run_cypher(
+        "CALL gds.graph.project($graph, 'Customer', "
+        "{OWNED_BY: {orientation: 'UNDIRECTED'}})",
+        params={"graph": OWNERSHIP_GRAPH},
     )
-    # kNN similarity graph over the encoded features. concurrency=1, full
-    # sampling, and a fixed seed make it deterministic; Euclidean similarity is
-    # normalized by GDS to (0, 1], higher meaning more alike.
-    neighbors = gds.run_cypher(
+    rows = gds.run_cypher(
         """
-        CALL gds.knn.stream($graph, {
-            nodeProperties: {features: 'EUCLIDEAN'},
-            topK: $top_k, sampleRate: 1.0, randomSeed: 42, concurrency: 1
-        })
-        YIELD node1, node2, similarity
-        RETURN gds.util.asNode(node1).id AS c1, gds.util.asNode(node2).id AS c2, similarity
+        MATCH (seed:Customer) WHERE seed.id IN $seeds
+        WITH collect(seed) AS sources
+        CALL gds.pageRank.stream($graph, {sourceNodes: sources, concurrency: 1})
+        YIELD nodeId, score
+        WITH gds.util.asNode(nodeId) AS c, score
+        RETURN c.id AS cid, c.name AS name, score
+        ORDER BY score DESC, cid
         """,
-        params={"graph": SIMILARITY_GRAPH, "top_k": KNN_TOP_K},
+        params={"graph": OWNERSHIP_GRAPH, "seeds": protags.sibling_ids},
     )
-    drop_graph(gds, SIMILARITY_GRAPH)
-    print(f"  kNN produced {len(neighbors)} neighbor pairs over 4 encoded features")
+    drop_graph(gds, OWNERSHIP_GRAPH)
 
-    # Each non-flagged customer's highest similarity to any risky member. kNN
-    # pairs are directed per source's top-K, so scan both endpoints.
-    risky_set = set(risky)
-    best: dict[str, float] = {}
-    for _, row in neighbors.iterrows():
-        c1, c2, sim = row["c1"], row["c2"], float(row["similarity"])
-        if c1 in risky_set and c2 not in risky_set:
-            candidate = c2
-        elif c2 in risky_set and c1 not in risky_set:
-            candidate = c1
-        else:
-            continue
-        if sim > best.get(candidate, 0.0):
-            best[candidate] = sim
-
-    nearest = sorted(best, key=lambda cid: (-best[cid], cid))[:N_SIMILAR]
-    candidates = [
+    scores = [
         {
-            "customer_id": cid,
-            "name": names[cid],
-            "similarity_to_risky": round(best[cid], 4),
+            "customer_id": r["cid"],
+            "name": r["name"],
+            "pagerank": round(float(r["score"]), 6),
         }
-        for cid in nearest
+        for _, r in rows.iterrows()
     ]
-
-    print("  Non-flagged customers most similar to the risky cohort (GDS kNN):")
-    for rank, row in enumerate(candidates, start=1):
+    print("  Customer ownership PageRank (top, the Kestrel family):")
+    for rank, row in enumerate(scores[:TOP_N_PRINT], start=1):
+        marker = "  <- Jade" if row["customer_id"] == protags.jade_id else ""
         print(
-            f"    {rank}. {row['customer_id']} {row['name']:<20} "
-            f"similarity={row['similarity_to_risky']}"
+            f"    {rank}. {row['customer_id']} {row['name']:<26} "
+            f"pagerank={row['pagerank']}{marker}"
         )
-    return candidates
+    return scores
 
 
-def write_similarity(gds: GraphDataScience, candidates: list[dict[str, Any]]) -> None:
-    cleared = gds.run_cypher(
-        """
-        MATCH (:Customer)-[r:CLASSIFIED_AS {source: $source}]->(:BusinessTerm)
-        DELETE r RETURN count(r) AS deleted
-        """,
-        params={"source": GDS_SOURCE},
-    )
-    print(f"  cleared {int(cleared['deleted'].iloc[0])} prior source:'gds' classifications")
-
-    rows = [
-        # score: kNN similarity to the nearest risky member, higher is more alike.
-        {"cid": c["customer_id"], "score": c["similarity_to_risky"]}
-        for c in candidates
-    ]
+def write_pagerank(gds: GraphDataScience, scores: list[dict[str, Any]]) -> None:
+    rows = [{"cid": s["customer_id"], "score": s["pagerank"]} for s in scores]
     result = gds.run_cypher(
         """
         UNWIND $rows AS row
         MATCH (c:Customer {id: row.cid})
-        MATCH (t:BusinessTerm {id: $term})
-        MERGE (c)-[r:CLASSIFIED_AS {source: $source}]->(t)
-        SET r.algorithm = 'knn',
-            r.score = row.score,
-            r.evaluatedAt = datetime($evaluated_at),
-            r.reason = 'GDS kNN: among the nearest neighbors of the known risky cohort; not yet tripping the last-3-invoices rule'
-        RETURN count(r) AS written
+        SET c.pagerank = row.score
+        RETURN count(c) AS written
         """,
-        params={
-            "rows": rows,
-            "term": RISKY_TERM_ID,
-            "source": GDS_SOURCE,
-            "evaluated_at": EVALUATED_AT,
-        },
+        params={"rows": rows},
     )
-    print(
-        f"  wrote {int(result['written'].iloc[0])} CLASSIFIED_AS edges "
-        f"(Customer)-[:CLASSIFIED_AS {{source:'gds'}}]->(:BusinessTerm {RISKY_TERM_ID})"
-    )
+    print(f"  wrote pagerank to {int(result['written'].iloc[0])} Customer nodes")
 
 
-def assert_exposure(exposure: list[dict[str, Any]], ground_truth: dict[str, Any]) -> None:
-    expected = ground_truth["gds_q4_supplier_exposure_by_business_unit"]
-    if exposure != expected:
+def concentration_cutoff(
+    scores: list[dict[str, Any]], protags: Protagonists
+) -> Cutoff:
+    """THR-03: midway between Cascade's betweenness and the next supplier's."""
+    by_id = {s["supplier_id"]: s["betweenness"] for s in scores}
+    cascade = by_id[protags.cascade_id]
+    runner_up = max((v for sid, v in by_id.items() if sid != protags.cascade_id), default=0.0)
+    return Cutoff(protags.cascade_id, cascade, runner_up, round((cascade + runner_up) / 2, 2))
+
+
+def contagion_cutoff(scores: list[dict[str, Any]], protags: Protagonists) -> Cutoff:
+    """THR-04: midway between Jade's PageRank and the top filler customer's."""
+    family = {protags.kestrel_id, protags.jade_id, *protags.sibling_ids}
+    by_id = {s["customer_id"]: s["pagerank"] for s in scores}
+    jade = by_id[protags.jade_id]
+    filler_max = max((v for cid, v in by_id.items() if cid not in family), default=0.0)
+    return Cutoff(protags.jade_id, jade, filler_max, round((jade + filler_max) / 2, 6))
+
+
+def write_thresholds(gds: GraphDataScience, cutoffs: dict[str, float]) -> None:
+    rows = [{"id": tid, "value": value} for tid, value in cutoffs.items()]
+    result = gds.run_cypher(
+        """
+        UNWIND $rows AS row
+        MATCH (t:Threshold {id: row.id})
+        SET t.value = row.value
+        RETURN count(t) AS written
+        """,
+        params={"rows": rows},
+    )
+    written = int(result["written"].iloc[0])
+    if written != len(cutoffs):
         sys.exit(
-            "Q4 exposure drifted from ground_truth.\n"
-            f"  computed: {exposure}\n  expected: {expected}"
+            f"Threshold write set {written} of {len(cutoffs)} Threshold nodes; "
+            f"expected ids {sorted(cutoffs)} to all exist."
         )
-    top = exposure[0]["business_unit_id"]
-    if top != ground_truth["gds_q4_exposed_business_unit"]:
-        sys.exit(f"Q4 top BU {top} != expected {ground_truth['gds_q4_exposed_business_unit']}")
-    print(f"  assert OK: exposure ranking matches ground_truth, {top} on top")
+    for tid, value in cutoffs.items():
+        print(f"  set Threshold {tid}.value = {value}")
 
 
-def assert_similarity(candidates: list[dict[str, Any]], risky: list[str]) -> None:
-    """Shape check: N_SIMILAR non-flagged candidates, each a genuine kNN neighbor
-    of the risky cohort.
+def update_thresholds_csv(path: Path, cutoffs: dict[str, float]) -> None:
+    """Fill the two blank graph-native threshold rows in thresholds.csv.
 
-    The candidates are emergent from the kNN run, so there is no exact-value
-    ground truth to compare against. This guards against gross breakage: a wrong
-    count, a rule-flagged customer slipping in, or a similarity score outside
-    GDS's normalized (0, 1] band (which would mean the ranking regressed to a raw
-    distance rather than a similarity, the anti-pattern this pass replaced).
+    Only the THR-03/THR-04 value cells are touched; every other row is rewritten
+    verbatim. thresholds.csv is graph-only (never uploaded to Unity Catalog), so
+    persisting the computed cutoffs here keeps them a governed graph value, not a
+    lakehouse column.
     """
-    risky_set = set(risky)
-    if len(candidates) != N_SIMILAR:
-        sys.exit(f"Q5 expected {N_SIMILAR} candidates, got {len(candidates)}: {candidates}")
-    flagged = [c["customer_id"] for c in candidates if c["customer_id"] in risky_set]
-    if flagged:
-        sys.exit(f"Q5 candidates include rule-flagged customers: {flagged}")
-    off_band = [
-        (c["customer_id"], c["similarity_to_risky"])
-        for c in candidates
-        if not 0.0 < c["similarity_to_risky"] <= 1.0
-    ]
-    if off_band:
-        sys.exit(f"Q5 candidate similarity outside GDS's (0, 1] band: {off_band}")
-    ids = ", ".join(c["customer_id"] for c in candidates)
-    print(f"  assert OK: {N_SIMILAR} non-flagged candidates, each near the risky cohort ({ids})")
+    with path.open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = reader.fieldnames or []
+        rows = list(reader)
+
+    missing = set(cutoffs) - {row["id"] for row in rows}
+    if missing:
+        sys.exit(f"thresholds.csv is missing rows for {sorted(missing)}; not writing.")
+
+    for row in rows:
+        if row["id"] in cutoffs:
+            value = cutoffs[row["id"]]
+            row["value"] = str(int(value)) if float(value).is_integer() else str(value)
+
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    path.write_text(buffer.getvalue())
+    print(f"  wrote {', '.join(sorted(cutoffs))} back into {path.name}")
+
+
+def assert_betweenness(scores: list[dict[str, Any]], conc: Cutoff, protags: Protagonists) -> None:
+    """Cascade must be the strict betweenness maximum in the supplier network."""
+    if conc.top_score <= conc.runner_up:
+        sys.exit(
+            f"Story 1 betweenness: Cascade ({protags.cascade_id})={conc.top_score} "
+            f"is not the strict network maximum (runner-up={conc.runner_up})."
+        )
+    top = scores[0]["supplier_id"]
+    if top != protags.cascade_id:
+        sys.exit(
+            f"Story 1 betweenness: top supplier is {top}, "
+            f"expected Cascade {protags.cascade_id}."
+        )
+    print(
+        f"  assert OK: Cascade betweenness {conc.top_score} is the strict network "
+        f"maximum (next {conc.runner_up}); THR-03 cutoff {conc.value}"
+    )
+
+
+def assert_pagerank(scores: list[dict[str, Any]], cont: Cutoff, protags: Protagonists) -> None:
+    """Jade must clear the contagion cutoff while no filler customer does."""
+    family = {protags.kestrel_id, protags.jade_id, *protags.sibling_ids}
+    by_id = {s["customer_id"]: s["pagerank"] for s in scores}
+    jade = by_id[protags.jade_id]
+    if jade < cont.value:
+        sys.exit(
+            f"Story 2 PageRank: Jade ({protags.jade_id})={jade} does not clear "
+            f"THR-04 cutoff {cont.value}."
+        )
+    fillers_over = sorted(
+        (cid, v) for cid, v in by_id.items() if cid not in family and v >= cont.value
+    )
+    if fillers_over:
+        sys.exit(
+            f"Story 2 PageRank: filler customers clear THR-04 cutoff {cont.value}: "
+            f"{fillers_over}"
+        )
+    print(
+        f"  assert OK: Jade PageRank {jade} clears THR-04 cutoff {cont.value}; "
+        f"no filler customer does"
+    )
 
 
 def main() -> None:
@@ -325,11 +367,12 @@ def main() -> None:
         "--data-dir",
         type=Path,
         default=HERE / "data",
-        help="directory holding ground_truth.json (default: data/)",
+        help="directory holding ground_truth.json and thresholds.csv (default: data/)",
     )
     args = parser.parse_args()
 
     ground_truth = json.loads((args.data_dir / "ground_truth.json").read_text())
+    protags = Protagonists.from_ground_truth(ground_truth)
 
     load_dotenv(HERE / ".env")
     uri = require_env("NEO4J_URI")
@@ -340,16 +383,28 @@ def main() -> None:
     with gds:
         print(f"Connected to {uri} (database={database}), GDS client v{gds.version()}")
 
-        exposure = compute_exposure(gds)
-        assert_exposure(exposure, ground_truth)
-        write_exposure(gds, exposure)
+        betweenness = compute_betweenness(gds, protags)
+        conc = concentration_cutoff(betweenness, protags)
+        assert_betweenness(betweenness, conc, protags)
+        write_betweenness(gds, betweenness)
 
-        risky = find_risky_cohort(gds)
-        candidates = compute_similarity(gds, risky)
-        assert_similarity(candidates, risky)
-        write_similarity(gds, candidates)
+        pagerank = compute_pagerank(gds, protags)
+        cont = contagion_cutoff(pagerank, protags)
+        assert_pagerank(pagerank, cont, protags)
+        write_pagerank(gds, pagerank)
 
-    print("\nGDS analytics complete: Q4 exposure and Q5 similarity written back to Neo4j.")
+        header("Graph-native thresholds (set from the computed distributions)")
+        cutoffs = {
+            CONCENTRATION_THRESHOLD_ID: conc.value,
+            CONTAGION_THRESHOLD_ID: cont.value,
+        }
+        write_thresholds(gds, cutoffs)
+        update_thresholds_csv(args.data_dir / "thresholds.csv", cutoffs)
+
+    print(
+        "\nGDS analytics complete: betweenness and pagerank written to Neo4j as "
+        "node properties, THR-03/THR-04 set. Nothing synced to Delta."
+    )
 
 
 if __name__ == "__main__":

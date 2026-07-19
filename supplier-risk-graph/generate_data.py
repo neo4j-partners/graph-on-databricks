@@ -30,6 +30,7 @@ from __future__ import annotations
 import csv
 import json
 import random
+from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -376,31 +377,43 @@ def make_supplies(rng: random.Random, suppliers: list[dict]) -> list[dict]:
 
 
 def make_supply_relationships(rng: random.Random, suppliers: list[dict]) -> list[dict]:
-    """Supplier-to-supplier SUPPLIES edges.
+    """Supplier-to-supplier SUPPLIES edges, as a disjoint union of stars.
 
-    Cascade (SUP-901) feeds all five tier-1 bottle suppliers. Filler tier-2
-    suppliers feed scattered background suppliers, but each filler source picks
-    targets of DISTINCT subcategories so it can never reproduce Cascade's
-    convergence (several same-subcategory suppliers all serving one BU).
+    Cascade (SUP-901) feeds all five tier-1 bottle suppliers: a clean five-leaf
+    star. Each filler source then feeds one to three leaves drawn WITHOUT
+    replacement from a leaf pool that is disjoint from the source set, so no
+    filler source is ever also a leaf (no chains) and no leaf is shared across
+    sources (no cross-links). The whole supplier-to-supplier graph is therefore a
+    set of isolated stars, and a star centre with k leaves has betweenness
+    C(k, 2): filler stars top out at C(3, 2)=3 while Cascade's is C(5, 2)=10.
+    That gap is what keeps Cascade the strict betweenness maximum over the
+    supplier network in Phase 2. A chained or cross-linked filler web (a leaf
+    that is also a source, or a leaf with two parents) would create bridge nodes
+    whose betweenness outscores Cascade and hides it, so both are forbidden here
+    and asserted in check_story1. Each source also keeps its leaves in distinct
+    subcategories, so no filler can reproduce Cascade's same-subcategory
+    convergence onto one business unit.
     """
     rels = [{"fromSupplierId": CASCADE_ID, "toSupplierId": t} for t in TIER1_IDS]
 
     background = [s for s in suppliers if s["id"] not in PROTAGONIST_SUPPLIER_IDS]
-    sources = rng.sample(background, N_FILLER_SUP_SOURCES)
+    pool = list(background)
+    rng.shuffle(pool)
+    sources = pool[:N_FILLER_SUP_SOURCES]
+    available = pool[N_FILLER_SUP_SOURCES:]  # leaf pool, disjoint from the sources
     for source in sources:
-        candidates = [s for s in background if s["id"] != source["id"]]
-        rng.shuffle(candidates)
+        want = rng.randint(1, 3)
         used_subcats: set[str] = set()
         picked = 0
-        want = rng.randint(1, 3)
-        for cand in candidates:
-            if cand["subcategory"] in used_subcats:
-                continue
-            used_subcats.add(cand["subcategory"])
-            rels.append({"fromSupplierId": source["id"], "toSupplierId": cand["id"]})
-            picked += 1
-            if picked == want:
-                break
+        remaining = []
+        for cand in available:
+            if picked < want and cand["subcategory"] not in used_subcats:
+                used_subcats.add(cand["subcategory"])
+                rels.append({"fromSupplierId": source["id"], "toSupplierId": cand["id"]})
+                picked += 1
+            else:
+                remaining.append(cand)  # untouched leaves stay for the next source
+        available = remaining
     return rels
 
 
@@ -661,6 +674,27 @@ def check_story1(suppliers: list[dict], supplies: list[dict],
     assert convergence_sources == {CASCADE_ID}, (
         f"Cascade must be the unique convergence point, got {convergence_sources}")
 
+    # The supplier-to-supplier graph must be a disjoint union of stars, so that
+    # betweenness (a Phase 2 computation) singles Cascade out. A star centre with
+    # k leaves has betweenness C(k, 2); this holds only if no node is both a
+    # source and a target (no chains) and no target has two parents (no
+    # cross-links). Assert both structurally here, plus that Cascade's star is
+    # strictly the largest, which bounds every filler star below it. A chained or
+    # cross-linked filler web would create bridge nodes that outscore Cascade.
+    src_ids = {r["fromSupplierId"] for r in supply_rels}
+    dst_counts = Counter(r["toSupplierId"] for r in supply_rels)
+    chain_nodes = sorted(src_ids & set(dst_counts))
+    assert not chain_nodes, f"supplier chain nodes (both source and target): {chain_nodes}"
+    shared_targets = sorted(t for t, n in dst_counts.items() if n > 1)
+    assert not shared_targets, f"supplier targets with >1 parent (cross-links): {shared_targets}"
+    leaves_per_source = Counter(r["fromSupplierId"] for r in supply_rels)
+    cascade_leaves = leaves_per_source[CASCADE_ID]
+    max_filler_leaves = max(
+        (n for src, n in leaves_per_source.items() if src != CASCADE_ID), default=0)
+    assert cascade_leaves > max_filler_leaves, (
+        f"Cascade star ({cascade_leaves} leaves) must exceed every filler star "
+        f"({max_filler_leaves}), or filler betweenness can rival Cascade's")
+
 
 def check_story2(customers: list[dict], invoices: list[dict],
                  findings: list[dict], delinquent: set[str],
@@ -769,11 +803,9 @@ def main() -> None:
     supplies = make_supplies(rng, suppliers)
     supply_rels = make_supply_relationships(rng, suppliers)
 
-    # OWNED_BY edges: one row per customer that carries a parent.
-    owned_by = [
-        {"customer_id": c["id"], "parent_customer_id": c["parentCustomerId"]}
-        for c in customers if c["parentCustomerId"]
-    ]
+    # OWNED_BY edges ride on the customers.parentCustomerId column; the loader
+    # derives the edge from it directly, so no separate owned_by.csv is emitted.
+    owned_by_edges = sum(1 for c in customers if c["parentCustomerId"])
 
     # Recompute the delinquent cohort from the data (must equal the plant).
     delinquent = compute_delinquent(customers, invoices)
@@ -871,7 +903,6 @@ def main() -> None:
                for s in supplies])
     write_csv("has_finding.csv", ["customer_id", "finding_id"],
               [{"customer_id": f["customer_id"], "finding_id": f["id"]} for f in findings])
-    write_csv("owned_by.csv", ["customer_id", "parent_customer_id"], owned_by)
     write_csv("classified_as.csv",
               ["entity_id", "entity_label", "term_id", "reason", "evaluatedAt", "ruleVersion"],
               classified_as)
@@ -897,7 +928,7 @@ def main() -> None:
             "revenue_entries": len(revenue_entries),
             "compliance_findings": len(findings),
             "supply_relationships": len(supply_rels),
-            "owned_by_edges": len(owned_by),
+            "owned_by_edges": owned_by_edges,
         },
         "story1_hidden_glassworks": {
             "cascade_id": CASCADE_ID,

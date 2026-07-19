@@ -78,11 +78,14 @@ class TableSpec:
 
     `types` names the columns whose inferred type needs correcting; the rest
     stay strings. Type names match load.py's CONVERTERS so both sides agree.
+    `required` names the load-bearing columns `--check` confirms are present, so
+    a dropped or renamed contract column fails offline instead of at upload.
     """
 
     csv_name: str
     table: str
     types: dict[str, str] = field(default_factory=dict)
+    required: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -97,7 +100,9 @@ class DerivedSpec:
 
 # The eight base instance CSVs that become UC tables. Type maps mirror the
 # matching NODE_SPECS in load.py; knowledge-layer and remaining relationship
-# CSVs stay graph-only. Table names match data_sources.csv.
+# CSVs stay graph-only. The six node tables plus supply_relationships are the
+# DS-01..DS-07 rows in data_sources.csv; the supplier_business_units bridge is
+# lakehouse-only and has no data_sources.csv row.
 BASE_SPECS = [
     TableSpec(
         "customers.csv",
@@ -110,8 +115,9 @@ BASE_SPECS = [
             # only creditLimit needs a hint so it lands DOUBLE, not string/int.
             "creditLimit": "number",
         },
+        required=("parentCustomerId", "creditLimit", "defaultedPeriod"),
     ),
-    TableSpec("suppliers.csv", "suppliers", {"riskScore": "int"}),
+    TableSpec("suppliers.csv", "suppliers", {"riskScore": "int"}, required=("subcategory",)),
     TableSpec("business_units.csv", "business_units"),
     TableSpec(
         "invoices.csv",
@@ -136,7 +142,11 @@ BASE_SPECS = [
     # Supplier-to-supplier link (fromSupplierId, toSupplierId), the raw edges
     # behind the graph's SUPPLIES relationship. Uploaded so plain Genie can see
     # the links in the lakehouse. Both columns are strings, so no schemaHints.
-    TableSpec("supply_relationships.csv", "supply_relationships"),
+    TableSpec(
+        "supply_relationships.csv",
+        "supply_relationships",
+        required=("fromSupplierId", "toSupplierId"),
+    ),
 ]
 
 # Gold table: the CLASSIFIED_AS edges written back from the graph. In the
@@ -358,7 +368,8 @@ def upload_derived_table(w: Any, cfg: Config, spec: DerivedSpec) -> int:
 
 
 def check(data_dir: Path) -> None:
-    """Offline: confirm the base CSVs read and report the row counts."""
+    """Offline: confirm the base CSVs read, carry their load-bearing columns, and
+    report the row counts."""
     print(f"Validating base CSVs in {data_dir}:")
     total = 0
     for spec in BASE_SPECS:
@@ -366,6 +377,11 @@ def check(data_dir: Path) -> None:
         if not path.is_file():
             sys.exit(f"Missing CSV: {path}")
         rows = read_csv(path)
+        header = set(rows[0]) if rows else set()
+        expected = set(spec.types) | set(spec.required)
+        missing = sorted(expected - header)
+        if missing:
+            sys.exit(f"{spec.csv_name}: missing column(s) {', '.join(missing)}")
         total += len(rows)
         print(f"  {spec.table}: {len(rows)} rows ({spec.csv_name})")
     print(f"Check passed: {len(BASE_SPECS)} base tables, {total} rows ready to upload.")
