@@ -2,9 +2,21 @@
 
 ## Read this before proposing anything about the demo
 
+Two files, and they are the whole reading list.
+
 `proposals/CONTRACT.md` is the authority for Story 1. Read it before suggesting a change to the
-demo's narrative, questions, beats, data topology, or knowledge layer. `proposals/simplified-plan.md`
-is the working detail behind it. Where they disagree, the contract wins.
+demo's narrative, questions, beats, data topology, or knowledge layer.
+
+`proposals/REBUILD.md` is the current work list: what is left to do, in the order it has to happen.
+Read it before starting work. It gets deleted when the rebuild is done.
+
+Where they disagree, the contract wins.
+
+**`proposals/simplified-plan.md` and `worklog/` are reference, not required reading.** They hold the
+history of how the demo reached its current shape, including the reasoning behind decisions that are
+now settled. Go there when you need to know why something was decided, not to find out what to do.
+Do not treat them as instructions and do not keep them in sync with the two files above: they are a
+record of the past, so they are allowed to be stale.
 
 ## The core point, which is misread constantly
 

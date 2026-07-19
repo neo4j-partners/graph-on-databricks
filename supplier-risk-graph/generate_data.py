@@ -37,7 +37,6 @@ import itertools
 import json
 import math
 import random
-import subprocess
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
@@ -298,7 +297,7 @@ BUSINESS_TERMS = [
     {"id": "TERM-02", "name": "Defaulted Customer", "definition": "A customer with a recorded default in the snapshot."},
     {"id": "TERM-03", "name": "Delinquent Customer", "definition": "A customer more than 60 days late on each of its last three invoices."},
     {"id": "TERM-04", "name": "High-Risk Supplier", "definition": "A supplier whose procurement risk score meets or exceeds the threshold."},
-    {"id": "TERM-05", "name": "Critical Supplier", "definition": "A supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into the business run through, leaving few alternatives around it. A Critical Supplier need not sell to a business unit directly, and often does not."},
+    {"id": "TERM-05", "name": "Critical Supplier", "definition": "A supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it. A Critical Supplier need not sell to a business unit directly, and often does not."},
     {"id": "TERM-06", "name": "Ownership Risk", "definition": "An active customer with a clean record of its own (it carries its own invoices and is neither defaulted nor delinquent) that absorbs more failure through its ownership stakes than any other trading customer. Risk propagates from every defaulted customer in the book along OWNED_BY edges in proportion to the size of each stake, so a small holding next to a failure transmits little and a controlling chain several levels long transmits a great deal. Defaulted members and invoice-less holding companies are excluded, so the clean operating account is the headline."},
 ]
 
@@ -1501,28 +1500,6 @@ def check_referential(customers: list[dict], suppliers: list[dict],
         assert rel["toSupplierId"] in supplier_ids, f"unknown {rel['toSupplierId']}"
 
 
-def git_sha() -> str:
-    """The commit this build came from, or a marker saying it is not knowable.
-
-    Stamped into the build identity so that "which build did this transcript
-    come from" is answerable from the artifact rather than from memory. A dirty
-    tree gets the suffix, because a sha alone would claim a reproducibility the
-    working tree does not have.
-    """
-    try:
-        sha = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, check=True, cwd=DATA_DIR.parent,
-        ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True, text=True, check=True, cwd=DATA_DIR.parent,
-        ).stdout.strip()
-        return f"{sha}-dirty" if dirty else sha
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return "unknown"
-
-
 def check_quarter(revenue_entries: list[dict], quarter_periods: set[str]) -> None:
     """The generated data covers the quarter it was shaped and asserted around.
 
@@ -1878,17 +1855,6 @@ def main() -> None:
         "schema_version": 2,
         "seed": SEED,
         "as_of_date": AS_OF.isoformat(),
-        # Which build this is, so a transcript can be traced back to the data it
-        # was captured against. `quarter` is the one the pre-flight compares
-        # against on the day: AS_OF is date.today() at generation, so if a
-        # calendar quarter rolls between building and demoing, "the most recent
-        # full quarter" resolves to a quarter nothing here ever asserted.
-        "build_identity": {
-            "seed": SEED,
-            "as_of_date": AS_OF.isoformat(),
-            "git_sha": git_sha(),
-            "quarter": DEFAULTED_PERIOD,
-        },
         "summary": {
             "customers": len(customers),
             "suppliers": len(suppliers),

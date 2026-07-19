@@ -2,12 +2,6 @@
   "schema_version": 2,
   "seed": 42,
   "as_of_date": "2026-07-19",
-  "build_identity": {
-    "seed": 42,
-    "as_of_date": "2026-07-19",
-    "git_sha": "64c7ce3-dirty",
-    "quarter": "2026-Q2"
-  },
   "summary": {
     "customers": 508,
     "suppliers": 156,

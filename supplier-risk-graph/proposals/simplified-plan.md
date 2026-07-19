@@ -1,5 +1,11 @@
 # Simplified plan: Story 1
 
+> **Historical reference, not instructions.** The work list moved to `REBUILD.md` and the standing
+> rules live in `CONTRACT.md`. Read this file when you want to know *why* something was decided, which
+> it records at length and they do not. Do not read it to find out what to do, and do not keep it in
+> sync with them. Its phase structure and status markers are a snapshot of 2026-07-19 and are allowed
+> to go stale. Where it disagrees with the contract or the work list, it is the one that is wrong.
+
 > **The graph finds the attribution. The lakehouse computes the number.**
 
 `CONTRACT.md` in this directory is the authority. It holds the claim, the two-claim rule, the two run

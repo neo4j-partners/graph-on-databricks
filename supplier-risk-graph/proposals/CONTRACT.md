@@ -32,8 +32,10 @@ plausible, defensible, and anchored to nothing.
 to Run A. The governed vocabulary, meaning the term names, the rule names, and the `TERM-`,
 `RULE-`, `MEAS-`, `THR-` and `GM-` identifiers, must never appear in a Unity Catalog table or
 column name, a table or column comment, a Genie space instruction, or an example SQL. Section 7
-asserts this. Genie inventing a plausible-sounding definition is not a failure of the claim: an
-invented definition cites nothing, which is the demonstration.
+asserts this, and `guard.py` is the check that proves it: it runs inside `make demo`, and standalone
+via `make guard`, which is the one to run in pre-flight because the Genie space is hand-synced and
+can drift after a build. Genie inventing a plausible-sounding definition is not a failure of the
+claim: an invented definition cites nothing, which is the demonstration.
 
 ---
 
