@@ -1,6 +1,6 @@
 # Makefile for the supplier-risk-graph demo pipeline.
 #
-# The four steps are one unit, not four independent chores. generate_data.py
+# The five steps are one unit, not five independent chores. generate_data.py
 # stamps data/ with a fresh as-of date, and load.py, gds.py and upload.py each
 # carry that same snapshot onward. Run one without the others and Neo4j or
 # Unity Catalog holds a stale snapshot while data/ground_truth.json claims
@@ -25,7 +25,7 @@
 UV ?= uv
 
 .DEFAULT_GOAL := help
-.PHONY: help demo data check expected
+.PHONY: help demo data check expected guard
 
 help:
 	@echo "supplier-risk-graph demo pipeline"
@@ -40,6 +40,10 @@ help:
 	@echo "  make check     Offline validation only. Parses the CSVs, checks"
 	@echo "                 referential integrity and the UC column contracts."
 	@echo "                 Connects to nothing and changes nothing."
+	@echo "  make guard     Vocabulary guard against the LIVE workspace: Unity"
+	@echo "                 Catalog names and comments, and the Genie space."
+	@echo "                 Read-only. Run in pre-flight on the day, because the"
+	@echo "                 space is hand-synced and can drift after a build."
 	@echo "  make expected  Print the presenter's expected-results table for the"
 	@echo "                 current data/ground_truth.json."
 	@echo "  make help      This message."
@@ -52,14 +56,16 @@ help:
 # the first non-zero exit, so a failed step never lets a later one publish a
 # half-built snapshot.
 demo:
-	@echo "==> [1/4] generate_data.py: writing data/ CSVs and ground_truth.json"
+	@echo "==> [1/5] generate_data.py: writing data/ CSVs and ground_truth.json"
 	$(UV) run generate_data.py
-	@echo "==> [2/4] load.py: WIPING Neo4j and reloading from data/"
+	@echo "==> [2/5] load.py: WIPING Neo4j and reloading from data/"
 	$(UV) run load.py
-	@echo "==> [3/4] gds.py: computing betweenness and pageRank into Neo4j"
+	@echo "==> [3/5] gds.py: computing betweenness and pageRank into Neo4j"
 	$(UV) run gds.py
-	@echo "==> [4/4] upload.py: rebuilding Unity Catalog tables and metric view"
+	@echo "==> [4/5] upload.py: rebuilding Unity Catalog tables and metric view"
 	$(UV) run upload.py
+	@echo "==> [5/5] guard.py: no governed vocabulary visible to Run A"
+	$(UV) run guard.py
 	@echo "==> Pipeline complete. Expected results for this build:"
 	$(UV) run expected_results.py
 
@@ -74,6 +80,14 @@ data:
 check:
 	$(UV) run load.py --check
 	$(UV) run upload.py --check
+	$(UV) run guard.py --offline
+
+# The live half of the guard, split out so it can run on its own on the day.
+# `make demo` runs it as step 5; this target is the pre-flight re-run, and it
+# exists because the Genie space is hand-synced through the manage_genie MCP
+# tool, so a build-time pass says nothing about the space at demo time.
+guard:
+	$(UV) run guard.py
 
 expected:
 	$(UV) run expected_results.py

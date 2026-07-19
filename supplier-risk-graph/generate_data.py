@@ -37,6 +37,7 @@ import itertools
 import json
 import math
 import random
+import subprocess
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
@@ -219,6 +220,28 @@ SUBCATEGORIES = {
     "services": ["consulting", "maintenance"],
 }
 
+# Which subcategories make up one commodity. A supply path counts as carrying a
+# commodity only when every supplier on it trades in one of these, which is what
+# scopes Supply Exposure to the material at risk instead of to bare
+# reachability. It cannot be subcategory equality: the furnace at the raw end
+# and the bottle maker at the finished end are different subcategories on the
+# same chain.
+#
+# This grouping is an authored judgment, not instance data, so it belongs to the
+# knowledge layer and never to Unity Catalog. The subcategory *values* are
+# columns Run A has always been able to read, which the fairness rule requires.
+# The grouping is the traversal filter, and handing it over hands over leg 3.
+# guard.py enforces that: it fails if any comment or Genie instruction
+# enumerates two or more members of one commodity.
+#
+# Seeded with the subcategories that exist today. The rebuild adds the
+# intermediate glass tiers between the furnace and the bottle makers and extends
+# this mapping with them. Written before those tiers exist on purpose, so the
+# check is not authored against data that was just built to satisfy it.
+COMMODITY_SUBCATEGORIES = {
+    "glass": {"raw glass", "glass bottles"},
+}
+
 # Filler supplier name suffix derived from the supplier's subcategory, so a
 # supplier's name always reads consistently with the specialty its subcategory
 # column names (no "Cans Co" tagged glass bottles). Suffixes are distinct across
@@ -324,12 +347,31 @@ POLICIES = [
 ]
 
 THRESHOLDS = [
-    {"id": "THR-01", "name": "Supplier Risk Threshold", "value": SUPPLIER_RISK_THRESHOLD, "currency": ""},
-    {"id": "THR-02", "name": "Late Payment Threshold", "value": LATE_DAYS_THRESHOLD, "currency": ""},
-    # The two graph-native thresholds are left empty here on purpose: Phase 2
-    # (gds.py) fills them from the computed betweenness / PageRank distribution.
-    {"id": "THR-03", "name": "Supply Concentration Threshold", "value": "", "currency": ""},
-    {"id": "THR-04", "name": "Ownership Contagion Threshold", "value": "", "currency": ""},
+    {"id": "THR-01", "name": "Supplier Risk Threshold", "value": SUPPLIER_RISK_THRESHOLD, "currency": "", "basis": ""},
+    {"id": "THR-02", "name": "Late Payment Threshold", "value": LATE_DAYS_THRESHOLD, "currency": "", "basis": ""},
+    # The two graph-native thresholds are left empty here on purpose: gds.py
+    # fills their `value` from the computed betweenness / PageRank distribution.
+    #
+    # `basis` is the other half of that split and is the reason the column
+    # exists. THR-03's governed parameter is a percentile, pinned across
+    # reseeds; the cutoff it resolves to moves on every build. One column cannot
+    # honestly hold both, so `basis` carries the authored language and `value`
+    # carries the output. RULE-05's expression ends "at or above the Supply
+    # Concentration Threshold", so this is the text that answers the room's next
+    # question in Beat 3, and answering it with a bare betweenness score is the
+    # weakest possible moment for the strongest artifact leg 1 has.
+    #
+    # The suffix on the percentile is written out rather than computed because
+    # contract section 7 makes the percentile immovable. If that ever changes,
+    # this string is a place that has to change with it.
+    {"id": "THR-03", "name": "Supply Concentration Threshold", "value": "", "currency": "",
+     "basis": f"Review any supplier at or above the {SUPPLY_CONCENTRATION_PERCENTILE}th percentile of supply betweenness."},
+    # THR-04's basis stays empty on purpose. Its honest text would describe a
+    # cutoff placed between the protagonist and the runner-up, which is a fitted
+    # value rather than a governed parameter, and contract section 8 bans
+    # redesigning Story 2. Leaving it empty documents which thresholds are
+    # governed and which are not.
+    {"id": "THR-04", "name": "Ownership Contagion Threshold", "value": "", "currency": "", "basis": ""},
 ]
 
 # term -> defining rule, stated explicitly. RULE-07/RULE-08 define measures rather
@@ -1418,6 +1460,48 @@ def check_referential(customers: list[dict], suppliers: list[dict],
         assert rel["toSupplierId"] in supplier_ids, f"unknown {rel['toSupplierId']}"
 
 
+def git_sha() -> str:
+    """The commit this build came from, or a marker saying it is not knowable.
+
+    Stamped into the build identity so that "which build did this transcript
+    come from" is answerable from the artifact rather than from memory. A dirty
+    tree gets the suffix, because a sha alone would claim a reproducibility the
+    working tree does not have.
+    """
+    try:
+        sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, check=True, cwd=HERE,
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, check=True, cwd=HERE,
+        ).stdout.strip()
+        return f"{sha}-dirty" if dirty else sha
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "unknown"
+
+
+def check_quarter(revenue_entries: list[dict], quarter_periods: set[str]) -> None:
+    """The generated data covers the quarter it was shaped and asserted around.
+
+    AS_OF is date.today() by design, so Beat 4's "most recent full quarter" is
+    derived from the build date. This asserts the revenue actually spans that
+    quarter, which catches a generator whose trailing window and whose quarter
+    label have drifted apart.
+
+    It is deliberately NOT the day-of check and cannot replace it. A build-time
+    assert cannot catch a calendar quarter that rolls between building and
+    demoing; only a comparison against the recorded build identity can, and that
+    lives in the pre-flight. Conflating the two is how the gap survives.
+    """
+    covered = {row["period"] for row in revenue_entries}
+    missing = quarter_periods - covered
+    assert not missing, (
+        f"revenue_entries does not cover the build's own quarter: missing "
+        f"{sorted(missing)}. Beat 4 would sum a quarter the data does not hold.")
+
+
 def check_ontology() -> None:
     """The knowledge layer must be walkable outbound from a BusinessTerm.
 
@@ -1708,7 +1792,7 @@ def main() -> None:
     write_csv("business_rules.csv",
               ["id", "name", "expression", "description", "threshold"], BUSINESS_RULES)
     write_csv("policies.csv", ["id", "name", "type"], POLICIES)
-    write_csv("thresholds.csv", ["id", "name", "value", "currency"], THRESHOLDS)
+    write_csv("thresholds.csv", ["id", "name", "value", "currency", "basis"], THRESHOLDS)
     write_csv("data_sources.csv", ["id", "name", "system", "table"], DATA_SOURCES)
     write_csv("graph_metrics.csv",
               ["id", "name", "nodeLabel", "property", "algorithm", "description"],

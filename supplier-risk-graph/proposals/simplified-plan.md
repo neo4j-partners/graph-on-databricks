@@ -547,6 +547,16 @@ neither result can be invalidated by the topology rebuild.
 
 ### Phase 1, the governed wording
 
+**Complete, 2026-07-19.** All four texts are operator-approved and landed in `generate_data.py`. The
+check that proves it, per contract section 10: `check_ontology()` passes against the new wording, and
+no assert needed relaxing, because RULE-05's expression still carries the literal `Critical Supplier`
+and `SUPPLIES` strings the generator requires. The approved wording is recorded below under "The draft
+wording", which is now the landed wording rather than a proposal.
+
+One editorial item is outstanding and blocks nothing: `TERM-05` says paths carry a commodity "into the
+business" while `RULE-05` says "into a business unit". Per-unit is the correct scope and matches
+`MEAS-01`, so `TERM-05` is the one to align.
+
 Draft the governed text for `TERM-05`, `RULE-05`, `MEAS-01` and `RULE-07`, get it approved, and land
 it. Nothing else.
 
@@ -640,16 +650,49 @@ and `SUPPLIES` strings the term-salience asserts key on. `TERM-05` and `RULE-05`
 superlative reason and the concentration reason above. `MEAS-01` and `RULE-07` changed to the
 commodity-scoped population predicate with grain and aggregation untouched.
 
-### Phase 2, the rebuild
+### Phase 2, the guards
 
-The generator changes, the GDS changes, `make demo`, and `make expected`, in one batch. These were
-four separate phases in an earlier draft and splitting them was fiction: the topology rebuild, the
-betweenness rework, and the reload are a single regenerate cycle that gets run repeatedly until it
-comes out clean.
+**In progress.** The THR-03 percentile constant is committed on its own, ahead of any topology work,
+per the immovability guard in contract section 7. That is what makes "chosen before the run" a fact
+anyone can verify from git history rather than a claim in a document. A pre-rebuild baseline of the
+green build is captured in `../worklog/pre-rebuild-baseline.md`.
 
-**The first commit of this phase is the THR-03 percentile constant, on its own, before any topology
-work,** per the immovability guard in contract section 7. That is what makes "chosen before the run" a
-fact anyone can verify from git history rather than a claim in a document.
+**Why this is a separate phase from the rebuild, given the plan previously refused to split.** The
+earlier draft split the work into generator changes, GDS changes, and reload, and that split was
+fiction: the topology rebuild, the betweenness rework, and the reload are one regenerate cycle that
+gets run repeatedly until it comes out clean. Splitting the cycle is still fiction and is still
+refused.
+
+This is a different cut, along a line that is real. Everything in this phase can be written and
+verified against the **current green build**, with the topology untouched and the RNG stream unmoved.
+Everything in the rebuild phase cannot. Landing the guards first means that when the rebuild breaks
+something, the guard is already known good, so the failure is unambiguously in the data rather than in
+the check. The baseline capture already demonstrated the value of that ordering by falsifying two
+diagnostics that had been written into this plan from reasoning alone.
+
+Nothing in this phase changes the topology, and nothing in it reseeds. The one regenerate it needs, for
+the `basis` column, adds a field without touching any RNG draw, so the ownership and supplier data come
+back identical and the baseline stays valid.
+
+Contents:
+
+- The three Story 2 landmine asserts, written and confirmed passing against known-good data.
+- The three-legs resolution check against the currently loaded graph.
+- The vocabulary guard, built as something callable standalone, then run against live Unity Catalog and
+  the live Genie space. If it fails today, that is a finding worth having before the rebuild rather
+  than after.
+- The build-time quarter assert, and recording the build identity alongside the seed and the git sha.
+- The `basis` column on `thresholds.csv` and the matching `load.py` `NodeSpec` change.
+
+**Exit criterion:** every item above passes against the current build, with `data/` otherwise
+unchanged. A guard that has never been seen to pass is not a guard.
+
+### Phase 2.5, the rebuild
+
+The generator changes, the GDS changes, `make demo`, and `make expected`, in one batch, run repeatedly
+until it comes out clean. Numbered 2.5 rather than 3 on purpose: this plan refers to phases by name
+because renumbering has broken cross-references here before, and inserting a phase would renumber the
+re-probe and the docs.
 
 **Exit criterion:**
 
@@ -657,7 +700,7 @@ fact anyone can verify from git history rather than a claim in a document.
   constraint, the exposure constraint, the vocabulary guard, and the three structural asserts.
 - THR-03 resolves from the generator's percentile, Cascade clears it, and the cohort clearing it has
   more than one member.
-- The three-legs resolution check passes against the loaded graph.
+- The three-legs resolution check still passes against the rebuilt graph.
 - Two consecutive runs produce the same betweenness ranking.
 - Story 2 still holds: the Jade assertion passes, THR-04 still sits between Jade and the next trading
   customer, and the three landmine asserts pass.
@@ -772,8 +815,8 @@ claim-integrity one.
 - A Run B probe recorded in `probe-run-b.md`.
 - A betweenness top-N read and recorded.
 - Five beats written that match what the transcripts say and that contain no scripted Run A answer.
-- **The three legs produce three distinct visible outputs on screen in Beat 3.** The rebuild phase
-  asserts they resolve. No build can check that they read as three different things to a room, so this
+- **The three legs produce three distinct visible outputs on screen in Beat 3.** The guards phase
+  asserts they resolve and the rebuild phase re-confirms it. No build can check that they read as three different things to a room, so this
   is the editorial half and it belongs here. If two of them land as the same slide, the beat needs
   restaging.
 
