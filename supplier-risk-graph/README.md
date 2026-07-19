@@ -4,7 +4,7 @@
 
 A runnable demo built on a global beverage producer's supply-and-credit risk scenario. Its suppliers specialize by subcategory (glass bottles, malt, hops, cans, labels, and the raw glass behind the bottles), and its customers are the drinks trade: distributors, wholesalers, supermarket groups, and bar and hotel chains. The Databricks lakehouse holds the facts as Unity Catalog Delta tables: customers, suppliers, invoices, revenue, compliance findings, and the supplier-to-supplier links. The Neo4j knowledge graph mirrors those facts and adds the governed meaning: the business definitions, thresholds, rules, and the multi-hop lineage that ties every risk classification back to the physical table behind it.
 
-The demo contrasts two engines over the same data. A Databricks Genie Agent over the Unity Catalog tables is the lakehouse-only engine. Genie paired with a read-only Neo4j knowledge graph is the second engine. Both answer the everyday risk questions. The payoff is two graph-native questions the lakehouse-only engine cannot answer, because their definitions live only in the graph. One set of CSVs feeds both sides, so it runs offline.
+The demo contrasts two engines over the same data. **Genie Agent** is the lakehouse-only engine: a Databricks Genie space scoped to the Unity Catalog instance tables and nothing else. **Genie One** is the same Genie Agent under a supervisor that can also call a read-only Neo4j MCP server over the knowledge graph. Both answer the everyday risk questions. The payoff is two graph-native questions the lakehouse-only engine cannot answer, because their definitions live only in the graph. One set of CSVs feeds both sides, so it runs offline.
 
 ## Overview
 
@@ -96,9 +96,13 @@ The demo Cypher reads each cutoff from the live `Threshold` node, so the values 
 
 `thresholds.csv` is graph-only and is **never uploaded to Unity Catalog.** `upload.py` does not touch it. This is deliberate: if the two graph-native cutoffs became a Delta column, the lakehouse-only engine could read them and the demo would tie. Keeping them in the graph alone is what makes Critical Supplier and Ownership Risk graph-native.
 
-## Set up the Genie Agent (one-time)
+## Set up the two engines (one-time)
 
-Do this once before the call so the lakehouse-only engine answers over the instance tables and nothing else. The point of the demo is that this engine cannot resolve the two graph-native questions, so the space must not be given the graph's answers.
+Do this once before the call. The demo contrasts **Genie Agent**, the lakehouse-only engine, against **Genie One**, the same Genie Agent under a supervisor that can also call a read-only Neo4j MCP server over the knowledge graph. The point of the demo is that Genie Agent cannot resolve the two graph-native questions, so its space must not be given the graph's answers.
+
+### Genie Agent (the lakehouse-only engine)
+
+Scope this space to the instance tables and nothing else.
 
 1. Confirm `upload.py` has published these tables into `graph-on-databricks.supplier_risk`:
    - Core instance tables: `customers`, `suppliers`, `business_units`, `invoices`, `revenue_entries`, `compliance_findings`. Columns are camelCase and share keys where they join: `invoices.customerId` and `compliance_findings.customerId` to `customers.id`, `revenue_entries.businessUnitId` and `customers.businessUnitId` to `business_units.id`.
@@ -108,6 +112,16 @@ Do this once before the call so the lakehouse-only engine answers over the insta
 2. Create a Genie space scoped to the `supplier_risk` schema. Add the instance tables the questions read: `customers`, `suppliers`, `business_units`, `invoices`, `compliance_findings`, `revenue_entries`, `supply_relationships`, and the `supplier_business_units` bridge.
 3. **Do not add the two gold tables, `classifications` and `business_unit_exposure`, to the space.** They materialize the graph's answers into Delta. Adding them re-introduces write-back leakage: the lakehouse-only engine could read the graph's conclusions straight from a column and tie, which is the exact failure this demo is built to expose. For the same reason, the GDS scores (betweenness, personalized PageRank) are never synced to Delta and live only in the graph.
 4. Add sample-question SQL for a couple of the column-findable questions so Genie has curated examples to learn from. The [`DEMO.md`](DEMO.md) walkthrough lists the sample questions and their expected answers, including the two graph-native questions the lakehouse-only engine cannot answer.
-5. Publish and smoke-test the space before the call.
+5. Set the space instructions from the Genie space description block in [`DEMO.md`](DEMO.md) under **What to put in the Genie space description**. It tells the supervisor what Genie owns (facts, counts, rankings) and what to send to the graph instead.
+6. Publish and smoke-test the space before the call.
 
-For the questions to ask, how the graph engine consumes the governed semantics, and the deeper multi-agent supervisor story, see [`DEMO.md`](DEMO.md).
+### Genie One (Genie Agent plus the graph)
+
+Genie One wraps the same Genie Agent in a supervisor that can also reach the knowledge graph, so it resolves the two graph-native definitions and the provenance the lakehouse-only engine cannot.
+
+1. Stand up a read-only Neo4j MCP server against the loaded graph, the same database `load.py` and `gds.py` wrote. It must emit read Cypher only.
+2. Register both tools with the supervisor: the Genie Agent space above and the Neo4j MCP server.
+3. Set the descriptions the supervisor routes on, both in [`DEMO.md`](DEMO.md): paste the block under **What to put in the MCP server description** onto the MCP server or tool, and the block under **What to put in the Genie space description** onto the Genie space. These two descriptions are what the supervisor reads to send facts to Genie and definitions, relationships, and provenance to the graph.
+4. Smoke-test both routes before the call: a plain fact question should land on Genie, and a Critical Supplier or Ownership Risk question should route to the graph.
+
+For the questions to ask, how Genie One consumes the governed semantics, and the deeper multi-agent supervisor story, see [`DEMO.md`](DEMO.md).

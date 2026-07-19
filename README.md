@@ -39,6 +39,15 @@ Start here:
 
 - [aircraft-graphrag/README.md](./aircraft-graphrag/README.md): project overview, run order, prerequisites, and the `DATA_SOURCE` switch.
 
+### [Supplier Risk Graph](./supplier-risk-graph/README.md)
+
+A governed supply-and-credit risk demo for a global beverage producer that contrasts two engines over the same data: **Genie Agent**, a Databricks Genie space scoped to the Unity Catalog instance tables, and **Genie One**, the same Genie Agent under a supervisor that can also call a read-only Neo4j knowledge graph. Both answer the everyday risk questions; the payoff is two graph-native questions the lakehouse-only engine cannot answer, because their definitions and GDS cutoffs (supplier betweenness, ownership PageRank) live only in the graph. One set of CSVs feeds both sides, so it runs offline.
+
+Start here:
+
+- [supplier-risk-graph/README.md](./supplier-risk-graph/README.md): project overview, pipeline run order, and two-engine setup.
+- [supplier-risk-graph/DEMO.md](./supplier-risk-graph/DEMO.md): the five-beat walkthrough and the Genie/MCP description blocks.
+
 ---
 
 ## Neo4j + Databricks Integrations Showcased
