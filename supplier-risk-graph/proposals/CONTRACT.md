@@ -25,8 +25,39 @@ Supporting statements, both still true and both still used on stage:
 > Run A can compute any number you ask for, perfectly, and still not know which number to ask for.
 
 **What this claim is not.** It is not "SQL cannot express traversal or centrality." SQL can express
-both. It is not "Run A is wrong." Run A is never wrong and is never beaten. Its answers are
-plausible, defensible, and anchored to nothing.
+both. Its answers are plausible, defensible, and anchored to nothing.
+
+**Run A can return an answer that is false at full depth, and that is a legitimate finding.** This
+supersedes the earlier absolute that Run A is never wrong. The re-probe after the topology rebuild
+found one: asked whether the Americas glass bottle suppliers share a common upstream supplier, Run A
+returns no, because it looks one hop up and the answer sits two hops up. The graph, traversing the
+commodity-scoped chain, returns yes and names the supplier. Two runs, one question, opposite words.
+
+The earlier absolute was written to stop a specific failure and it overshot. What it was protecting
+against is still banned and is stated in the next paragraph. What it should never have prevented is
+reporting honestly what a probe actually found. A demo that has to soften a real result to stay
+inside its own framing is a demo arguing with its evidence.
+
+**The line, and it is the whole of it: an emerged wrong answer is a finding, an engineered one is a
+plant.** The convergence result qualifies because nobody built it. The topology that produced it was
+built to stop Cascade being a cut vertex, the result was discovered by asking, and it would have
+been recorded either way. What remains permanently banned is the reverse order: predicting what
+Genie will answer, then shaping data so the prediction fails. See section 2's corollary and section
+8. If you find yourself reaching for a topology change because a probe answered inconveniently, you
+are on the banned side of this line no matter how the result is described afterwards.
+
+**On stage, narrate the mechanism and never the verdict.** The truthful and sufficient sentence is
+that Genie looks one level deep by default. It is not incapable of going deeper and could likely be
+prompted to, and saying so costs the demo nothing because default behaviour is what a procurement
+analyst will actually get. "Genie is wrong," "Genie is bad," and any framing that invites the room
+to score one product against another are out. The room should leave thinking about depth of
+question, not about which vendor lost. A result that has to be sold as a gotcha will make the room
+defend the tool it already owns instead of evaluating the argument.
+
+**Reliability is a separate question and is not settled.** A wrong answer observed once is Claim B,
+vivid and not guaranteed, and section 2 governs it unchanged. Before any beat leans on the
+convergence result, it gets asked enough times to know whether the answer is stable. Until then no
+beat may depend on it, and the beat that carries it must still work if Genie answers the other way.
 
 **What keeps the claim true.** It holds by construction only while no authored artifact is visible
 to Run A. The governed vocabulary, meaning the term names, the rule names, and the `TERM-`,
@@ -56,6 +87,16 @@ costs nothing: it is still an answer anchored to nothing, and the presenter says
 answers. Genie Agent is generative and stochastic. Chasing a specific predicted answer, and then
 engineering data so that answer is wrong, is unwinnable. No beat in this demo contains a scripted
 Run A answer.
+
+**The corollary is unchanged by section 1's revision, and the order of operations is why.** Section
+1 now allows reporting that a Run A answer is false at full depth. That permission is about
+recording what a probe found, after asking. It grants nothing to a document written before the ask.
+Writing down the answer you expect is still banned whether you expect it to be right or wrong, and a
+wrong answer you predicted is worth less than no answer at all, because you will read the transcript
+looking for it. Probe, record, then write.
+
+Anything a probe finds enters as Claim B unless repeated asking shows otherwise. That includes
+findings that are flattering.
 
 ---
 
@@ -238,7 +279,16 @@ required a size in order to make a story work. This is its inverse: it forbids t
 
 Every item was a real failure in a previous pass.
 
-- **Predicting Genie's answer, in any document or beat.** See section 2.
+- **Predicting Genie's answer, in any document or beat.** See section 2. Section 1 permits reporting
+  that an observed answer is false at full depth. It does not permit writing down an expected answer
+  of either kind before the ask.
+- **Engineering data so a predicted Run A answer fails.** This is the sharp edge of the item above
+  and it survives section 1's revision intact. A wrong answer that emerged from a topology built for
+  other reasons is evidence. The same wrong answer produced by changing the topology until Run A
+  missed is a plant, and no amount of accurate reporting afterwards converts one into the other.
+- **Framing any beat as Genie being wrong, bad, or beaten.** Section 1 allows the result and governs
+  the narration: describe the mechanism, that Genie looks one level deep by default and could likely
+  be prompted deeper, and never the verdict.
 - Decoy hubs, barring background suppliers from a business unit, reserving a subcategory for one
   supplier.
 - Asserting the narrative in the generator. Build a true topology, run it, write the beats from the

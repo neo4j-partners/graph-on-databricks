@@ -6,7 +6,7 @@
 
 A global beverage producer runs two mature risk programs. Procurement scores and qualifies every supplier. Credit control rates every customer and sets facility limits. Both are healthy, and both grade entities one at a time. The exposures that matter are structural, and neither program can see them.
 
-- **Supplier concentration risk, hidden in the sub-tier.** Procurement has five qualified, separately-contracted tier-1 bottle suppliers in the Americas. All five buy their raw glass from Cascade Glassworks, which scores mid-tier and never trips a report. It is a single point of failure behind a supply base that looks diversified, and a quarter of Americas recognized revenue is the exposure. The producer knows its tier-1 suppliers. It does not know who *they* buy from.
+- **Supplier concentration risk, hidden in the sub-tier.** Procurement has five qualified, separately-contracted tier-1 bottle suppliers in the Americas. All five buy their container glass from a tier of processors, and every one of those processors melts its glass at Cascade Glassworks, which scores mid-tier and never trips a report. It is a single point of failure behind a supply base that looks diversified, and the exposure is the Americas' recognized revenue for the most recent full quarter. The producer knows its tier-1 suppliers. It does not know who *they* buy from.
 - **Group credit exposure, hidden in the ownership structure.** Jade Beverage Distribution is a spotless platinum account with an 800,000 EUR facility, assessed standalone and rated accordingly. It is owned 85% by a holding group whose other arms own the four companies that already defaulted. Every late-payer report puts Jade in the clear, right up until the parent pulls it down with the rest.
 
 Both exposures are already in the data. Neither is visible to a tool that reads columns, because both live in the *connections*: who supplies whom, and who owns whom.
@@ -21,7 +21,7 @@ Both exposures are already in the data. Neither is visible to a tool that reads 
 
 ## What this repo is
 
-A runnable demo of that scenario. Suppliers specialize by subcategory: glass bottles, malt, hops, cans, labels, and the raw glass behind the bottles. Customers are the drinks trade: distributors, wholesalers, supermarket groups, and bar and hotel chains.
+A runnable demo of that scenario. Suppliers specialize by subcategory: glass bottles, malt, hops, cans, labels, and the tiers behind the bottles, which run from feedstock through the furnaces to the processors. The subcategories that make up one commodity are the `COMMODITY_SUBCATEGORIES` dict in the generator, and a supply path counts as carrying that commodity only when every supplier on it trades in one of them. Customers are the drinks trade: distributors, wholesalers, supermarket groups, and bar and hotel chains.
 
 - **Databricks owns the facts.** Unity Catalog Delta tables hold customers, suppliers, invoices, revenue, compliance findings, and the supplier-to-supplier links.
 - **Neo4j owns the meaning.** The knowledge graph mirrors those facts and adds the governed definitions, thresholds, rules, and the multi-hop lineage tying every risk classification back to its physical table.
@@ -44,8 +44,8 @@ In a lakehouse the facts are clean, but the *meaning* is scattered. What counts 
 - **Who:** Cascade Glassworks, SUP-901.
 - **Business term:** Critical Supplier.
 - **Algorithm:** betweenness centrality over the multi-tier supply chain.
-- **What it finds:** the sub-tier single point of failure joining the two halves of the supplier network.
-- **The decoy:** counting connections does not find it. SUP-109 leads on raw link count, and Cascade does not come out on top.
+- **What it finds:** the sub-tier supplier that every commodity-carrying glass path into the Americas runs through, sitting a tier back from anything that unit buys from directly.
+- **The decoy:** counting connections does not find it. The most connected supplier in the network is somebody else, which the build asserts, and Cascade sells to no business unit at all, so the supplier-to-unit bridge table never names it.
 
 ### Story 2: the clean payer in a bad group
 
@@ -76,12 +76,12 @@ Graph properties and the instance tables use camelCase, so the Cypher in the wal
 
 ## The dataset
 
-Generated from scratch with a fixed seed of 42 and an as-of date that defaults to today, so the demo shows forward-looking risk rather than a stale snapshot. Pass `--as-of YYYY-MM-DD` to `generate_data.py` for a reproducible build. Names, ids, risk scores, cohorts, and the governed thresholds come from the seed and never move. Every date, euro amount, and row count is re-derived on each run.
+Generated from scratch with a fixed seed of 42 and an as-of date that defaults to today, so the demo shows forward-looking risk rather than a stale snapshot. Pass `--as-of YYYY-MM-DD` to `generate_data.py` for a reproducible build. Names, ids, and the hand-set business thresholds come from the seed and never move. Every date, euro amount, row count, and resolved graph-native cutoff is re-derived on each run.
 
 **Do not read live figures out of this file.** `generate_data.py` rewrites [`data/ground_truth.json`](data/ground_truth.json) on every run, stamped with the `as_of_date` it used, and that file is the reference for counts, quarterly revenue, and exposure amounts. The docs quote only the values that cannot drift.
 
 - **Scale:** a few hundred customers and a couple of hundred suppliers, sized from the generator's background population constants with the story protagonists added on top. Late payers, overdue balances, supplier risk scores, and compliance findings carry a believable spread so the two contrasts land against ordinary background risk.
-- **Two webbed edge layers hide the plants.** Supplier-to-supplier links form two cross-linked clusters, densely webbed inside each and joined at exactly one point, so plenty of suppliers feed other suppliers and only one bridges the halves. Ownership links form weighted multi-parent groups: a customer can be held by several owners at different stakes, so Kestrel is one of many owned groups rather than the only one. The webbing is what makes the two planted subgraphs look ordinary to the graph algorithms, so only the real metric singles each out.
+- **Two webbed edge layers hide the plants.** Supplier-to-supplier links form several regional clusters, each grown by preferential attachment and then given chords beyond the spanning tree that connects it, so a cluster's interior traffic always has more than one route. Several cross-cluster bridges join the clusters to each other, every bridge a different supplier and none of them trading glass, so no single supplier separates the network and the commodity-scoped exposure measure has nowhere to leak. The constants are `SUP_CLUSTERS`, `SUP_WEB_CHORD_RATIO`, and `SUP_INTER_CLUSTER_BRIDGES` in the generator. Ownership links form weighted multi-parent groups: a customer can be held by several owners at different stakes, so Kestrel is one of many owned groups rather than the only one. The webbing is what makes the two planted subgraphs look ordinary to the graph algorithms, so only the real metric singles each out.
 
 Per-table and per-edge counts for the current dataset are in the `summary` block of `data/ground_truth.json`.
 
@@ -124,7 +124,7 @@ Each step depends on the state the previous one leaves behind, and two of the gr
    uv run load.py --check    # validate CSVs only, no database
    ```
 
-3. **Run the GDS analytics.** Runs betweenness centrality over the supplier network, behind Critical Supplier, and personalized PageRank over the ownership network, behind Ownership Risk. Results are written back as Neo4j node properties only and never synced to Delta. This step also computes THR-03 and THR-04, the two graph-native thresholds the generator leaves blank, and writes them onto the live `Threshold` nodes and back into `data/thresholds.csv`. **Until this step runs, Critical Supplier and Ownership Risk have no cutoff and the demo cannot resolve them.**
+3. **Run the GDS analytics.** Runs betweenness centrality over the supplier network, behind Critical Supplier, and personalized PageRank over the ownership network, behind Ownership Risk. Results are written back as Neo4j node properties only and never synced to Delta. This step also resolves THR-03 and THR-04, the two graph-native thresholds the generator leaves blank, and writes them onto the live `Threshold` nodes and back into `data/thresholds.csv`. THR-03's governed input is `SUPPLY_CONCENTRATION_PERCENTILE`, hand-set in the generator and imported by `gds.py` rather than restated there; what `gds.py` produces is the cutoff that percentile resolves to against this run's score distribution. **Until this step runs, Critical Supplier and Ownership Risk have no cutoff and the demo cannot resolve them.**
 
    ```bash
    uv run gds.py
@@ -139,7 +139,7 @@ Each step depends on the state the previous one leaves behind, and two of the gr
 Quick check that the load worked, before you walk through anything live:
 
 - **Referential integrity:** `uv run load.py --check` reports node and relationship totals and confirms every relationship endpoint resolves.
-- **Story 1:** after `gds.py`, Cascade Glassworks (SUP-901) carries the highest betweenness in the supplier network, and the five tier-1 bottle suppliers score clean.
+- **Story 1:** after `gds.py`, Cascade Glassworks (SUP-901) clears the Supply Concentration Threshold, in a cohort with more than one member, and the five tier-1 bottle suppliers score clean. Where Cascade ranks on betweenness is printed to the build log and never asserted: `assert_betweenness` in `gds.py` reports the ranking rather than requiring a winner.
 - **Story 2:** after `gds.py`, Jade Beverage Distribution (CUST-904) is the top *trading* customer by stake-weighted PageRank while its own record stays clean. The trading qualifier is load-bearing: Kestrel, Harbour, and Tern score higher and are correctly excluded, because they carry no invoices, so there is no receivable to act on and no facility to cut.
 
 ## The threshold lifecycle
@@ -147,7 +147,9 @@ Quick check that the load worked, before you walk through anything live:
 `data/thresholds.csv` holds the four governing cutoffs, filled at two different times, so run order matters:
 
 - **THR-01 Supplier Risk Threshold (70)** and **THR-02 Late Payment Threshold (60)** are hand-set business constants. The generator writes them with values and `load.py` loads them as-is. Edit these in the generator to change what "high-risk supplier" or "delinquent customer" means.
-- **THR-03 Supply Concentration Threshold** and **THR-04 Ownership Contagion Threshold** are graph-native. The generator writes them blank and `load.py` creates the nodes with a null value, because their values can only be placed once the GDS scores exist. `gds.py` computes each cutoff from the score distribution. Do not hand-edit these two. `gds.py` overwrites them on every run.
+- **THR-03 Supply Concentration Threshold** and **THR-04 Ownership Contagion Threshold** are graph-native. The generator writes their `value` blank and `load.py` creates the nodes with a null value, because a cutoff cannot be placed until the GDS scores exist. Do not hand-edit these two. `gds.py` overwrites them on every run.
+
+  The two are set by different routes, and the distinction is the point of THR-03's `basis` column. THR-03's governed parameter is a percentile of supply betweenness, hand-set in the generator before any score is computed and before the topology it applies to exists, which is why it lands in git ahead of the data rather than alongside it. The run resolves that percentile against its own distribution, so the resolved cutoff is an output of the build and not a target it was aimed at. It catches whoever is in the tail, which is a cohort rather than a name, and the build fails if that cohort has fewer than two members. If the protagonist fails to clear the percentile, the topology is what gets fixed and the percentile does not move. THR-04 is placed from the computed PageRank distribution instead, and Story 2 is out of scope for change.
 
 The demo Cypher reads each cutoff from the live `Threshold` node, so the values only need to be correct in the graph, which they are once `gds.py` has run.
 

@@ -84,6 +84,97 @@ rather than a dial. It is repeated as a pointer because the loop below is exactl
 violated. If Cascade fails to clear THR-03 twice, check whether the sole-source assert passes and
 escalate. Do not take a third run at the topology.
 
+### Iteration 1: built, run, and green, with one defect that is not the topology's
+
+The generator and the GDS are rebuilt and `make demo` runs clean end to end. What it produced:
+
+- **Cascade clears THR-03, which was the open empirical question.** The percentile resolved to a
+  cutoff catching a cohort of eight, and Cascade is in it. The cohort has more than one member
+  without anything being arranged for it.
+- **The three legs intersect on exactly one supplier, and it is not the one any ranking returns.**
+  Cascade ranks eighth of 169 on raw betweenness. Of the eight in the cohort, it is the only one
+  sitting on a commodity-carrying glass path into the Americas. So the finding comes from the
+  definition and the commodity scoping together, and no single ordering produces it. That is a
+  better demo than Cascade topping the ranking would have been, and it was not designed for.
+- **A rival furnace clears the threshold on its own merits.** Raw glass returns a cohort of furnaces
+  and one of them is genuinely critical elsewhere, which is what the subcategory was supposed to
+  stop being a synonym for the protagonist.
+- **Cascade is not a cut vertex.** Removing it strands nobody. The network holds at one component,
+  73 percent intermediate, 26 tiers deep.
+- **The premise assert earned its place on the first run.** It failed, and it failed on something no
+  other check would have seen: the feedstock vendors were buying from unfiltered cluster members, so
+  a background furnace could sell to a vendor that sells to Cascade, and the Americas' glass became
+  reachable from furnaces other than Cascade by running the path backwards through the feedstock
+  tier. Vendors now buy from the non-glass side of their cluster, which is also what a cullet
+  recovery operation actually does.
+
+**The defect, and it belongs to a choice made during the rebuild rather than to the agreed
+topology.** Deleting the decoy-hub loop left nothing producing a degree leader, so the clusters were
+changed to grow by preferential attachment. That produced a real leader, and it also correlated the
+two measures: six of the top eight by betweenness are also the top eight by degree, and Cascade sits
+at rank eight on both. Leg 2 claims betweenness discovers what counting connections cannot, and on
+this build counting connections over `supply_relationships` returns Cascade too. The
+`top_by_degree != CASCADE_ID` assert passes, so nothing caught it; what failed is the claim that
+assert stands in for, not the assert.
+
+**The fix is density, not attachment, and it keeps both mechanisms.** Preferential attachment stays,
+because without it the degree distribution is flat enough that the leader and Cascade sit within a
+hair of each other, which is a coin toss on stage. `SUP_WEB_CHORD_RATIO` rises alongside it. Chords
+are the only mechanism here that makes a well-connected supplier uncritical: they give a cluster hub
+alternate routes so traffic passes around it, which leaves its degree intact and collapses its
+betweenness. Cascade is untouched by them because no chord exists around its position, and lowering
+background betweenness lowers the percentile, so it clears with more headroom rather than less.
+
+**This is not asserted, and that is deliberate.** The realized top-N overlap prints alongside the
+degree leader line. `check_supply_structure` already draws this line: it asserts the structure in
+which betweenness and degree *can* diverge and refuses to assert that they *do*, because asserting
+the outcome is fitting the data to the story. A build where the separation does not appear at a
+plausible density is a finding to escalate, not a reason to keep turning the ratio.
+
+**Does this spend an iteration?** No, and the reasoning matters more than the answer. The stopping
+rule counts honest attempts at the agreed topology. What failed here is an unrequested design choice
+made inside that topology, and Cascade cleared the percentile on the first run, which is the thing
+the rule exists to protect. Recording it here rather than deciding it silently is the point.
+
+### The chord-ratio build: separation achieved, and one thing changed that was not the target
+
+`SUP_WEB_CHORD_RATIO` went from 0.6 to 1.5, preferential attachment untouched. The reasoning is in
+the constants block in the generator: below 1.0 most nodes get no chord and a tree-shaped backbone
+survives, and on a tree the busiest node is on every path through its part of the network, so the
+two measures agree by construction. Above 1.0 every node has more than one chord endpoint in
+expectation. The value is a background density parameter and does not reach Cascade, whose score
+comes from spanning the feedstock and processor tiers, where no chord routes around it.
+`report_degree_overlap` in `gds.py` prints the realized overlap next to the degree leader line.
+
+`make demo` re-run clean, and what it produced:
+
+- **The separation appeared.** The top eight by each measure now share three suppliers rather than
+  six, and Cascade is outside the top eight by degree entirely while ranking eighth by betweenness.
+  A GROUP BY over `supply_relationships` does not return it. Leg 2's claim now holds on the data
+  and not just on the topology.
+- **Cascade still clears THR-03, in a cohort of eight, with the cutoff lower than before.** That is
+  the predicted side effect: suppressing background betweenness lowers the percentile, so Cascade
+  clears with more headroom rather than less.
+- **The sole-source premise holds.** The rival furnace in the cohort carries no commodity-carrying
+  glass path into the Americas, so it is critical elsewhere on its own merits, which is what the
+  subcategory was supposed to do.
+- **The degree leader and the betweenness leader are now the same supplier.** Worth noting and not a
+  problem: what the demo needs is that the leader is not Cascade, and it is not.
+
+**What changed that was not the target, and it should not be fixed quietly.** The intersection is no
+longer exactly one supplier. The processor Cascade sells through rose into the THR-03 cohort, and it
+sits on commodity-carrying glass paths into the Americas too, so the cohort now contains two glass
+suppliers on the Americas' chain rather than one. The iteration 1 bullet claiming exactly one
+supplier is superseded by this section.
+
+Whether that weakens Story 1 is a judgement call and not mine to make silently. The case that it
+does not: Cascade is the upstream one, every unit of the processor's material passes through it, and
+a risk committee surfacing both is a more honest result than a threshold that isolates a single
+name, which is the failure CONTRACT.md section 8 bans. The case that it does: Beat 3's punchline is
+a name, and two names need a sentence explaining which one to act on. **Open for the re-probe to
+settle**, because the right test is what Genie One actually returns when asked, not what the graph
+could be made to return. Do not re-tune the topology for it before then.
+
 ### Topology, agreed
 
 Cascade stops being the network's only bridge and becomes a genuine narrow waist: it buys feedstock
@@ -145,13 +236,13 @@ data is what makes a later failure unambiguously the data's fault rather than th
 Rebuild around one true fact: one business unit's tier-1 bottle suppliers all trace back through the
 sub-tier to Cascade, and the other units' glass suppliers do not. That is the entire topology.
 
-- [ ] **Several regional clusters with multiple inter-cluster bridges,** not two clusters joined by
+- [x] **Several regional clusters with multiple inter-cluster bridges,** not two clusters joined by
       one. Cascade is currently a literal cut vertex, which makes its betweenness trivially maximal
       and invites the fair question of why a global supply network has a single bridge.
-- [ ] **The extra bridges carry something other than glass.** More bridges make betweenness
+- [x] **The extra bridges carry something other than glass.** More bridges make betweenness
       interesting and also give the exposure measure more places to leak. Commodity scoping is what
       keeps those compatible.
-- [ ] **The glass chain is a chain of glass companies.** Every sub-tier vendor between Cascade and
+- [x] **The glass chain is a chain of glass companies.** Every sub-tier vendor between Cascade and
       the tier-1 bottle makers must itself trade in a glass subcategory, or the path is not
       commodity-carrying and the sole-source premise fails silently. What counts as a glass
       subcategory is defined by the `glass` entry in the generator's `COMMODITY_SUBCATEGORIES`, so
@@ -163,17 +254,17 @@ sub-tier to Cascade, and the other units' glass suppliers do not. That is the en
       so each new subcategory becomes newly scanned vocabulary and a comment or Genie instruction
       that enumerates two members of the glass grouping starts failing the guard. That is the
       intended behavior, not a regression.
-- [ ] **Real intermediate subcategories for the sub-tier,** not raw glass doing double duty as both
+- [x] **Real intermediate subcategories for the sub-tier,** not raw glass doing double duty as both
       Cascade's peers and its customers. Double duty breaks the cohort check, since `WHERE
       subcategory = 'raw glass'` is supposed to return other furnaces. The processor tier sits
       downstream of the furnace, so name it for what it makes, `container glass` being the obvious
       one. Cullet is not a candidate here: the agreed topology puts it upstream as feedstock, which
       is where it belongs physically and where it does the fan-in work.
-- [ ] **The feedstock tier is glass too, and it is easy to forget.** Cascade's feedstock vendors are
+- [x] **The feedstock tier is glass too, and it is easy to forget.** Cascade's feedstock vendors are
       what give it the fan-in the score depends on, so if they are not in `COMMODITY_SUBCATEGORIES`
       the paths through Cascade stop being commodity-carrying at exactly the point the story turns
       on. Cullet, sand and soda ash all belong in the `glass` entry alongside the processor tier.
-- [ ] **Keep the glass chain shallow.** Cascade to sub-tier to tier-1 to business unit, so Beat 3's
+- [x] **Keep the glass chain shallow.** Cascade to sub-tier to tier-1 to business unit, so Beat 3's
       convergence paths stay legible on screen. The four-tier assert is cleared by the background
       network, which is also what gives betweenness a real distribution.
 
@@ -185,14 +276,14 @@ building the premise is the work.
 
 ### Generator, delete
 
-- [ ] `SUP_HUB_DEGREE_MARGIN` and the decoy-hub boost loop. Leave SUP-109 as an ordinary supplier
+- [x] `SUP_HUB_DEGREE_MARGIN` and the decoy-hub boost loop. Leave SUP-109 as an ordinary supplier
       rather than removing the row, so downstream RNG draws do not shift for no benefit.
-- [ ] `CASCADE_A_LINKS` and `CASCADE_B_LINKS` as hand-tuned counts.
-- [ ] The `americas_glass == set(TIER1_IDS)` assert and the glass-bottle bar in `make_supplies`.
-- [ ] The "raw glass is reserved for Cascade" reservation, so the subcategory holds a cohort.
-- [ ] The rank-disagreement asserts, the `pairs_separated` strict-max assert, and the cut-vertex
+- [x] `CASCADE_A_LINKS` and `CASCADE_B_LINKS` as hand-tuned counts.
+- [x] The `americas_glass == set(TIER1_IDS)` assert and the glass-bottle bar in `make_supplies`.
+- [x] The "raw glass is reserved for Cascade" reservation, so the subcategory holds a cohort.
+- [x] The rank-disagreement asserts, the `pairs_separated` strict-max assert, and the cut-vertex
       assert, which the connected-component check replaces.
-- [ ] **The BU-03 currency band in `check_exposure`,** which is pure surplus, because the recompute
+- [x] **The BU-03 currency band in `check_exposure`,** which is pure surplus, because the recompute
       above it already confirms the figure sums the right unit, quarter, and column.
 - [x] **The Jade band is replaced, not deleted.** It bracketed `JADE_CREDIT_FACILITY`, which `main`
       pins onto Jade's row and then derives `jade_exposure` from, so the band asserted a constant
@@ -215,17 +306,18 @@ structural asserts, and re-verifying them is part of this step.
 
 ### GDS
 
-- [ ] **Rework the THR-03 computation** to resolve the generator's `SUPPLY_CONCENTRATION_PERCENTILE`
-      rather than compute a one-winner cutoff. `place_cutoff` and `concentration_cutoff` for Story 1
-      go. This closes the current disagreement where the graph states a governed percentile in
+- [x] **Rework the THR-03 computation** to resolve the generator's `SUPPLY_CONCENTRATION_PERCENTILE`
+      rather than compute a one-winner cutoff. The one-winner cutoff logic for Story 1 goes:
+      `concentration_cutoff` is rewritten rather than deleted, and `place_cutoff` survives for
+      Story 2. This closes the current disagreement where the graph states a governed percentile in
       THR-03's `basis` and computes its cutoff by another route.
-- [ ] **Delete the strict-max requirement in `assert_betweenness`.** Replace with the cohort check,
+- [x] **Delete the strict-max requirement in `assert_betweenness`.** Replace with the cohort check,
       that Cascade clears THR-03. Report the ranking, do not assert who wins.
-- [ ] Add `concurrency: 1` to `compute_betweenness` for symmetry with PageRank. It is already exact
+- [x] Add `concurrency: 1` to `compute_betweenness` for symmetry with PageRank. It is already exact
       Brandes and already deterministic, so this costs nothing and proves nothing. Do not generalize
       the reasoning.
-- [ ] Keep `check_supplier_projection` and its UNDIRECTED comment block.
-- [ ] Leave the Story 2 path untouched, including `place_cutoff` itself, which `contagion_cutoff`
+- [x] Keep `check_supplier_projection` and its UNDIRECTED comment block.
+- [x] Leave the Story 2 path untouched, including `place_cutoff` itself, which `contagion_cutoff`
       still uses for THR-04. No Louvain, no new projection, no canonical relabeling.
 
 ### Rebuild exit criteria
@@ -267,20 +359,69 @@ because Story 2 is out of scope, so changing it is a redesign of Story 2, which 
 
 ## Re-probe, after the rebuild
 
-- [ ] Re-run the four probe questions plus a Beat 1 spread run against rebuilt data.
-- [ ] **Does Genie reach for recursion once Cascade sits two tiers back?** The one-hop ceiling is
+### Run A re-probed, six questions, and the ceiling held
+
+Run against the re-synced space with `make guard` clean on every surface first. Each question in its
+own fresh conversation, verbatim, no follow-ups and no priming turns.
+
+- **No recursive CTE on any question, six for six.** Including both questions that use chain
+  language. Moving Cascade two tiers back did not raise the ceiling, which was the largest open risk
+  in the rebuild.
+- **The sub-tier absorbs the dependency query, exactly as designed.** Asked what the glass bottle
+  suppliers depend on, Run A wrote one hop and returned the container glass processors. Cascade does
+  not appear in the result set.
+- **Both cohort questions behaved.** Counting connections returns a background supplier, so leg 2
+  holds live and not only in the assert. The raw glass subcategory returns a cohort of furnaces with
+  Cascade among them rather than Cascade alone.
+- **Beat 1 showed no spread this run.** Three fresh asks, all three on the same axis. Claim A held
+  on all three, nothing cited a governed definition. Claim B did not appear, which is what the
+  two-claim rule exists for and needs no change, since `DEMO.md` already says to narrate the
+  ungroundedness when the asks agree.
+
+### The convergence question flipped, and the contract moved rather than the data
+
+The invited convergence question previously returned the protagonist as a single row. It now returns
+no. Run A builds the same well-formed one-hop convergence query and correctly finds that no direct
+upstream serves every Americas bottle maker, because the processor tier now sits in between. The
+graph, traversing the commodity-scoped chain, returns yes and names the supplier. Two runs, one
+question, opposite words.
+
+**`CONTRACT.md` section 1 has been rewritten rather than the topology.** The owner's ruling is that a
+Run A answer that is false at full depth is a legitimate finding and the strongest available
+evidence for the graph, and that the earlier "Run A is never wrong" absolute overshot what it was
+protecting against. Sections 1, 2 and 8 now carry the distinction that matters: an **emerged** wrong
+answer is evidence, an **engineered** one is a plant, and the second is still banned outright. This
+result qualifies because the topology that produced it was built to stop the protagonist being a cut
+vertex, and the result was discovered by asking.
+
+**On stage the narration is the mechanism, never the verdict.** Genie looks one level deep by
+default and could likely be prompted deeper. That sentence is true, sufficient, and costs the demo
+nothing, because default behaviour is what an analyst actually gets. Framing any beat as Genie being
+wrong or beaten is now explicitly banned in section 8.
+
+**Stability measured, five asks, and the flip held every time.** The SQL varied on every ask, a
+boolean case, a zero-row filter, a full ranked list with a supplies-all flag, an overlap listing, and
+the conclusion was identical five for five. Answer stable while the query is generative is the
+strongest form this evidence could take, and it is still five asks on one build rather than a
+guarantee. The beat carrying it must still work if Run A answers the other way, and the presenter
+narrates the mechanism rather than the verdict per `CONTRACT.md` section 1.
+
+- [x] Re-run the four probe questions plus a Beat 1 spread run against rebuilt data.
+- [x] **Repeat the convergence question enough times to establish whether the flip is stable.** New,
+      and it comes out of the ruling above rather than out of the original plan.
+- [x] **Does Genie reach for recursion once Cascade sits two tiers back?** The one-hop ceiling is
       what the demo's structure relies on. The shape to test is that a one-hop query returns the
       sub-tier vendors and stops, so Cascade never enters the result set. If Genie writes a recursive
       CTE, the beats need restaging. The load-bearing claim survives either way, because a recursive
       answer still cites no governed definition.
-- [ ] Re-probe the exact phrase "common upstream supplier." If Genie adds a second hop by hand rather
+- [x] Re-probe the exact phrase "common upstream supplier." If Genie adds a second hop by hand rather
       than recursing, the convergence caveat needs stating more carefully than "one join."
-- [ ] **Re-ask the convergence question the presenter invites, verbatim:** "do all our Americas glass
+- [x] **Re-ask the convergence question the presenter invites, verbatim:** "do all our Americas glass
       bottle suppliers share a common upstream supplier?" This is the frozen phrasing for the question
       `CONTRACT.md` section 4 says to invite rather than hope nobody asks. Run A answered it correctly
       while Cascade sat one hop away, so what the re-probe establishes is whether that still holds
       with Cascade two tiers back.
-- [ ] **Ask the two cohort questions directly.** A connection count over `supply_relationships` does
+- [x] **Ask the two cohort questions directly.** A connection count over `supply_relationships` does
       not name Cascade, and `WHERE subcategory = 'raw glass'` returns a cohort of furnaces rather
       than Cascade alone. The build asserts the first and the second falls out of the intermediate
       subcategories above, but both are cheap to ask and the second is the one the rebuild can break
@@ -330,7 +471,14 @@ because Story 2 is out of scope, so changing it is a redesign of Story 2, which 
 - [ ] **The Genie space,** which is hand-synced and not in this repo. The rebuild changes values
       rather than schema: no column is added or dropped, what moves is the set of subcategory values
       and the supply rows. So this is a filter-value re-sync rather than a schema migration, which
-      makes it smaller than it reads and lets it be scheduled on its own. Re-sync the region and
+      makes it smaller than it reads and lets it be scheduled on its own. **It is larger than that
+      sentence predicted, though, and the reason is worth knowing before the re-sync starts.** The
+      rebuild adds four subcategory values rather than adjusting existing ones, and `guard.py` reads
+      `COMMODITY_SUBCATEGORIES` through its `commodity_subcategories` helper, so all six glass
+      subcategories are now scanned vocabulary. A space instruction or column comment that enumerates
+      two of them starts failing the guard. That is the intended behavior rather than a regression,
+      but it means the re-sync can fail the guard on text that passed before and was never touched.
+      Re-sync the region and
       subcategory filters, re-verify no example SQL primes Cascade, and
       re-read the subcategory column comment and the `supply_relationships` SEMANTICS entry to
       confirm they stay neutral. Verify against the live workspace, not against a worklog: twice here
@@ -340,6 +488,45 @@ because Story 2 is out of scope, so changing it is a redesign of Story 2, which 
       captured in the re-probe replaces them and is not compared against v2. Stamp each new
       transcript with the seed and the as-of date, both read from the top level of
       `data/ground_truth.json`, so which build a transcript came from is never a question again.
+
+## THR-03 rounding, after the re-probe
+
+`concentration_cutoff` in `gds.py` resolves the nearest-rank percentile, rounds the result to two
+decimals, and then selects the cohort with `>=` against that rounded value. The scores it selects
+against carry four. When the rounding goes up, the supplier whose score defined the percentile no
+longer clears the cutoff derived from it. When it goes down, suppliers scoring below the percentile
+join the cohort. Neither is visible in the output: both produce a plausible cutoff and a plausible
+cohort, and the build prints only the rounded figure.
+
+This is reachable because Cascade sits on the boundary. It ranked last in the clearing cohort on the
+builds recorded above, which is exactly the position the defect acts on, so a regenerate has roughly
+even odds of `assert_betweenness` failing on arithmetic rather than on topology. That failure prints
+the CONTRACT section 7 message about fixing the topology and spending an iteration, which is the
+wrong diagnosis and the expensive one. The pre-flight section below makes a demo-day regenerate a
+documented event, so this is reachable from the room and not only from the build loop.
+
+**It is deliberately not fixed before the re-probe.** Fixing it can move THR-03's resolved value and
+can move cohort membership, and the re-probe is the step that captures what the graph actually
+returns when asked. A transcript captured against one cutoff with a fix applied after it leaves no
+way to tell which cutoff the transcript describes.
+
+- [ ] **Record the raw numbers during the re-probe,** at full precision rather than as displayed:
+      Cascade's betweenness, the unrounded nearest-rank score `concentration_cutoff` selected, the
+      rounded value written to the graph, and every cohort member's score. The build log carries the
+      rounded figures only, so this has to be read off the scores rather than off the log.
+- [ ] **Establish which way the rounding went on the probed build,** and whether Cascade is the
+      supplier that defined the percentile. If it is and the rounding went down, the transcripts
+      describe a cohort the fix would not change and the fix lands cleanly. If it went up, the
+      probed build already dropped a supplier from its own cohort, and the cohort questions in the
+      re-probe need re-reading before their answers are trusted.
+- [ ] **Then fix it:** select the cohort against the unrounded percentile score, and round only for
+      the value written to the Threshold node, to `thresholds.csv`, and to the display. Re-run and
+      confirm the cohort is unchanged, or that the re-probe findings still hold if it moved.
+
+**Do not fold this into the topology stopping rule.** It is an arithmetic defect in the cutoff
+resolver rather than an honest attempt at the agreed topology, so a build failing
+`assert_betweenness` for this reason has not spent an iteration. Keeping that distinction visible is
+why this is written down rather than fixed quietly.
 
 ## Pre-flight, on the day
 

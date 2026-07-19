@@ -66,6 +66,26 @@ N_DELINQUENT = 15  # background customers planted to satisfy the Delinquent rule
 # connects it, as a fraction of cluster size; chords are what give a cluster
 # alternate routes, so no node inside it becomes a bridge.
 #
+# The ratio and the attachment rule are doing two different jobs and both are
+# needed. Preferential attachment decides who leads on degree, and produces a
+# clear leader instead of the flat distribution that made the deleted decoy-hub
+# loop necessary. Chords decide whether that leader also leads on betweenness: a
+# cluster grown by attachment alone is a tree, and on a tree the busiest node is
+# on every path through its part of the network, so the two measures agree and
+# betweenness finds nothing a GROUP BY would not. The first build ran at 0.6,
+# where most nodes get no chord and a tree-shaped backbone survives, and the top
+# eight by each measure overlapped six of eight. Above 1.0 every node has more
+# than one chord endpoint in expectation, which is past the point where a
+# cluster's interior traffic has somewhere else to go. Raising it does not touch
+# Cascade, whose betweenness comes from spanning the feedstock tier and the
+# processor tier: no chord inside a background cluster routes around that.
+# It is a background density parameter, not a Cascade parameter.
+#
+# The realized separation is printed by report_degree_overlap in gds.py rather
+# than asserted, for the same reason check_supply_structure refuses to assert
+# divergence. If it does not separate at a plausible density, that is a finding
+# to escalate under CONTRACT.md section 7, not a reason to keep turning this.
+#
 # Cascade earns its betweenness by position rather than by being a cut vertex. It
 # buys feedstock from CASCADE_FEEDSTOCK_VENDORS vendors spread across the
 # clusters and sells down through the processor tier to the tier-1 bottle makers,
@@ -86,7 +106,7 @@ N_DELINQUENT = 15  # background customers planted to satisfy the Delinquent rule
 # Cascade is being moved away from. None of them carries glass, which is what
 # keeps a structurally rich background compatible with a commodity-scoped
 # exposure measure. See COMMODITY_SUBCATEGORIES.
-SUP_WEB_CHORD_RATIO = 0.6
+SUP_WEB_CHORD_RATIO = 1.5
 SUP_CLUSTERS = 4
 SUP_INTER_CLUSTER_BRIDGES = 7
 CASCADE_FEEDSTOCK_VENDORS = 6

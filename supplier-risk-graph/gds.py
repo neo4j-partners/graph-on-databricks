@@ -102,6 +102,11 @@ CRITICAL_SUPPLIER_TERM = "Critical Supplier"  # TERM-05, governs Supplier.betwee
 OWNERSHIP_RISK_TERM = "Ownership Risk"  # TERM-06, governs Customer.pagerank
 
 TOP_N_PRINT = 6  # how many ranked rows to echo for eyeballing on stage
+# How deep report_degree_overlap compares the two rankings. Wider than
+# TOP_N_PRINT because the question is whether the measures agree at all, not
+# what fits on a slide, and narrow enough that an overlap is a real coincidence
+# rather than an artifact of comparing most of the network with itself.
+TOP_N_OVERLAP = 8
 
 # Weighted personalized PageRank config, shared by the stats and stream calls so
 # the convergence check describes the run the scores actually come from. The
@@ -836,21 +841,20 @@ def check_three_legs(gds: GraphDataScience, protags: Protagonists) -> None:
     # asserting a hop count here would bake today's topology into the check.
     leg3 = gds.run_cypher(
         """
-        MATCH path = (c:Supplier {id: $cascade})-[:SUPPLIES*1..6]->(t:Supplier)
+        MATCH (c:Supplier {id: $cascade})-[:SUPPLIES*1..6]->(t:Supplier)
         WHERE t.id IN $tier1
-        RETURN count(path) AS paths, count(DISTINCT t) AS reached
+        RETURN count(DISTINCT t) AS reached
         """,
         params={"cascade": protags.cascade_id, "tier1": protags.tier1_ids},
     )
-    paths = int(leg3["paths"].iloc[0])
     reached = int(leg3["reached"].iloc[0])
-    if paths < 1:
+    if reached < 1:
         sys.exit(
             f"Leg 3 does not resolve: no SUPPLIES path from "
             f"{protags.cascade_id} to any tier-1 supplier. The explanation leg "
             f"has no path evidence to put on screen."
         )
-    print(f"  leg 3 explanation: {paths} path(s) reaching "
+    print(f"  leg 3 explanation: reached "
           f"{reached} of {len(protags.tier1_ids)} tier-1 suppliers")
 
 
@@ -896,6 +900,49 @@ def assert_betweenness(
         f"  assert OK: Cascade betweenness {cascade} clears the THR-03 cutoff "
         f"{conc.value} ({conc.percentile}th percentile), ranking {rank} of "
         f"{len(scores)} in a cohort of {len(conc.members)}"
+    )
+
+
+def report_degree_overlap(
+    gds: GraphDataScience, scores: list[Score], protags: Protagonists
+) -> None:
+    """Print how far the betweenness ranking diverges from counting connections.
+
+    Leg 2 claims the graph algorithm finds something a GROUP BY over
+    supply_relationships would not. That claim is about the realized data, not
+    about the topology, so the generator cannot assert it: check_supply_structure
+    asserts only that the network has the shape in which the two measures *can*
+    diverge, and asserting the outcome there would be fitting the data to the
+    story. This is the other half of that decision. The overlap is measured and
+    printed so a build that fails to separate says so, and it is not a pass
+    condition, so a build that fails to separate still finishes and leaves the
+    evidence on the floor rather than being tuned until it passes.
+
+    A high overlap is a finding to escalate under CONTRACT.md section 7, not a
+    signal to keep raising SUP_WEB_CHORD_RATIO.
+    """
+    rows = gds.run_cypher(
+        """
+        MATCH (s:Supplier)-[:SUPPLIES]-(t:Supplier)
+        RETURN s.id AS supplierId, count(*) AS degree
+        ORDER BY degree DESC, supplierId
+        """
+    )
+    degrees = {r["supplierId"]: int(r["degree"]) for _, r in rows.iterrows()}
+    top_degree = [r["supplierId"] for _, r in rows.iterrows()][:TOP_N_OVERLAP]
+    top_between = [s.node_id for s in scores[:TOP_N_OVERLAP]]
+    shared = set(top_degree) & set(top_between)
+
+    cascade_degree_rank = top_degree.index(protags.cascade_id) + 1 \
+        if protags.cascade_id in top_degree else None
+    placement = (
+        f"rank {cascade_degree_rank}" if cascade_degree_rank
+        else f"outside the top {TOP_N_OVERLAP}"
+    )
+    print(
+        f"  degree vs betweenness: the top {TOP_N_OVERLAP} by each measure share "
+        f"{len(shared)} supplier(s); Cascade has degree "
+        f"{degrees.get(protags.cascade_id, 0)} and sits {placement} by degree"
     )
 
 
@@ -956,6 +1003,7 @@ def main() -> None:
         betweenness = compute_betweenness(gds, protags)
         conc = concentration_cutoff(betweenness)
         assert_betweenness(betweenness, conc, protags)
+        report_degree_overlap(gds, betweenness, protags)
         write_betweenness(gds, betweenness)
 
         pagerank = compute_pagerank(gds, protags)
