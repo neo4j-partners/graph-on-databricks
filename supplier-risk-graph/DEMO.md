@@ -18,23 +18,31 @@ This walkthrough assumes the one-time setup in the [`README.md`](README.md) is d
 
 Two engines answer the same question over the same data:
 
-- **Genie Agent (lakehouse-only):** a Databricks Genie space scoped to the `supplier_risk` schema. It reads the raw instance tables and the `customer_risk_exposure` metric view over them, and nothing else. The metric view holds no conclusions, only aggregates of columns already in those tables.
-- **Genie One (Genie plus the graph):** the same Genie Agent under a supervisor that can also call a read-only Neo4j MCP server over the knowledge graph.
+- **Genie alone**, the lakehouse-only engine. A Databricks Genie space, the Genie Agent product, scoped to the `supplier_risk` schema. It reads the raw instance tables and the `customer_risk_exposure` metric view over them, and nothing else. The metric view holds no conclusions, only aggregates of columns already in those tables.
+- **Genie + Graph.** That same Genie space under a supervisor, the Genie One product, which can also call a read-only Neo4j MCP server over the knowledge graph.
+
+**Those are the two names used everywhere below.** Say them on stage as well: they carry the contrast in the name itself, which a room follows without being told. The product names appear once, here, and then never again. The worklog and the probe records call the two engines Run A and Run B, which is what this walkthrough called them until 2026-07-19: those files are historical records and are left as written.
+
+**What is numbered and what is named.** Beats are numbered, one to five, and they are the only numbered sequence in this walkthrough. Everything else has a name: the two engines above, and the three steps of Beat 3, which are Definition, Discovery, and Explanation.
 
 The demo runs two stories:
 
 - **The setup:** each story puts one natural question to both engines.
 - **Ungrounded:** the lakehouse-only engine reads every column correctly and returns a plausible, defensible answer that is anchored to nothing, because no lakehouse artifact says what the question's terms mean.
-- **Grounded:** Genie One resolves the governed definition from the graph, walks the connections, and returns an answer a risk committee can act on because it cites an authored definition.
+- **Grounded:** Genie + Graph resolves the governed definition from the graph, walks the connections, and returns an answer a risk committee can act on because it cites an authored definition.
 
 ### The honesty framing
 
-**The demo is ungrounded versus grounded. It is not wrong versus right.** Genie Agent is a frontier LLM over tables. Ask it a business question and it returns an answer grounded in nothing but column names, and the axis it picks is generative rather than reproducible. Genie One with the graph ontology returns an answer grounded in an authored definition, so it is the same answer every time. **Run A is never wrong and is never beaten.** Say that out loud rather than implying otherwise.
+**The demo is ungrounded versus grounded. It is not wrong versus right.** Genie alone is a frontier LLM over tables. Ask it a business question and it returns an answer grounded in nothing but column names, and the axis it picks is generative rather than reproducible. Genie + Graph returns an answer grounded in an authored definition, so it is the same answer every time.
+
+**Genie alone can return an answer that is false at full depth, and that is a legitimate finding rather than something to soften.** The re-probe found one: asked whether the Americas glass bottle suppliers share a common upstream supplier, Genie alone looks one hop up and answers from what it finds there, while the graph traverses the commodity-scoped chain and answers the other way. `CONTRACT.md` section 1 is the authority for how that is handled, and the line it draws is that an **emerged** wrong answer is evidence while an **engineered** one is a plant. Predicting an answer and then shaping data so the prediction fails stays banned outright.
+
+**On stage, narrate the mechanism and never the verdict.** The truthful and sufficient sentence is that Genie looks one level deep by default. It is not incapable of going deeper and could likely be prompted to, and saying so costs the demo nothing, because default behaviour is what a procurement analyst actually gets. "Genie is wrong," "Genie is bad," and any framing that invites the room to score one product against another are out. The room should leave thinking about depth of question, not about which vendor lost.
 
 Two claims, different strength, and they must stay separate on stage:
 
-- **Load-bearing, cannot fail:** no Run A answer cites a governed business definition, because none exists in the lakehouse. True by construction, on every run.
-- **Vivid, not guaranteed:** Run A's answers vary across runs. Show it live, never depend on it. If three asks agree, narrate the ungroundedness and move on.
+- **Load-bearing, cannot fail:** no answer from Genie alone cites a governed business definition, because none exists in the lakehouse. True by construction, on every run.
+- **Vivid, not guaranteed:** the answers Genie alone gives vary across runs. Show it live, never depend on it. If three asks agree, narrate the ungroundedness and move on.
 
 Never claim SQL cannot express these traversals. A Databricks audience knows recursive CTEs exist. The defensible claims are narrower and true:
 
@@ -42,7 +50,7 @@ Never claim SQL cannot express these traversals. A Databricks audience knows rec
 
 - No lakehouse column governs what "single point of failure" or "same ownership group" means. The definition lives in the graph.
 - The two graph-native signals, supplier betweenness and weighted ownership PageRank, are graph computations no column carries and no aggregate reproduces. Both are expressible in SQL and neither is anything a BI tool writes unprompted. Their governing cutoffs are governed values in the graph, never a column a BI tool could sort on.
-- **Do not predict what Genie will answer, in this file or on stage.** No Story 1 beat contains a scripted Run A answer, and none may be reintroduced in another form. Story 2's beats still carry the older scripted framing and are out of scope for the current rebuild, so read them as history rather than as a licence to script Story 1.
+- **Do not predict what Genie will answer, in this file or on stage.** No Story 1 beat contains a scripted answer for Genie alone, and none may be reintroduced in another form. Story 2's beats still carry the older scripted framing and are out of scope for the current rebuild, so read them as history rather than as a licence to script Story 1.
 
 ### The five-beat arc
 
@@ -50,11 +58,11 @@ Both stories run the same five beats, so the audience learns the rhythm on story
 
 1. **The ask:** one natural question, put to both engines.
 2. **Ungrounded:** the lakehouse-only engine answers from the columns, correctly, with nothing governing what the answer means.
-3. **Grounded:** Genie One resolves the definition, applies it, and explains the structure behind the result.
+3. **Grounded:** Genie + Graph resolves the definition, applies it, and explains the structure behind the result.
 4. **The exposure:** the grounded finding gets a euro figure, computed from the same lakehouse data.
 5. **The decision:** the recommended action, handed to the room as a live choice.
 
-- **Nothing here is pasted.** Both engines write their own queries. The presenter types a question and Genie or Genie One generates the SQL or Cypher, so this script gives questions and talking points, not queries.
+- **Nothing here is pasted.** Both engines write their own queries. The presenter types a question and the engine generates the SQL or Cypher, so this script gives questions and talking points, not queries.
 - **The names line up on both sides.** Graph properties and the instance tables both use camelCase. See [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) for the full label, relationship, and property model.
 
 ## Story 1: the hidden glassworks
@@ -89,49 +97,53 @@ The background network is not a two-cluster graph joined at Cascade. It is sever
 
 ### Beat 1, the ask
 
-Asked verbatim, of both runs. `CONTRACT.md` section 6 is the authority for this wording and changing it means changing that file.
+Asked verbatim, of both engines. `CONTRACT.md` section 6 is the authority for this wording and changing it means changing that file.
 
 > "How diversified is our glass bottle supply for the Americas?"
 
 - **The ambiguity is the demonstration, not a bug to fix.** "Diversified" can mean units per supplier or sources per unit. Nothing in the lakehouse says which axis is correct. Do not reword the question to force the intended axis.
-- **The danger words are "depend on" and "common upstream."** Beat 1 must never drift toward dependency phrasing, because that hands Run A the convergence query directly. "Point of failure" is safe and was probed.
+- **The danger words are "depend on" and "common upstream."** Beat 1 must never drift toward dependency phrasing, because that hands Genie alone the convergence query directly. "Point of failure" is safe and was probed.
 
 ### Beat 2, ungrounded
 
-Run A only, and there is no script here on purpose.
+Genie alone, and there is no script here on purpose.
 
 - **Ask it three times, live, in fresh conversations.** Three rather than two, because two asks can land on the same axis and show no spread.
 - **Read out what comes back and note that nothing in it references a governed definition.** That is the load-bearing observation and it holds on every run.
 - **If the three answers differ, narrate the spread. If they agree, narrate the ungroundedness.** Both land. Do not ask a fourth to manufacture a disagreement.
-- **Every table is in the space,** including `supply_relationships` and `supplier_business_units`. Nothing is withheld from Run A. The gap is grounding, not access.
+- **Every table is in the space,** including `supply_relationships` and `supplier_business_units`. Nothing is withheld from Genie alone. The gap is grounding, not access.
 
-> **TODO, re-probe.** The staging detail for this beat gets written from the Run B and Run A transcripts recorded in the re-probe phase. See the "Re-probe, after the rebuild" section of `proposals/REBUILD.md`. Do not write a predicted answer here in the meantime.
+- **What the re-probe recorded is in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md), and it is staging background rather than a script.** Read it to know what the beat feels like to run: which tables Genie alone reaches for, that it answers from one hop, and that it invents its reading of "diversified" on the spot. Do not carry any of it onto a slide and do not expect the same axis twice. The observation that lands is the one that holds on every run, that nothing in the answer references a governed definition.
 
 ### Beat 3, grounded
 
-Run B, and the three legs appear in this order, each with its own visible output.
+Genie + Graph, and the three steps appear in this order, each with its own visible output.
 
-- **Leg 1, definition.** Genie One resolves what a Critical Supplier means from the graph: a supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it, and one that need not sell to that business unit directly. The Supply Concentration Threshold parameterizes it. The lakehouse has no answer to that question at all.
-- **Leg 2, discovery.** It reads the precomputed supply betweenness and applies the governed threshold, which returns a cohort of suppliers rather than a single name.
-- **Leg 3, explanation.** It walks the commodity-carrying glass chain into the Americas and shows the tier-1 bottle makers converging on their shared upstream source.
+- **Definition.** Genie + Graph resolves what a Critical Supplier means from the graph: a supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it, and one that need not sell to that business unit directly. The Supply Concentration Threshold parameterizes it. The lakehouse has no answer to that question at all.
+- **Discovery.** It reads the precomputed supply betweenness and applies the governed threshold, which returns a cohort of suppliers rather than a single name.
+- **Explanation.** It walks the commodity-carrying glass chain into the Americas and shows the tier-1 bottle makers converging on their shared upstream source.
 - **The result:** Cascade Glassworks clears the Supply Concentration Threshold, and so do other suppliers, because the threshold catches a cohort. What singles Cascade out is the definition and the commodity scoping applied together: it is the cohort member sitting on the Americas' commodity-carrying glass paths. **The finding does not come from topping a ranking, and the presenter should not describe it as one.** Other furnaces in the cohort are genuinely critical elsewhere on their own merits.
 - **Why no score sort finds it:** Cascade's own risk score sits below the High-Risk threshold and plenty of suppliers score higher, so no risk-score filter surfaces it.
-- **Carry the criticality side-by-side.** Ask the second frozen question of both runs: "What is our single biggest point of failure in our supply base?" This is safe to ask precisely because no beat depends on Run A answering any particular way.
+- **Carry the criticality side-by-side.** Ask the second frozen question of both engines: "What is our single biggest point of failure in our supply base?" This is safe to ask precisely because no beat depends on Genie alone answering any particular way. The re-probe asked it of Genie alone and recorded what came back in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md): read that for staging, ask it live, and script neither side.
 
-> **TODO, re-probe.** Beat 3's narrative gets written from what Run B actually returns, per the "Write the five beats from what the transcripts say" item in `proposals/REBUILD.md`. Two open points belong to that work: whether the three legs land as three distinct visible outputs on screen, and how to present the result if the returned cohort carries more than one supplier on the Americas' glass chain. Both are settled by transcript, not by argument.
+> **TODO, Genie + Graph.** Beat 3's narrative gets written from what Genie + Graph actually returns against the rebuilt data, which has not been probed yet. Genie alone's side of the re-probe is recorded and closed; Genie + Graph's is not. Two open points belong to that work: whether the three steps land as three distinct visible outputs on screen, and how to present the result if the returned cohort carries more than one supplier on the Americas' glass chain. Both are settled by transcript, not by argument.
 
 ### The convergence caveat, said out loud
 
-Once someone knows to start from the tier-1 bottle makers, "which supplier feeds all of these" is a short query and Run A can get there. This is confirmed, not theoretical: given the phrase "common upstream supplier," Genie wrote a correct convergence query on the first try. The graph-native step is the one before it, knowing which suppliers to ask about at all.
+Convergence is cheap in SQL once you know where to start. "Which supplier feeds all of these" is a short query against the tier-1 bottle makers, and nothing about it is beyond Genie alone. The graph-native step is the one before it, knowing which suppliers to ask about at all.
 
-**Invite that question rather than hoping nobody asks it.** The frozen phrasing is "do all our Americas glass bottle suppliers share a common upstream supplier?" The question presupposes the finding it returns, which is the point.
+**Invite that question rather than hoping nobody asks it.** The frozen phrasing is "do all our Americas glass bottle suppliers share a common upstream supplier?"
 
-> **TODO, re-probe.** That earlier result was recorded while Cascade sat one hop from the bottle makers. Whether it still holds now that a processor tier sits between them is a re-probe question, and if Genie reaches the answer by adding a hop by hand rather than recursing, this caveat needs stating more carefully than "one query."
+**What the question now reaches, and how to narrate it.** With a processor tier between Cascade and the bottle makers, one hop up from the bottle makers lands on the processors rather than on the furnace, so the convergence query Genie alone writes answers about the tier it can see. The graph, walking the commodity-carrying chain to full depth, answers about the tier below that. The sentence to say is the mechanism: Genie looks one level deep by default, it is not incapable of going deeper, and it could likely be prompted to. That is true, sufficient, and costs the demo nothing, because default behaviour is what an analyst actually gets.
+
+- **Never frame this as Genie being wrong or beaten.** `CONTRACT.md` sections 1 and 8 ban it outright, and a result sold as a gotcha makes the room defend the tool it already owns instead of evaluating the argument.
+- **The beat has to work whichever way Genie alone answers.** The re-probe asked this question repeatedly in fresh conversations and the answer held every time while the SQL varied, which is the strongest form that evidence can take and still only one build. It enters as claim B and stays there. If Genie alone converges on the furnace on the day, nothing breaks: the graph still resolved the definition, the commodity scoping, and the tier that made the finding actionable, and the presenter says so.
+- **Repeat it after any regenerate** before leaning on it, because the processor tier's fan-out moves with the seed. The record is in [`worklog/probe-run-a-v3.md`](worklog/probe-run-a-v3.md).
 
 ### Beat 4, the exposure
 
 - **What beat 3 handed over:** an entity, Cascade Glassworks, not a number. The graph has no euros in it.
-- **How Genie One gets to a number:** it follows `MEASURED_BY` from the Critical Supplier term to the Supply Exposure measure, reads the Supply Exposure Rule, and lands on the `RevenueEntry` and `BusinessUnit` entities and the tables they map to. That is what tells it which question to ask next, and about which business unit.
+- **How Genie + Graph gets to a number:** it follows `MEASURED_BY` from the Critical Supplier term to the Supply Exposure measure, reads the Supply Exposure Rule, and lands on the `RevenueEntry` and `BusinessUnit` entities and the tables they map to. That is what tells it which question to ask next, and about which business unit.
 - **What the measure actually says:** the recognized revenue that stops when a Critical Supplier stops, for the most recent full quarter, for every business unit whose supply of the commodity at risk runs wholly through that supplier. A path that does not carry the commodity creates no dependency and is excluded. Scoped that way, the measure returns one business unit and no other, and the build asserts it.
 - **The follow-on question, put to Genie:** recognized revenue per business unit for the most recent full quarter, over the instance tables. No graph query produces the figure. Read it off the screen.
 
@@ -145,7 +157,7 @@ Once someone knows to start from the tier-1 bottle makers, "which supplier feeds
 
 Hand the room the live choice: qualify a second glass source for the exposed unit, against the figure beat 4 just returned.
 
-The point that makes it a decision rather than a slide is that a second source is not automatically a fix. **A second supplier whose own glass also traces back to Cascade changes nothing,** because the commodity-carrying paths still converge on the same furnace. Sourcing decisions made on the tier-1 view cannot tell the two cases apart, and the governed definition can. The rough cost of a second source is presenter framing, not a data answer. Genie One's data answer ends at the finding and the exposure.
+The point that makes it a decision rather than a slide is that a second source is not automatically a fix. **A second supplier whose own glass also traces back to Cascade changes nothing,** because the commodity-carrying paths still converge on the same furnace. Sourcing decisions made on the tier-1 view cannot tell the two cases apart, and the governed definition can. The rough cost of a second source is presenter framing, not a data answer. Genie + Graph's data answer ends at the finding and the exposure.
 
 ### Graph mechanics
 
@@ -209,7 +221,7 @@ Put to both engines:
 
 *Contagion is risk spreading across relationships, so a clean node inherits risk from the nodes it is connected to.*
 
-- **The governed definition:** Genie One resolves what Ownership Risk means from the graph: "an active customer with a clean record of its own, no default and never delinquent, that absorbs more failure through its ownership stakes than any other trading customer," parameterized by the Ownership Contagion Threshold, a weighted PageRank cutoff.
+- **The governed definition:** Genie + Graph resolves what Ownership Risk means from the graph: "an active customer with a clean record of its own, no default and never delinquent, that absorbs more failure through its ownership stakes than any other trading customer," parameterized by the Ownership Contagion Threshold, a weighted PageRank cutoff.
 - **How it filters:** it excludes the defaulted customers and the invoice-less holding companies, then returns the clean operating customers whose stake-weighted propagated risk clears the cutoff, with the ownership chain as the stated reason.
 - **The result:** Jade Beverage Distribution comes back, a platinum account owned 85% by Kestrel Holdings, which owns Harbour Group and Tern Capital outright, and those two own the four companies that defaulted in the most recent quarter. Jade scores clearly ahead of the next trading customer, a gap wide enough that the cutoff sits between them with room to spare, even though Jade itself never missed a payment and nothing within two hops of it has failed.
 - **Why nobody else clears it:** the accounts sitting directly beside a default hold only a few percent of it, so almost nothing propagates to them. Kestrel's stakes are 65% to 90% at every level, so four failures arrive at Jade largely intact. The cutoff sits between Jade and the field.
@@ -218,7 +230,7 @@ Put to both engines:
 ### Beat 4, the exposure
 
 - **What beat 3 handed over:** an entity, Jade Beverage Distribution, not a number.
-- **How Genie One gets to a number:** it follows `MEASURED_BY` from the Ownership Risk term to the Credit Exposure measure, reads the Credit Exposure Rule, and lands on the `Invoice` and `Customer` entities and the tables they map to. That is what tells it which question to ask next, and about which customer.
+- **How Genie + Graph gets to a number:** it follows `MEASURED_BY` from the Ownership Risk term to the Credit Exposure measure, reads the Credit Exposure Rule, and lands on the `Invoice` and `Customer` entities and the tables they map to. That is what tells it which question to ask next, and about which customer.
 - **The follow-on question, put to Genie:**
 
 > "What is Jade Beverage Distribution's committed credit facility, and how much of it is drawn as open invoice balance?"
@@ -244,7 +256,7 @@ Cut Jade's committed facility down toward the balance already drawn, using the t
 
 - **The grounding gap is the proof.** No prediction, no proof by clock. The lakehouse-only engine reading every column correctly and still having nothing to anchor the answer to is the whole argument, demonstrated live, twice.
 - **Beat 5 stays open on purpose.** Handing the room a live decision with a euro figure attached converts the contrast into urgency, and it costs nothing to build.
-- **Genie One's answers read like actions.** It composes its reason from the path itself and closes with the recommended action, something a risk officer acts on rather than provenance trivia.
+- **Genie + Graph's answers read like actions.** It composes its reason from the path itself and closes with the recommended action, something a risk officer acts on rather than provenance trivia.
 
 ## The fairness rebuttal: show the GDS run once
 
@@ -252,7 +264,7 @@ Cut Jade's committed facility down toward the balance already drawn, using the t
 - **The show:** run `gds.py` once on stage, about 30 seconds.
 - **The rebuttal:** both engines get every table, including the raw supply links and the ownership stakes. What plain Genie will not do is invent an all-pairs shortest-path computation or an iterative weighted propagation, unprompted, from a business question. Both are expressible in SQL; neither is something a BI tool reaches for, and both are one line of GDS.
 - **Do not say BI cannot compute these at all.** It is not true, a Databricks audience knows it is not true, and the demo does not need it. The claim that holds is the one above.
-- **If challenged, invite the shortcut.** Offer the room the obvious aggregates live and let Genie run them. Counting connections over `supply_relationships` does not name Cascade, and the build asserts that. Ranking customers by distance to a default, or by defaults per ownership group, does not return Jade. The shortcuts are available, they run, and they return a different name.
+- **If challenged, invite the shortcut.** Offer the room the obvious aggregates live and let Genie run them. Counting connections over `supply_relationships` does not name Cascade: the build asserts it and the re-probe read it back live, where the question returned an equipment vendor. Ranking customers by distance to a default, or by defaults per ownership group, does not return Jade. The shortcuts are available, they run, and they return a different name.
 
 Three facts behind the rebuttal:
 
@@ -266,19 +278,19 @@ The two stories are the payoff. The four column-findable terms make the contrast
 
 - **The warm-up question:** ask both engines "Which suppliers are high-risk?"
 - **The lakehouse answer:** it has the `riskScore` column but no governed threshold, so it guesses a cutoff, often a top-N or a round number, and can miscount.
-- **The Genie One answer:** it reads the governed threshold off the rule and returns every supplier at or above 70, the governed cutoff, consistent no matter who asks.
+- **The Genie + Graph answer:** it reads the governed threshold off the rule and returns every supplier at or above 70, the governed cutoff, consistent no matter who asks.
 - **Why it matters:** this is the honest baseline. With a column and a governed number, BI can close most of the gap; the two stories are exactly the cases where there is no such column.
 
-## What else Genie One can answer
+## What else Genie + Graph can answer
 
 The knowledge layer answers questions that span definitions, which the fact side finds awkward or cannot express.
 
 - **Impact analysis.** "If we lower the Late Payment Threshold to 45 days, which terms, rules, and tables change?" A traversal from `Threshold` through `APPLIES_TO`, `DEFINED_BY`, and `EVALUATES` to the affected entities and their Unity Catalog tables.
 - **Policy scope.** "Which policies govern customer data?" Follow `CONSTRAINS` from each `Policy` to its `Entity`. The Credit Risk Policy and the Compliance (KYC) Policy both constrain the Customer entity.
-- **Provenance.** "Show the full lineage behind Jade's Strategic Account label." Genie One walks instance to term to rule to entity to the physical tables, returning the Strategic Account term, the reason recorded on the edge, the Strategic Account Rule, the Customer entity, and the tables it maps to. Customer carries two sources, `supplier_risk.customers` and `supplier_risk.owned_by`, so the walk returns both. That is the honest answer: the ownership stakes are part of what the Customer entity is made of.
+- **Provenance.** "Show the full lineage behind Jade's Strategic Account label." Genie + Graph walks instance to term to rule to entity to the physical tables, returning the Strategic Account term, the reason recorded on the edge, the Strategic Account Rule, the Customer entity, and the tables it maps to. Customer carries two sources, `supplier_risk.customers` and `supplier_risk.owned_by`, so the walk returns both. That is the honest answer: the ownership stakes are part of what the Customer entity is made of.
 - **Queryable glossary.** The knowledge layer is the catalog. List every governed term and its definition, which threshold parameterizes which term, or which policy owns which rule.
 
-The two graph-native terms, Critical Supplier and Ownership Risk, are never pre-planted as `CLASSIFIED_AS` edges. Genie One resolves each from its definition and applies it live using the precomputed betweenness and PageRank properties, so those labels never exist as a materializable row and can never leak into a gold table.
+The two graph-native terms, Critical Supplier and Ownership Risk, are never pre-planted as `CLASSIFIED_AS` edges. Genie + Graph resolves each from its definition and applies it live using the precomputed betweenness and PageRank properties, so those labels never exist as a materializable row and can never leak into a gold table.
 
 ## Pre-flight check
 
@@ -287,6 +299,13 @@ You do not need to verify figures. Every number comes back from Genie live, and 
 - **`make demo`** rebuilds everything. The generator asserts both story shapes on every run, so a clean run with no `AssertionError` is the check.
 - **`make expected`** prints the figures this build actually produced, generated from `data/ground_truth.json` on the spot. Read it once before you go on and treat it as the answer key, not anything typed into this file.
 - **`make check`** validates the CSVs offline and touches neither Neo4j nor Unity Catalog.
+
+### The two checks that run on the day, every day
+
+These are not build checks and a clean build says nothing about either. Both guard against drift between the build and the room, so they run last, after everything else has passed, and they run on every demo day rather than once.
+
+- **The vocabulary guard, standalone against the live Genie space, via `make guard`.** The space is hand-synced and can change after a build. This is the check that protects the load-bearing claim, which is why it runs last rather than only first.
+- **Today's quarter still matches the quarter the build was shaped around.** Read it off the "Last full quarter" row that `make expected` renders out of the `story1_hidden_glassworks` block. The as-of date is the build date, so a calendar quarter rolling between the build and the demo silently changes what "the most recent full quarter" means in Beat 4, and no build-time assert can catch it. The fix when it fails is a regenerate, which is one `make demo`.
 
 The two shapes the generator asserts:
 
@@ -378,7 +397,7 @@ and rankings from the instance tables and the customer_risk_exposure metric view
 
 Nothing more. No capability list, no limitations list, no statement of what the space is good at. A capabilities list is a hint sheet: it tells the model which questions it is expected to be able to answer, and the demo turns on the model reaching its own conclusions about what it can see.
 
-- **Keep the space neutral.** It carries facts about the data, not routing rules. The same block serves beats 1 and 2 standalone and under Genie One, so it must never tell the space which questions to refuse. Routing lives in the supervisor's Genie-tool description, given right after the block.
+- **Keep the space neutral.** It carries facts about the data, not routing rules. The same block serves beats 1 and 2 standalone and under Genie + Graph, so it must never tell the space which questions to refuse. Routing lives in the supervisor's Genie-tool description, given right after the block.
 - **The table set it assumes:** the instance tables plus the `customer_risk_exposure` metric view. Kept out are the two gold tables, `classifications` and `business_unit_exposure`, and the raw `compliance_findings` table. Findings reach the space only as the metric view's `open_finding_count` measure, which makes a two-branch fanout impossible rather than merely discouraged.
 - **Schema facts only:** grain, units, join paths, and what a coded value means. No analytical conclusions. The demo turns on Genie reading every column correctly and still missing what only the graph can see, so an instruction that hints at a multi-tier traversal or pre-judges what a metric implies would hand over the answer. `upload.py` applies the same rule to the comments it writes into Unity Catalog.
 
@@ -423,7 +442,7 @@ Conventions:
 
 **Check the deployed text against this block, not against a worklog.** The instructions field drifts: a deployed space has been found carrying an older, shorter variant missing the currency rendering rule, the `supplier_business_units` bridge rule, the `revenue_entries.period` rule, and the status value lists. Read the field back from the live space and compare it line by line.
 
-**Supervisor routing (Genie One only).** When Genie runs under the Genie One supervisor, the routing lives in the supervisor's description of the Genie tool, not in the neutral space above. Set that tool description to: Genie owns facts, counts, totals, and rankings over the instance tables; route anything that needs a business-term definition, a relationship judgment, or classification provenance to the graph tool instead.
+**Supervisor routing (Genie + Graph only).** When Genie runs under the Genie + Graph supervisor, the routing lives in the supervisor's description of the Genie tool, not in the neutral space above. Set that tool description to: Genie owns facts, counts, totals, and rankings over the instance tables; route anything that needs a business-term definition, a relationship judgment, or classification provenance to the graph tool instead.
 
 > **Guardrail.** The two gold tables, `classifications` and `business_unit_exposure`, are produced by the pipeline but must never be added to the Genie space. They materialize the graph's answers into Delta, and adding them re-introduces write-back leakage: the lakehouse-only engine would read the graph's conclusions straight from a column and tie, which is the exact failure this demo is built to expose.
 
@@ -499,8 +518,8 @@ The dataset looks more complicated than the story needs. Several webbed supplier
 - **Several inter-cluster bridges, each a different supplier, and none of them carrying glass.** Cascade is not a cut vertex: remove it and the network stays in one component. Ranking highly by position is fine. Ranking highly because you are the only way across the graph is trivially true and invites a fair question from the room, so the topology no longer has that shape.
 - **A commodity test on every supply path.** More bridges make betweenness interesting and also give the exposure measure more places to leak. Scoping the measure to paths where every supplier trades in a glass subcategory is what keeps those two compatible.
 - **Cascade buys feedstock from vendors spread across the clusters and sells down through glass processors.** Cullet, sand, and soda ash flow in from several regions; container glass flows out toward the bottle makers. The fan-in is what earns the score, and it is the load-bearing realism claim: container glass is too heavy and too cheap to ship far, so a furnace selling raw glass across regions is a shaky premise while a furnace buying feedstock across regions is simply how furnaces work.
-- **A processor tier between Cascade and the bottle makers.** This is the hidden choke point shape: Cascade sells to no business unit directly and never sits one hop from the tier-1 makers, so a one-hop query returns the sub-tier vendors and stops.
-- **Rival furnaces feeding the other units' bottle makers.** They make the raw-glass subcategory return a real cohort rather than a synonym for Cascade, and they make the other business units genuinely protected rather than merely unlinked, which is what Beat 4's comparison rests on.
+- **A processor tier between Cascade and the bottle makers.** This is the hidden choke point shape: Cascade sells to no business unit directly and never sits one hop from the tier-1 makers, so a one-hop query returns the sub-tier vendors and stops. Confirmed live in the re-probe: asked what the glass bottle suppliers depend on, Genie alone wrote one hop and returned the container glass processors, and Cascade did not appear in the result set.
+- **Rival furnaces feeding the other units' bottle makers.** They make the raw-glass subcategory return a real cohort rather than a synonym for Cascade, and they make the other business units genuinely protected rather than merely unlinked, which is what Beat 4's comparison rests on. The re-probe read both back live: filtering to the raw glass subcategory returns a population of furnaces with Cascade as one ordinary row among them, and the other units' bottle makers do show furnaces as direct upstreams, so their glass supply is real rather than an absence of edges.
 
 **Story 2, the ownership network:**
 
@@ -522,7 +541,7 @@ The rule is that the generator asserts structural relationships and never assert
 
 - **Story 1 asserts the premise, not the finding.** `check_supply_structure` in `generate_data.py` asserts the shape in which betweenness and connection count *can* diverge: one connected component, not a forest, a substantial share of suppliers on both sides of `supply_relationships`, and real traversal depth. It deliberately refuses to assert that the two measures *do* diverge. The realized overlap between the top of each ranking prints to the build log every run, alongside the degree leader, and is read rather than asserted. A build where the separation disappears is a finding to escalate, not a reason to turn a constant.
 - **The one Story 1 ranking constraint that is asserted is negative:** Cascade is not the top-degree supplier. Cascade sitting one tier back from the bottle makers is the definition of a hidden choke point, so this is a property of an honest topology rather than a plant. It is not the last line of defense either, because the probe showed Genie does not reach for connection counts at all.
-- **The real last line of defense is the one-hop ceiling.** Across the probed questions Genie never wrote a recursive CTE and never walked past one hop. Whether that holds now that Cascade sits two tiers back is the single most important thing the re-probe establishes.
+- **The real last line of defense is the one-hop ceiling, and the re-probe closed it as a finding rather than a question.** Across every question probed against the rebuilt data, including the two phrased with explicit chain language, Genie wrote no recursive CTE and never walked past one hop. Moving Cascade two tiers back did not raise the ceiling, which was the largest open risk in the rebuild. It is a measurement of the default reflex on one build, not a guarantee: nothing was hinted, nothing was asked twice in a conversation, and model updates move reflexes. Re-probe after any regenerate.
 - **Story 2 still asserts that Jade tops weighted PageRank** among trading customers, and that hop distance to the nearest default and defaults per ownership group both return someone else.
 
 This is why the offer in the fairness rebuttal is safe: you can invite the room to run the shortcuts live, because they run and they return a different name.

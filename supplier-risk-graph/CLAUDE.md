@@ -22,33 +22,41 @@ record of the past, so they are allowed to be stale.
 
 The demo is **ungrounded versus grounded**. It is NOT wrong versus right.
 
-Genie Agent is a frontier LLM over tables. Ask it a business question and it returns a plausible
+**The two engines are called Genie alone and Genie + Graph.** Those names replace Run A and Run B
+everywhere in `DEMO.md` and `proposals/CONTRACT.md` as of 2026-07-19. `worklog/` and `REBUILD.md`
+still use the old names and are not being rewritten. Contract section 3 holds the mapping.
+
+Genie alone is a frontier LLM over tables. Ask it a business question and it returns a plausible
 answer grounded in nothing but column names. The axis it picks is generative and not reproducible.
-Genie One with the graph ontology returns an answer grounded in an authored definition, so it is the
+Genie + Graph returns an answer grounded in an authored definition, so it is the
 same answer every time and a risk committee can act on it.
 
-Run A is never wrong and is never beaten. Its answers are plausible, defensible, and anchored to
-nothing.
+Genie alone's answers are plausible, defensible, and anchored to nothing. It **can** return an answer
+that is false at full depth, and reporting that honestly is allowed: contract section 1 supersedes
+the earlier absolute that it is never wrong. The line that survives is that an emerged wrong answer
+is a finding and an engineered one is a plant. Never frame a beat as Genie being wrong, bad, or
+beaten. Narrate the mechanism, that Genie looks one level deep by default and could likely be
+prompted deeper, and never the verdict.
 
 ## The rule that this project keeps violating
 
 **Do not predict what Genie will answer, and do not engineer data so a predicted answer is wrong.**
 
-Genie Agent is stochastic. Every previous version of this demo tried to pin down its answer and
+Genie alone is stochastic. Every previous version of this demo tried to pin down its answer and
 build the story on top of that prediction. Each one got relitigated when the prediction turned out
 to be untested or wrong. That is the single largest source of wasted work in this project's history.
 
 Two claims, different strength, and they must stay separate:
 
-- **Load-bearing, cannot fail:** no Run A answer cites a governed business definition, because none
+- **Load-bearing, cannot fail:** no answer from Genie alone cites a governed business definition, because none
   exists in the lakehouse. True by construction, every run.
-- **Vivid, not guaranteed:** Run A's answers vary across runs. Show it, never depend on it.
+- **Vivid, not guaranteed:** the answers Genie alone gives vary across runs. Show it, never depend on it.
 
 Never build a beat on the second alone.
 
 ## Consequences for anything you propose
 
-- No beat contains a scripted Run A answer. If you find yourself writing "Genie will say X," stop.
+- No beat contains a scripted answer for Genie alone. If you find yourself writing "Genie will say X," stop.
 - Ambiguity in a demo question is usually the demonstration, not a bug. Do not "fix" a question to
   force the intended axis without checking the contract first.
 - If a beat only works because of a data plant, change the beat. See the banned list in the
@@ -68,5 +76,5 @@ SEMANTICS dict, `assert_betweenness` in `gds.py`. Line numbers in the worklog we
 day and sent a reader to the wrong place.
 
 **No demo artifact contains a value that a reseed would change.** The generator is RNG-driven and
-Genie Agent is stochastic. See the reseed-invariance section in `proposals/CONTRACT.md`. Enforcement
+Genie alone is stochastic. See the reseed-invariance section in `proposals/CONTRACT.md`. Enforcement
 is editorial: re-read what you changed before committing.

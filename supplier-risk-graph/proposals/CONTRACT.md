@@ -13,23 +13,23 @@ is a detail and belongs in `simplified-plan.md`.
 
 The demo is **ungrounded versus grounded**. It is not wrong versus right.
 
-> Genie Agent is a frontier LLM over tables. Ask it a business question and it returns a plausible
+> Genie alone is a frontier LLM over tables. Ask it a business question and it returns a plausible
 > answer grounded in nothing but column names. The axis it picks is generative and not
-> reproducible. Genie One with the graph ontology returns an answer grounded in an authored
+> reproducible. Genie + Graph returns an answer grounded in an authored
 > definition, so it is the same answer every time and a risk committee can act on it.
 
 Supporting statements, both still true and both still used on stage:
 
 > The graph finds the attribution. The lakehouse computes the number.
 
-> Run A can compute any number you ask for, perfectly, and still not know which number to ask for.
+> Genie alone can compute any number you ask for, perfectly, and still not know which number to ask for.
 
 **What this claim is not.** It is not "SQL cannot express traversal or centrality." SQL can express
 both. Its answers are plausible, defensible, and anchored to nothing.
 
-**Run A can return an answer that is false at full depth, and that is a legitimate finding.** This
-supersedes the earlier absolute that Run A is never wrong. The re-probe after the topology rebuild
-found one: asked whether the Americas glass bottle suppliers share a common upstream supplier, Run A
+**Genie alone can return an answer that is false at full depth, and that is a legitimate finding.** This
+supersedes the earlier absolute that Genie alone is never wrong. The re-probe after the topology rebuild
+found one: asked whether the Americas glass bottle suppliers share a common upstream supplier, Genie alone
 returns no, because it looks one hop up and the answer sits two hops up. The graph, traversing the
 commodity-scoped chain, returns yes and names the supplier. Two runs, one question, opposite words.
 
@@ -60,7 +60,7 @@ convergence result, it gets asked enough times to know whether the answer is sta
 beat may depend on it, and the beat that carries it must still work if Genie answers the other way.
 
 **What keeps the claim true.** It holds by construction only while no authored artifact is visible
-to Run A. The governed vocabulary, meaning the term names, the rule names, and the `TERM-`,
+to Genie alone. The governed vocabulary, meaning the term names, the rule names, and the `TERM-`,
 `RULE-`, `MEAS-`, `THR-` and `GM-` identifiers, must never appear in a Unity Catalog table or
 column name, a table or column comment, a Genie space instruction, or an example SQL. Section 7
 asserts this, and `guard.py` is the check that proves it: it runs inside `make demo`, and standalone
@@ -77,19 +77,19 @@ separate is what stops this from being relitigated.
 
 | | Claim | Strength |
 |---|---|---|
-| **A** | No Run A answer cites a governed business definition, because none exists in the lakehouse. | **Load-bearing. Cannot fail.** True by construction, every run, forever. |
-| **B** | Run A's answers vary across runs. | **Vivid. Likely, not guaranteed.** Show it live, never depend on it. |
+| **A** | No answer from Genie alone cites a governed business definition, because none exists in the lakehouse. | **Load-bearing. Cannot fail.** True by construction, every run, forever. |
+| **B** | The answers Genie alone gives vary across runs. | **Vivid. Likely, not guaranteed.** Show it live, never depend on it. |
 
 **Never build a beat on B alone.** If Genie answers the same way three times on stage, the beat
 costs nothing: it is still an answer anchored to nothing, and the presenter says so and moves on.
 
 **Corollary, and the reason this demo kept getting rewritten:** we do not predict what Genie
-answers. Genie Agent is generative and stochastic. Chasing a specific predicted answer, and then
+answers. Genie alone is generative and stochastic. Chasing a specific predicted answer, and then
 engineering data so that answer is wrong, is unwinnable. No beat in this demo contains a scripted
-Run A answer.
+answer for Genie alone.
 
 **The corollary is unchanged by section 1's revision, and the order of operations is why.** Section
-1 now allows reporting that a Run A answer is false at full depth. That permission is about
+1 now allows reporting that an answer from Genie alone is false at full depth. That permission is about
 recording what a probe found, after asking. It grants nothing to a document written before the ask.
 Writing down the answer you expect is still banned whether you expect it to be right or wrong, and a
 wrong answer you predicted is worth less than no answer at all, because you will read the transcript
@@ -100,50 +100,63 @@ findings that are flattering.
 
 ---
 
-## 3. The two runs
+## 3. The two engines
 
-**Run A, Genie Agent.** The existing Databricks Genie Spaces product. Natural language over Unity
+**Genie alone.** The existing Databricks Genie Spaces product, Genie Agent. Natural language over Unity
 Catalog. Scoped to the `supplier_risk` schema. Gets **every** instance table, including
 `supply_relationships` and `owned_by`. Knowledge store holds column descriptions and join hints
 only. No traversal, no graph algorithms, no authored business vocabulary.
 
-**Run B, Genie One.** The enterprise chat agent. Wraps that same Genie Agent and adds MCP tools,
+**Genie + Graph.** The enterprise chat agent, Genie One. Wraps that same Genie space and adds MCP tools,
 including a read-only Neo4j MCP server over the knowledge graph, plus the authored ontology of
 terms, rules, thresholds, and metrics.
 
-**Fairness rule, non-negotiable:** both runs get every table. Nothing is withheld. The gap is
+**These two names replace Run A and Run B, which this file used until 2026-07-19.** The rename is
+vocabulary only and changes no settled line. Run A is Genie alone, Run B is Genie + Graph. The
+worklog and the probe records keep the old names, because they are historical records and are
+allowed to be stale.
+
+**Fairness rule, non-negotiable:** both engines get every table. Nothing is withheld. The gap is
 grounding, not access. No graph output is ever synced back into Delta.
 
 ---
 
-## 4. The three legs
+## 4. The three steps of Beat 3
 
-The graph grounds the answer through exactly three capabilities. They appear in this order, and
-each produces its own visible output in Beat 3.
+The graph grounds the answer through exactly three capabilities. They are named **Definition**,
+**Discovery**, and **Explanation**, they appear in that order, and each produces its own visible
+output in Beat 3. Refer to them by name and never by number: Beat numbers are the only numbered
+sequence in this demo, and a second one next to them is what made the script hard to read.
 
-| Leg | Role | What it does here |
+| Step | Capability | What it does here |
 |---|---|---|
-| **Ontology** | **Definition** | What does "Critical Supplier" mean? RULE-05 says. The lakehouse has no answer to that question at all. |
-| **Graph algorithms** | **Discovery** | Which entity satisfies that definition? Betweenness names Cascade Glassworks, with nobody pointing at it. |
-| **Pattern matching** | **Explanation** | Why? Every Americas glass supplier converges on Cascade. |
+| **Definition** | Ontology | What does "Critical Supplier" mean? RULE-05 says. The lakehouse has no answer to that question at all. |
+| **Discovery** | Graph algorithms | Which entity satisfies that definition? Betweenness names Cascade Glassworks, with nobody pointing at it. |
+| **Explanation** | Pattern matching | Why? Every Americas glass supplier converges on Cascade. |
 
 **The honest caveat, said out loud:** once someone knows to start from the tier-1 suppliers,
-"which supplier feeds all of these" is a single join, and Run A can get there. This is confirmed,
-not theoretical: given the phrase "common upstream supplier," Genie wrote a correct convergence
-query on the first try. The graph-native step is the one before it, knowing which suppliers to ask
-about. **Invite that question on stage rather than hoping nobody asks it.** The question
-presupposes the finding it returns, which is the point.
+"which supplier feeds all of these" is a single join, and Genie alone can get there. The graph-native
+step is the one before it, knowing which suppliers to ask about. **Invite that question on stage
+rather than hoping nobody asks it.**
+
+**What the re-probe changed about that caveat.** It was written when Cascade sat one hop from the
+bottle makers, and it recorded that Genie wrote a correct convergence query on the first try. With
+the processor tier in between, Genie alone answers the invited question from one hop up, which lands
+on the processors rather than on the furnace, while the graph answers from the full commodity-carrying
+chain. The caveat's underlying point stands unchanged, that convergence is cheap in SQL once you know
+where to start, but "confirmed, not theoretical" no longer describes the live build and has been
+removed. Section 1 governs the narration, and Beat 3 must work whichever way Genie alone answers.
 
 ---
 
 ## 5. The five beats
 
-| # | Beat | Run | What happens |
+| # | Beat | Engine | What happens |
 |---|---|---|---|
 | 1 | Ask | Both | The diversification question, asked identically of both. |
-| 2 | Ungrounded | A | Asked three times live, in fresh conversations. |
-| 3 | Grounded | B | Definition, then discovery, then explanation. Names Cascade. |
-| 4 | Exposure | B routing to lakehouse | The graph hands over attribution, the lakehouse computes revenue. |
+| 2 | Ungrounded | Genie alone | Asked three times live, in fresh conversations. |
+| 3 | Grounded | Genie + Graph | Definition, then Discovery, then Explanation. Names Cascade. |
+| 4 | Exposure | Genie + Graph, routing to the lakehouse | The graph hands over attribution, the lakehouse computes revenue. |
 | 5 | Decision | Room | A second source that also traces to Cascade changes nothing. |
 
 **Beat 2 is live and repeated, with no scripted answer.** Ask, read what comes back, and note out
@@ -161,7 +174,7 @@ axis is correct, and that is exactly the demonstration. Do not "fix" the questio
 intended axis.
 
 **Beat 3 includes the criticality side-by-side.** Ask "what is our single biggest point of failure
-in our supply base?" of both runs. This is safe because we no longer depend on Run A's answer being
+in our supply base?" of both engines. This is safe because we no longer depend on Genie alone's answer being
 any particular thing.
 
 **Beat 4 states the causal step out loud:** you cannot ship a bottled product without bottles, so if
@@ -169,13 +182,13 @@ the furnace stops, that unit's revenue stops rather than degrades, while the oth
 shipping. The kicker: what you pay Cascade is a rounding error in procurement spend. The exposure is
 the revenue that stops when they do, not what you pay them.
 
-**Steering Run B is allowed. Scripting it is not.** Decided before the Run B probe, so the result
+**Steering Genie + Graph is allowed. Scripting it is not.** Decided before the Genie + Graph probe, so the result
 cannot argue us into either position after the fact. The presenter may ask a question that points at
 the graph, name the ontology, or ask what a Critical Supplier is, because a risk committee would ask
 exactly that and a demo of a knowledge layer is allowed to use the knowledge layer. The presenter may
-not know the answer in advance. If the probe shows Run B needs steering to reach the definition, that
-is a staging note for Beat 3 and nothing more. If it shows Run B never reaches the graph at all, that
-is a routing defect and it is the one Run B result that stops the demo.
+not know the answer in advance. If the probe shows Genie + Graph needs steering to reach the definition, that
+is a staging note for Beat 3 and nothing more. If it shows Genie + Graph never reaches the graph at all, that
+is a routing defect and it is the one Genie + Graph result that stops the demo.
 
 ---
 
@@ -183,20 +196,20 @@ is a routing defect and it is the one Run B result that stops the demo.
 
 Asked verbatim. Changing these requires changing this file.
 
-**Beat 1, to both runs:**
+**Beat 1, to both engines:**
 
 ```
 How diversified is our glass bottle supply for the Americas?
 ```
 
-**Beat 3, to both runs:**
+**Beat 3, to both engines:**
 
 ```
 What is our single biggest point of failure in our supply base?
 ```
 
 **The danger words are "depend on" and "common upstream."** Not "point of failure," which is safe
-and was probed. Beat 1 must never drift toward dependency phrasing, because that hands Run A the
+and was probed. Beat 1 must never drift toward dependency phrasing, because that hands Genie alone the
 convergence query directly.
 
 **Beat 4, to the lakehouse:** recognized revenue per business unit for the most recent full quarter.
@@ -217,11 +230,11 @@ These are the premise, not the finding. Facts are asserted, outcomes are read.
   the definition of a hidden choke point, so this is a property of an honest topology, not a plant.
   Keep it, since it is cheap and reflexes shift with model updates, but note it is **not** the last
   line of defense: the probe showed Genie does not reach for connection counts at all.
-- **Each of the three legs resolves.** RULE-05's text is retrievable, Cascade's node carries a
+- **Each of Beat 3's three steps resolves.** RULE-05's text is retrievable, Cascade's node carries a
   betweenness property, and the convergence traversal returns at least one path. This is the
   mechanical half. That the three produce *distinct visible output on stage* cannot be asserted by a
   build and is a re-probe phase exit check instead.
-- **No governed vocabulary is visible to Run A.** No table name, column name, table comment, column
+- **No governed vocabulary is visible to Genie alone.** No table name, column name, table comment, column
   comment, Genie space instruction, or example SQL contains a governed term name, rule name, or a
   `TERM-`, `RULE-`, `MEAS-`, `THR-` or `GM-` identifier. This is the assert that protects claim A.
 - **The supplier network is not a forest.** On a forest every centrality collapses to degree, which
@@ -261,7 +274,7 @@ follows as a consequence rather than as a target. So:
 - **Two honest topology iterations, maximum.**
 - If it fails twice, the diagnostic that matters is whether the sole-source assert passes. If
   sole-source passes and betweenness still does not clear, the conclusion is that betweenness is not
-  measuring what leg 2 claims it measures on this network. That is a real finding about the demo's
+  measuring what the Discovery step claims it measures on this network. That is a real finding about the demo's
   design. Stop and escalate. Do not take a third run at the topology.
 
 **The same stopping rule governs `MIN_INTERMEDIATE_FRACTION`,** the floor on how many suppliers appear
@@ -282,9 +295,9 @@ Every item was a real failure in a previous pass.
 - **Predicting Genie's answer, in any document or beat.** See section 2. Section 1 permits reporting
   that an observed answer is false at full depth. It does not permit writing down an expected answer
   of either kind before the ask.
-- **Engineering data so a predicted Run A answer fails.** This is the sharp edge of the item above
+- **Engineering data so a predicted Genie alone answer fails.** This is the sharp edge of the item above
   and it survives section 1's revision intact. A wrong answer that emerged from a topology built for
-  other reasons is evidence. The same wrong answer produced by changing the topology until Run A
+  other reasons is evidence. The same wrong answer produced by changing the topology until Genie alone
   missed is a plant, and no amount of accurate reporting afterwards converts one into the other.
 - **Framing any beat as Genie being wrong, bad, or beaten.** Section 1 allows the result and governs
   the narration: describe the mechanism, that Genie looks one level deep by default and could likely
@@ -298,7 +311,7 @@ Every item was a real failure in a previous pass.
   resolved threshold values in prose, in the generator's narrative, in beat scripts, or in diagram
   labels. The numbers belong on screen at demo time. See section 9.
 - Syncing GDS scores or graph classifications into gold tables.
-- Withholding rows from Run A.
+- Withholding rows from Genie alone.
 - A supplier spend column.
 - Running GDS live on stage. The property is precomputed.
 - Community detection. Louvain is dropped permanently; reasoning is archived in
@@ -311,18 +324,18 @@ Every item was a real failure in a previous pass.
 Nothing in this demo depends on it and nothing in this demo attacks it. Recorded here so it is not
 reopened as a question.
 
-**Also out of scope, not open:** the Run B plumbing. The operator has already stood up the Neo4j MCP
+**Also out of scope, not open:** the Genie + Graph plumbing. The operator has already stood up the Neo4j MCP
 server with schema discovery and read-only Cypher support, and the Genie space alongside it, per the
 "Genie space and MCP setup" section of `DEMO.md`. No phase builds, configures, or changes it. What
-remains is verification only: the three legs must be shown to resolve against the loaded graph, and
-Run B must be probed and recorded. Recorded here so MCP setup is not reopened as work.
+remains is verification only: Beat 3's three steps must be shown to resolve against the loaded graph, and
+Genie + Graph must be probed and recorded. Recorded here so MCP setup is not reopened as work.
 
 ---
 
 ## 9. Reseed invariance
 
 No demo artifact contains a value that a reseed would change. The data generator is RNG-driven and
-Genie Agent is stochastic, so any demo built on a specific figure is a demo waiting to break.
+Genie alone is stochastic, so any demo built on a specific figure is a demo waiting to break.
 
 **What stays pinned:** protagonist identifiers and names, the governed vocabulary, the business unit
 roster, and the structural facts in section 7. The five business units are a hardcoded literal in the
@@ -363,7 +376,7 @@ Nothing here is decided by argument. Each closes with a transcript or a build ou
 | Beat 4's exact question wording | The re-probe phase | Asked verbatim, confirmed not steered |
 | The Story 1 beat script | The re-probe phase | Written from betweenness output, never before |
 
-**Closed 2026-07-19, the spread of Run A answers to Beat 1.** Five fresh conversations, recorded in
+**Closed 2026-07-19, the spread of Genie alone answers to Beat 1.** Five fresh conversations, recorded in
 `probe-run-a.md`. Four distinct queries, verdicts spanning "not diversified" to "highly
 diversified" on identical data. Claim A held five for five, no answer cited a governed definition.
 The one-hop ceiling held five for five. Two of the five runs agreed with each other, which is why
@@ -379,11 +392,11 @@ was never found. So a claim of done cites the assert or the read-back query that
 Without one, the correct word is "believed done." Verification means reading state back from the
 live system, never that the statement was issued.
 
-**The escape hatch is closed, with no exceptions.** "If Run A does better than expected, adjust the
+**The escape hatch is closed, with no exceptions.** "If Genie alone does better than expected, adjust the
 script" is not a resolution and no longer appears anywhere. There is no expected answer to do better
 than.
 
-**Including the last one.** An earlier draft kept a single carve-out: Run A naming Cascade unprompted
+**Including the last one.** An earlier draft kept a single carve-out: Genie alone naming Cascade unprompted
 at Beat 1 meant fixing the topology rather than the beat. Deleted 2026-07-19. It was the old
 predict-and-defeat reflex surviving in one line, and it does not survive the grounding claim, because
 Genie can name Cascade and still cite no governed definition. The cost is one line of Beat 3 staging,
