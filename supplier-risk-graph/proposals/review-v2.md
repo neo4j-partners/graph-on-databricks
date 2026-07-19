@@ -114,6 +114,15 @@ weaker guarantee than the doc claims, and finding 4 was ruled "accept, clarify s
 was visible. Holding the doc edit until finding 4 is reconfirmed with the fuller picture, because if
 the write-back is instead backed out, the old wording becomes correct and no doc change is needed.
 
+**Resolved and applied (findings 3 and 4 together).** Owner reconfirmed with the fuller picture: keep
+the write-back. CONTRACT section 8's ban is clarified to target gold tables visible to Genie alone,
+noting the `classifications` table materializes Critical Supplier but is held out of the space by
+`banned_tables`. DATA_ARCHITECTURE.md is updated in all three affected passages (the `classifications`
+table row, the "Classifications" section, and the explainability paragraph) to say Critical Supplier
+is now pre-planted while Ownership Risk stays live, and that its leak-safety is now procedural rather
+than structural. README.md was already consistent. Pre-flight must verify `banned_tables` keeps the
+table out of the live space.
+
 
 **APPROVED**
 
@@ -180,6 +189,13 @@ no such map drawn yet, only the building floor plan.
 
 Create the Story 1 topology diagram: the regional clusters, the processor tier, Cascade as a narrow
 waist two tiers back, and the independent glassworks feeding the other business units.
+
+**Applied.** `story1-hidden-glassworks-topology.svg` and its 2x PNG are added at the repo root, hand
+authored in the existing repo SVG style (the existing diagrams turned out to be hand-authored SVGs,
+not Excalidraw exports, and no Excalidraw-to-SVG renderer was available; PNG rendered with
+`rsvg-convert`). It shows the two parallel chains with Cascade as the coral choke point two tiers back,
+the protected independent-furnace chains, the not-a-cut-vertex note, and the BI-versus-Graph contrast.
+No reseed-variant values. Embedded in DEMO.md's Story 1 section.
 
 **APPROVED**
 

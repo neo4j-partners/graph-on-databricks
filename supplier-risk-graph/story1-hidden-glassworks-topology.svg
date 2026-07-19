@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="720" viewBox="0 0 1120 720" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4B5563"/>
+    </marker>
+    <marker id="arrow-coral" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E1503A"/>
+    </marker>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1120" height="720" fill="#F3F2ED"/>
+
+  <!-- Title -->
+  <text x="560" y="42" text-anchor="middle" font-size="22" font-weight="bold" fill="#16233A">Story 1: the hidden glassworks</text>
+  <text x="560" y="68" text-anchor="middle" font-size="13" fill="#5C6470">One furnace sits behind every glass path into the Americas. The other units draw their glass from independent furnaces.</text>
+
+  <!-- Tier labels (left margin, right-aligned) -->
+  <text x="262" y="167" text-anchor="end" font-size="10.5" font-weight="bold" letter-spacing="0.5" fill="#8A8579">FEEDSTOCK</text>
+  <text x="262" y="245" text-anchor="end" font-size="10.5" font-weight="bold" letter-spacing="0.5" fill="#8A8579">RAW GLASS</text>
+  <text x="262" y="323" text-anchor="end" font-size="10.5" font-weight="bold" letter-spacing="0.5" fill="#8A8579">PROCESSING</text>
+  <text x="262" y="407" text-anchor="end" font-size="10.5" font-weight="bold" letter-spacing="0.5" fill="#8A8579">TIER 1</text>
+  <text x="262" y="496" text-anchor="end" font-size="10.5" font-weight="bold" letter-spacing="0.5" fill="#8A8579">BUSINESS UNIT</text>
+
+  <!-- ================= Americas chain band ================= -->
+  <rect x="280" y="100" width="300" height="430" rx="14" fill="#EAF2FB" stroke="#CFE0F2" stroke-width="1.2"/>
+  <text x="430" y="122" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0B4C7F">The Americas chain</text>
+
+  <!-- Americas nodes -->
+  <rect x="305" y="140" width="250" height="46" rx="8" fill="#FFFFFF" stroke="#66AEE8" stroke-width="1.3" filter="url(#sh)"/>
+  <text x="430" y="159" text-anchor="middle" font-size="12.5" fill="#0B4C7F"><tspan x="430">Feedstock vendors</tspan><tspan x="430" dy="15" font-size="10.5" fill="#5C6470">cullet, sand, soda ash</tspan></text>
+
+  <rect x="305" y="218" width="250" height="46" rx="8" fill="#FDECE8" stroke="#E1503A" stroke-width="2.4" filter="url(#sh)"/>
+  <text x="430" y="237" text-anchor="middle" font-size="13" font-weight="bold" fill="#C42B12"><tspan x="430">Cascade Glassworks</tspan><tspan x="430" dy="15" font-size="10" font-weight="normal" fill="#A8412B">the hidden choke point</tspan></text>
+
+  <rect x="305" y="296" width="250" height="46" rx="8" fill="#FFFFFF" stroke="#66AEE8" stroke-width="1.3" filter="url(#sh)"/>
+  <text x="430" y="324" text-anchor="middle" font-size="12.5" fill="#0B4C7F">Container-glass processors</text>
+
+  <rect x="305" y="374" width="250" height="58" rx="8" fill="#FFFFFF" stroke="#66AEE8" stroke-width="1.3" filter="url(#sh)"/>
+  <text x="430" y="399" text-anchor="middle" font-size="12.5" fill="#0B4C7F"><tspan x="430">Bottle makers</tspan><tspan x="430" dy="15" font-size="10.5" fill="#5C6470">separately qualified, clean scores</tspan></text>
+
+  <rect x="305" y="486" width="250" height="44" rx="8" fill="#E5F1FF" stroke="#3D82C4" stroke-width="1.6" filter="url(#sh)"/>
+  <text x="430" y="513" text-anchor="middle" font-size="13" font-weight="bold" fill="#0166BC">Americas</text>
+
+  <!-- Americas supplies arrows -->
+  <line x1="430" y1="186" x2="430" y2="214" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arrow-slate)"/>
+  <text x="440" y="205" font-size="9" fill="#4B5563">supplies</text>
+  <line x1="430" y1="264" x2="430" y2="292" stroke="#E1503A" stroke-width="2" marker-end="url(#arrow-coral)"/>
+  <line x1="430" y1="342" x2="430" y2="370" stroke="#E1503A" stroke-width="2" marker-end="url(#arrow-coral)"/>
+  <line x1="430" y1="432" x2="430" y2="482" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arrow-slate)"/>
+
+  <!-- ================= Other units' chains band ================= -->
+  <rect x="700" y="100" width="340" height="430" rx="14" fill="#EAF7EF" stroke="#CDE9D8" stroke-width="1.2"/>
+  <text x="870" y="122" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#166534">The other units' chains</text>
+
+  <rect x="725" y="140" width="290" height="46" rx="8" fill="#FFFFFF" stroke="#7FC69B" stroke-width="1.3" filter="url(#sh)"/>
+  <text x="870" y="167" text-anchor="middle" font-size="12.5" fill="#166534">Their own vendors</text>
+
+  <rect x="725" y="218" width="290" height="46" rx="8" fill="#E9FBF0" stroke="#1F9D55" stroke-width="1.8" filter="url(#sh)"/>
+  <text x="870" y="245" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#166534">Independent furnaces</text>
+
+  <rect x="725" y="296" width="290" height="46" rx="8" fill="#FFFFFF" stroke="#7FC69B" stroke-width="1.3" filter="url(#sh)"/>
+  <text x="870" y="324" text-anchor="middle" font-size="12.5" fill="#166534">Glass processors</text>
+
+  <rect x="725" y="374" width="290" height="58" rx="8" fill="#FFFFFF" stroke="#7FC69B" stroke-width="1.3" filter="url(#sh)"/>
+  <text x="870" y="403" text-anchor="middle" font-size="12.5" fill="#166534">Bottle makers</text>
+
+  <rect x="725" y="486" width="290" height="44" rx="8" fill="#ECFDF3" stroke="#1F9D55" stroke-width="1.6" filter="url(#sh)"/>
+  <text x="870" y="513" text-anchor="middle" font-size="13" font-weight="bold" fill="#166534">The other business units</text>
+
+  <!-- Other supplies arrows -->
+  <line x1="870" y1="186" x2="870" y2="214" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arrow-slate)"/>
+  <text x="880" y="205" font-size="9" fill="#4B5563">supplies</text>
+  <line x1="870" y1="264" x2="870" y2="292" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arrow-slate)"/>
+  <line x1="870" y1="342" x2="870" y2="370" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arrow-slate)"/>
+  <line x1="870" y1="432" x2="870" y2="482" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arrow-slate)"/>
+
+  <!-- Cascade caption -->
+  <text x="630" y="228" text-anchor="middle" font-size="9.5" font-style="italic" fill="#A8412B">sells to no unit</text>
+  <text x="630" y="240" text-anchor="middle" font-size="9.5" font-style="italic" fill="#A8412B">directly, one tier</text>
+  <text x="630" y="252" text-anchor="middle" font-size="9.5" font-style="italic" fill="#A8412B">back from tier 1</text>
+
+  <!-- Cut-vertex caption -->
+  <text x="560" y="552" text-anchor="middle" font-size="10.5" font-style="italic" fill="#5C6470">Background: regional clusters joined by bridges carrying freight, equipment and ingredients, never glass, so removing Cascade leaves the network in one component. It is not a cut vertex.</text>
+
+  <!-- ================= Contrast card ================= -->
+  <rect x="60" y="568" width="1000" height="128" rx="12" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <text x="80" y="596" font-size="12.5" font-weight="bold" fill="#16233A">What each engine sees over the same tables</text>
+
+  <circle cx="88" cy="623" r="5" fill="#3D82C4"/>
+  <text x="102" y="627" font-size="12" fill="#16233A"><tspan font-weight="bold" fill="#0166BC">BI sees:</tspan><tspan dx="4" fill="#5C6470">separately contracted bottle suppliers, a supply base that looks diversified.</tspan></text>
+
+  <circle cx="88" cy="655" r="5" fill="#E1503A"/>
+  <text x="102" y="659" font-size="12" fill="#16233A"><tspan font-weight="bold" fill="#C42B12">Graph sees:</tspan><tspan dx="4" fill="#5C6470">every commodity-carrying glass path into the Americas crosses one furnace, while the</tspan></text>
+  <text x="102" y="677" font-size="12" fill="#5C6470">other units' glass arrives through furnaces that do not.</text>
+</svg>

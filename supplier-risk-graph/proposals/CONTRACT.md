@@ -307,13 +307,20 @@ comment that describes what a Critical Supplier is without using the words passe
 breaks the demo. The editorial rule in `upload.py` stays as the human review for that, and the two
 are not interchangeable.
 
-**The actual last line of defense is the one-hop ceiling.** The re-probe phase asked ten questions
-across six phrasings against the rebuilt data, where Cascade sits two tiers back behind the
-container glass processors, and Genie alone never wrote a recursive CTE and never walked past one
-hop, including on questions phrased with "depend on" and "upstream." The dependency question now
-returns the processors and Cascade never appears. This is a repeated observation and not a
-guarantee, so it is read the way section 1 reads the convergence result: probed, clean so far, and
-not something a beat may lean on as if the next ask were bound by it.
+**The one-hop ceiling holds for natural business questions and is not a last line of defense.** The
+re-probe phase asked ten questions across six phrasings against the rebuilt data, where Cascade sits
+two tiers back behind the container glass processors, and Genie alone never wrote a recursive CTE and
+never walked past one hop, including on questions phrased with "depend on" and "upstream." The
+dependency question returns the processors and Cascade never appears. Every one of those was a natural
+business question. Asked directly to list the tier-2 and tier-3 suppliers behind the Americas bottle
+makers, Genie alone wrote the recursion, walked the chain, and named Cascade as a single point of
+failure, recorded in `Genie Agent - Americas multi-tier supply chain.pdf`. So the ceiling is a fact
+about Genie's default reflex, not a claim that it cannot recurse when told to enumerate tiers, and no
+beat may treat it as one. What actually isolates Cascade is the commodity test and the governed
+threshold: the recursion reaches Cascade as one name in an unscoped list beside non-glass suppliers,
+and cannot single it out as the glass single point of failure. Story 1 leans on the default-question
+framing of Beats 1 and 2, and the tier-enumeration shortcut is invited and answered in the fairness
+rebuttal rather than relied on to fail.
 
 **Read from the output, never asserted:** Cascade's betweenness rank, the shape of the betweenness
 distribution, and which supplier a degree count names. The rank correlation between betweenness and
@@ -373,7 +380,11 @@ Every item was a real failure in a previous pass.
 - **Quoting any value that a reseed would change.** No counts, scores, totals, currency figures, or
   resolved threshold values in prose, in the generator's narrative, in beat scripts, or in diagram
   labels. The numbers belong on screen at demo time. See section 9.
-- Syncing GDS scores or graph classifications into gold tables.
+- Syncing GDS scores or graph classifications into any gold table visible to Genie alone. The ban is
+  about space-visibility, which is the leak vector. GDS scores are never synced to Delta at all. The
+  Critical Supplier classification does materialize into the `classifications` gold table, which is
+  permitted only because `banned_tables` in `guard.py` holds that table out of the Genie space;
+  re-adding it to the space is the failure this bans.
 - Withholding rows from Genie alone.
 - A supplier spend column.
 - Running GDS live on stage. The property is precomputed.
@@ -449,7 +460,19 @@ re-probe after a model update.
 tiers back behind the container glass processors. No recursive CTE anywhere and no walk past one
 hop, including on "depend on" and "upstream" phrasings. The dependency question returns the
 processors and Cascade never appears. Closed as evidence for the one-hop ceiling as Claim B, not as
-a guarantee about future asks.
+a guarantee about future asks. This covered natural business phrasings only; an explicit
+tier-enumeration prompt breaks the ceiling, recorded in the next entry.
+
+**Finding 2026-07-19, the one-hop ceiling breaks under explicit tier enumeration.** Asked directly to
+list the tier-2 and tier-3 suppliers behind the Americas bottle makers, Genie alone wrote a recursive
+traversal of `supply_relationships`, walked the full chain, and named Cascade as a single point of
+failure. Recorded in `Genie Agent - Americas multi-tier supply chain.pdf`. This does not contradict
+section 1, which already concedes Genie can be prompted deeper, but it retires the one-hop ceiling as
+a last line of defense. What survives: the recursion is not commodity-scoped, so Cascade returns as
+one name in an unscoped list beside non-glass suppliers reachable through bridge edges, under invented
+concentration cutoffs and no governed threshold, and Claim A held with no governed definition cited.
+Story 1 leans on the default-question framing of Beats 1 and 2 and folds the tier-enumeration shortcut
+into the fairness rebuttal per section 7.
 
 **Closed 2026-07-19, the spread of Genie alone answers to Beat 1.** Five fresh conversations, recorded in
 `probe-run-a.md`. Four distinct queries, verdicts spanning "not diversified" to "highly

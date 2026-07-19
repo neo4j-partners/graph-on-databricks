@@ -110,6 +110,8 @@ keep shipping. Procurement knows its tier-1 suppliers. It does not know who they
              while the other units' glass arrives through furnaces that do not
 ```
 
+![Story 1 topology: the Americas glass chain crosses one furnace, Cascade, while the other units draw glass from independent furnaces](story1-hidden-glassworks-topology.png)
+
 Cascade is not a cut vertex: the background network has inter-cluster bridges carrying freight,
 equipment, and ingredients but never glass, so removing Cascade leaves the network in one component.
 Cascade earns its position by spanning the feedstock and processor tiers, not by being the only way
@@ -173,8 +175,9 @@ Convergence is cheap in SQL once you know where to start. "Which supplier feeds 
 short query against the tier-1 bottle makers, well within Genie alone. The graph-native step is the
 one before it: knowing which suppliers to ask about at all.
 
-Invite that question rather than hoping nobody asks it. The frozen phrasing is "do all our Americas
-glass bottle suppliers share a common upstream supplier?" With a processor tier between Cascade and
+Invite that question rather than hoping nobody asks it. The invited phrasing, distinct from the three
+questions frozen in CONTRACT section 6, is "do all our Americas glass bottle suppliers share a common
+upstream supplier?" With a processor tier between Cascade and
 the bottle makers, one hop up lands on the processors, not the furnace, so the convergence query Genie
 alone writes answers about the tier it can see. The graph, walking the commodity-carrying chain to
 full depth, answers about the tier below. Narrate the mechanism: Genie looks one level deep by default
@@ -392,7 +395,17 @@ demonstration.
   that holds is the one above.
 - **If challenged, invite the shortcut.** Counting connections over `supply_relationships` does not
   name Cascade. Ranking customers by distance to a default, or by defaults per ownership group, does
-  not return Jade. The shortcuts run, and they return a different name.
+  not return Jade. Those shortcuts run, and they return a different name.
+- **The one shortcut that does reach Cascade, conceded not hidden.** Ask plain Genie to list the
+  tier-2 and tier-3 suppliers behind the Americas bottle makers and it writes the recursion, walks the
+  chain, and names Cascade as a single point of failure. Say so plainly rather than hoping nobody
+  tries it. What it returns is an unscoped, ungoverned list: Cascade appears beside a warehousing
+  supplier and a hops supplier that are reachable only through non-glass bridge edges and are not part
+  of the glass supply at all, under concentration cutoffs Genie invents rather than the governed
+  threshold it cannot see. Genie alone surfaces Cascade as one flagged name among false positives; it
+  cannot tell you Cascade is the glass single point of failure. The commodity test and the governed
+  definition are what isolate it, and Story 1 leans on the default questions of Beats 1 and 2 rather
+  than on Genie failing to recurse.
 - **The scores are precomputed graph properties and never synced to Delta.** Writing them into a gold
   table would recreate the write-back leakage this demo removes. Do not run GDS on stage.
 

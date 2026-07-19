@@ -77,7 +77,7 @@ It exists for correctness, not for meaning. `customers` has two independent one-
 
 | Table | Business description | Columns (key) | Notes |
 |---|---|---|---|
-| `classifications` | Business-term labels assigned to customers and suppliers, with the reason that produced them | `entity_id, entity_type, term, reason, evaluated_at, rule_version` | Materializes the `CLASSIFIED_AS` edges written back from Neo4j, each carrying rule provenance. Because the two graph-native terms are never planted as edges, this table holds only the column-findable classifications, never Critical Supplier or Ownership Risk |
+| `classifications` | Business-term labels assigned to customers and suppliers, with the reason that produced them | `entity_id, entity_type, term, reason, evaluated_at, rule_version` | Materializes the `CLASSIFIED_AS` edges written back from Neo4j, each carrying rule provenance. The four column-findable terms carry these edges, and Critical Supplier now does too, written by `gds.py` from the governed threshold as a stand-in for a production batch job. Ownership Risk alone carries no edge and is resolved live, so it is the one term absent from this table. This table is held out of the Genie space by `banned_tables` in `guard.py`, which is what keeps the materialized Critical Supplier label from reaching the lakehouse-only engine |
 | `business_unit_exposure` | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_count, avg_supplier_risk, max_supplier_risk` | One row per business unit, reporting supplier count, average, and max feeding-supplier risk, ordered by supplier count |
 
 **The two gold tables must never be added to the Genie space.** They materialize the graph's answers into Delta. Re-adding them re-introduces write-back leakage, so the lakehouse-only engine could read the graph's conclusions straight from a column and tie. That leakage is the exact failure the demo is built to avoid, so the gold tables stay out of the space. See "GDS properties" below for the same rule applied to the graph algorithm scores.
@@ -253,7 +253,7 @@ That the two thresholds differ in shape is recorded rather than tidied. THR-03's
 
 Column-findable classifications are pre-planted as `CLASSIFIED_AS` edges carrying provenance (reason, evaluated-at, rule version): Jade to Strategic Account; every customer carrying a recorded default, the four Kestrel members among them, to Defaulted Customer; the background high-risk suppliers to High-Risk Supplier; the background late payers to Delinquent Customer. These are deterministic facts, and the membership of each cohort is listed under `classification_cohorts` in `data/ground_truth.json`.
 
-**The two graph-native terms are resolved live, never pre-planted.** No `CLASSIFIED_AS` edge is created for Critical Supplier or Ownership Risk. The graph engine resolves the governed definition from the ontology, then walks the graph live using the precomputed betweenness and PageRank node properties to apply it. This keeps the flag a genuine live traversal and guarantees the two graph-native labels never exist as a materializable row anywhere, so they can never leak into a gold table.
+**Ownership Risk is resolved live, never pre-planted. Critical Supplier is now pre-planted, on purpose.** No `CLASSIFIED_AS` edge is created for Ownership Risk: the graph engine resolves the governed definition from the ontology, then walks the graph live using the precomputed PageRank node properties to apply it, so that label never exists as a materializable row anywhere and cannot leak into a gold table by construction. Critical Supplier used to work the same way, and a re-probe killed that reasoning: an agent doing schema discovery saw four terms carrying classification edges and two without, applied the majority pattern to Critical Supplier, got zero rows, and reported that the system does not classify critical suppliers. So `gds.py` now writes Critical Supplier `CLASSIFIED_AS` edges from the THR-03 cohort, which materialize into the `classifications` gold table. For Critical Supplier the leak guarantee is no longer structural: the label does materialize, and what keeps it away from the lakehouse-only engine is `banned_tables` in `guard.py` holding the `classifications` table out of the Genie space. The GDS scores themselves are still never synced to Delta.
 
 ## Relationships
 
@@ -322,7 +322,7 @@ CALL (relType) {
 RETURN a, r, b;
 ```
 
-The `CLASSIFIED_AS` edge is the explainability payoff for the column-findable terms: every one traces instance to business term to rule to entity to data source. The two graph-native flags are explainable too, but through a live traversal over the precomputed graph metrics rather than a stored edge.
+The `CLASSIFIED_AS` edge is the explainability payoff: every one traces instance to business term to rule to entity to data source. The four column-findable terms carry it, and Critical Supplier now does too. Ownership Risk is the exception, explainable through a live traversal over the precomputed graph metrics rather than a stored edge.
 
 ## CSV Mapping
 
