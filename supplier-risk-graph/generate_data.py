@@ -250,7 +250,7 @@ BUSINESS_TERMS = [
     {"id": "TERM-02", "name": "Defaulted Customer", "definition": "A customer with a recorded default in the snapshot."},
     {"id": "TERM-03", "name": "Delinquent Customer", "definition": "A customer more than 60 days late on each of its last three invoices."},
     {"id": "TERM-04", "name": "High-Risk Supplier", "definition": "A supplier whose procurement risk score meets or exceeds the threshold."},
-    {"id": "TERM-05", "name": "Critical Supplier", "definition": "A supplier the network disproportionately depends on: the narrowest bridge on a business unit's multi-tier supply paths."},
+    {"id": "TERM-05", "name": "Critical Supplier", "definition": "A supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into the business run through, leaving few alternatives around it. A Critical Supplier need not sell to a business unit directly, and often does not."},
     {"id": "TERM-06", "name": "Ownership Risk", "definition": "An active customer with a clean record of its own (it carries its own invoices and is neither defaulted nor delinquent) that absorbs more failure through its ownership stakes than any other trading customer. Risk propagates from every defaulted customer in the book along OWNED_BY edges in proportion to the size of each stake, so a small holding next to a failure transmits little and a controlling chain several levels long transmits a great deal. Defaulted members and invoice-less holding companies are excluded, so the clean operating account is the headline."},
 ]
 
@@ -272,8 +272,8 @@ BUSINESS_RULES = [
      "description": "Procurement risk score at or above the supplier risk threshold.",
      "threshold": SUPPLIER_RISK_THRESHOLD},
     {"id": "RULE-05", "name": "Critical Supplier Rule",
-     "expression": "a Critical Supplier is the highest-betweenness bridge on a business unit's multi-tier SUPPLIES paths (supplier -[:SUPPLIES]-> supplier, walked transitively), at or above the supply concentration threshold",
-     "description": "The supplier the network most depends on across multi-tier SUPPLIES paths into a business unit; read from precomputed betweenness.",
+     "expression": "A supplier is a Critical Supplier when a disproportionate share of the supply paths carrying a commodity into a business unit run through it, leaving the unit few alternatives if that supplier stops. Measured as supply betweenness over the multi-tier SUPPLIES network (supplier -[:SUPPLIES]-> supplier, walked transitively), at or above the Supply Concentration Threshold.",
+     "description": "The suppliers a business unit's commodity supply concentrates on, so that losing one leaves few alternatives. Read from precomputed supply betweenness and compared against the Supply Concentration Threshold, which catches a cohort rather than a single name.",
      "threshold": ""},
     {"id": "RULE-06", "name": "Ownership Risk Rule",
      "expression": "Ownership Risk applies to a clean-record customer with its own invoices (no defaultedPeriod, not Delinquent) whose stake-weighted propagated risk over OWNED_BY edges (customer -[:OWNED_BY]-> customer, walked transitively, weighted by ownershipPct) is >= the ownership contagion threshold, propagated from every Defaulted Customer in the book; excludes the defaulted members and any invoice-less holding company",
@@ -283,8 +283,8 @@ BUSINESS_RULES = [
     # the same way RULE-04 carries "supplier.riskScore >= 70", so the measure a
     # term is MEASURED_BY traces down to real tables through EVALUATES/MAPS_TO.
     {"id": "RULE-07", "name": "Supply Exposure Rule",
-     "expression": "sum(revenue_entries.amount) over the most recent full calendar quarter, for every business unit reached by the supplier's multi-tier SUPPLIES paths",
-     "description": "The recognized revenue at risk behind a Critical Supplier: the most recent full quarter of recognized revenue for every business unit the supplier's SUPPLIES paths reach.",
+     "expression": "sum(revenue_entries.amount) over the most recent full calendar quarter, for every business unit whose entire supply of the commodity at risk runs through the supplier, counting only paths on which every supplier trades in that commodity",
+     "description": "The recognized revenue at risk behind a Critical Supplier. A business unit is exposed when every commodity-carrying supply path for the material at risk passes through that supplier, so reachability through suppliers trading in something else does not count. The graph decides which units are in scope and the lakehouse computes the amount.",
      "threshold": ""},
     {"id": "RULE-08", "name": "Credit Exposure Rule",
      "expression": "customers.creditLimit as the committed facility, with sum(invoices.amount WHERE status = 'open') as the drawn portion",
@@ -410,7 +410,7 @@ SCORED_BY = [
 # portion of that facility already drawn, never an addition to it.
 MEASURES = [
     {"id": "MEAS-01", "name": "Supply Exposure",
-     "definition": "The recognized revenue at risk behind a Critical Supplier: the most recent full quarter of recognized revenue for every business unit the supplier's multi-tier SUPPLIES paths reach.",
+     "definition": "The recognized revenue that stops when a Critical Supplier stops: the most recent full quarter of recognized revenue for every business unit whose supply of the commodity at risk depends wholly on paths through that supplier. A path that does not carry the commodity creates no dependency and is excluded.",
      "grain": "business unit and fiscal quarter",
      "aggregation": "sum(revenue_entries.amount)"},
     {"id": "MEAS-02", "name": "Credit Exposure",

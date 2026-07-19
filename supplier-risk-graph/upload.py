@@ -267,11 +267,29 @@ DERIVED_SPECS = [CLASSIFICATIONS_SPEC, EXPOSURE_SPEC]
 # is not a comment, it is the column name with extra words, and every one of
 # those dilutes the ones that matter.
 #
-# Two observed failures set the emphasis. Genie rendered euro amounts with a
-# dollar sign, so every amount and currency column says EUR outright rather than
-# leaving it a SELECT DISTINCT away. And Genie multiplied customer aggregates by
-# joining two one-to-many branches at once, so the branch tables name their
-# grain; the customer_risk_exposure metric view is the real defense there.
+# Three observed failures set the emphasis, and every comment that survives past
+# a bare definition is here because one of them happened. Genie rendered euro
+# amounts with a dollar sign, so every amount and currency column says EUR
+# outright rather than leaving it a SELECT DISTINCT away. Genie multiplied
+# customer aggregates by joining two one-to-many branches at once, so the branch
+# tables name their grain; the customer_risk_exposure metric view is the real
+# defense there. And Genie answered a regional supplier question globally, so
+# suppliers and supplier_business_units carry the bridge join path.
+#
+# The leak test is directional, and it is narrower than "no analysis". A comment
+# that helps Genie read the lakehouse is the fairness rule working: the demo
+# needs Run A sharp, because Run A looking incompetent breaks the premise just
+# as badly as Run A winning. What must never appear is a comment carrying
+# something only the graph should know: a traversal that walks tiers to a hidden
+# source, a term that pre-labels a supplier critical, or an example list that
+# points at the story's commodities. So: does this help Genie read a column, or
+# does it hand over the finding?
+#
+# Two things were cut under that test. The subcategory comment used to give
+# "glass bottles, raw glass" as examples, naming Story 1's commodity and its
+# punchline out of a fifteen-value vocabulary. And several status columns used
+# to append what the value implies ("only open rows are live exposure") rather
+# than what it is.
 SEMANTICS: dict[str, TableSemantics] = {
     "customers": TableSemantics(
         comment=(
@@ -281,14 +299,14 @@ SEMANTICS: dict[str, TableSemantics] = {
         ),
         columns={
             "segment": "Commercial tier: platinum, gold, or silver.",
-            "profitabilityTrend": "Direction of account profitability: improving, stable, or declining.",
-            "churnRisk": "Qualitative churn assessment: low, medium, or high.",
-            "avgDaysLate": "Mean days late across the customer's paid invoices. 0.0 means a clean payment record.",
+            "profitabilityTrend": "Account profitability direction: improving, stable, or declining.",
+            "churnRisk": "Churn assessment: low, medium, or high.",
+            "avgDaysLate": "Mean days late across the customer's paid invoices.",
             "overdueShare": "Fraction of the customer's invoices currently overdue, 0.0 to 1.0.",
             "creditLimit": "Total committed credit facility in EUR.",
             "defaultedPeriod": (
                 "Quarter in which the customer recorded a default, format YYYY-Qn. "
-                "Null for customers that have never defaulted."
+                "Null if the customer has never defaulted."
             ),
         },
     ),
@@ -301,15 +319,12 @@ SEMANTICS: dict[str, TableSemantics] = {
         ),
         columns={
             "category": "Procurement category: ingredients, packaging, logistics, equipment, or services.",
-            "subcategory": (
-                "Specialty within the category, for example glass bottles, raw "
-                "glass, malt, freight."
-            ),
+            "subcategory": "Specialty within the category.",
             "riskScore": "Procurement risk score, 0-100, higher is riskier.",
         },
     ),
     "business_units": TableSemantics(
-        comment="One row per business unit. The regional dimension for suppliers, customers, and revenue.",
+        comment="One row per business unit.",
         columns={
             "region": (
                 "Region code: AMER is the Americas, EMEA is Europe, Middle East and "
@@ -325,8 +340,8 @@ SEMANTICS: dict[str, TableSemantics] = {
         columns={
             "amount": "Invoice amount in EUR.",
             "currency": "ISO 4217 currency code. Every amount in this dataset is EUR; render amounts with the euro symbol.",
-            "daysLate": "Days between dueDate and payment. 0 means paid on time.",
-            "status": "Lifecycle state: paid, open, or overdue. Only open and overdue rows are live exposure.",
+            "daysLate": "Days between dueDate and payment.",
+            "status": "Lifecycle state: paid, open, or overdue.",
         },
     ),
     "revenue_entries": TableSemantics(
@@ -344,15 +359,15 @@ SEMANTICS: dict[str, TableSemantics] = {
         comment="One row per compliance finding, many per customer.",
         columns={
             "type": "Finding category: KYC, AML, or sanctions.",
-            "status": "Finding state: open or closed. Only open findings are outstanding risk.",
+            "status": "Finding state: open or closed.",
         },
     ),
     "supplier_business_units": TableSemantics(
         comment=(
             "Many-to-many bridge mapping which suppliers serve which business "
-            "units. This is the join path from suppliers to business_units, "
-            "which share no column: route through this table to scope any supplier "
-            "question to a region or unit. One row per supplier-unit pair."
+            "units. Suppliers and business_units share no column, so route through "
+            "this table to scope a supplier question to a region or unit. One row "
+            "per supplier-unit pair."
         ),
     ),
     "supply_relationships": TableSemantics(
@@ -367,9 +382,8 @@ SEMANTICS: dict[str, TableSemantics] = {
             "One row per ownership stake between customers. The customer in "
             "customer_id is owned by the customer in parent_customer_id, and "
             "ownershipPct is the fraction held, from 0 to 1. Both sides join to "
-            "customers.id. A customer can have more than one owner, so this is "
-            "not a single parent column, and ownership chains run several levels "
-            "deep."
+            "customers.id. A customer can have more than one owner, so this is not "
+            "a single parent column."
         ),
     ),
 }
