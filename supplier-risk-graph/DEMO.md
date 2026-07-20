@@ -333,6 +333,19 @@ Put to both engines:
   are holding companies: they buy nothing and carry no invoices, so there is no receivable to act on
   and no facility to cut. The definition says "an active customer" for exactly this reason. The demo
   answers which trading account is most exposed, and that is Jade.
+- **Ask for the governed term by name.** The neutral Beat 1 question can route Genie + Graph into a
+  loose delinquency-and-holdco list that never resolves the definition, the same way loose phrasing
+  routes Story 1 to whichever term sounds closest. Name Ownership Risk instead, the way Story 1 names
+  Critical Supplier. It is a term in the ontology with an authored definition, a rule, and a threshold.
+- **Questions to try, tested live before the demo.** Probe these against the live space and keep
+  whichever resolves the definition cleanest. Do not script which one lands.
+  - "Which customers have Ownership Risk?"
+  - "Using the Ownership Risk definition in the graph, which trading customer is most exposed to its
+    ownership group's defaults?"
+  - "Which active customer with a clean payment record absorbs the most failure through its ownership
+    stakes?"
+  - "Apply the Ownership Contagion Threshold from the graph and list the trading customers that clear
+    it."
 
 ### Beat 4, the exposure
 
