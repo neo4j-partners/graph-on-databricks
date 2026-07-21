@@ -1,5 +1,49 @@
 # supplier-risk-graph — CLAUDE.md
 
+## The two MCP servers are one domain, joined on id
+
+This demo is served by two MCP servers over the same supplier and customer data. Treat them as two
+views of one dataset, not two datasets.
+
+- **`genie-supplier-risk`** is the lakehouse view. It answers over the Unity Catalog `supplier_risk`
+  schema in natural language and returns rows, counts, totals, and rankings. Authoritative for
+  amounts, dates, aggregates, and the `customer_risk_exposure` metric view. Tables: `customers`,
+  `suppliers`, `invoices`, `business_units`, `revenue_entries`, `compliance_findings`, the bridge
+  tables `supplier_business_units`, `supply_relationships`, `owned_by`, and the
+  `customer_risk_exposure` metric view.
+- **`neo4j-agentcore`** is the graph view. It answers structural questions in Cypher: paths,
+  ownership chains, supply chains, betweenness, PageRank, and the governed knowledge layer.
+  Authoritative for relationships and for any authored business definition.
+
+**The join key is the `id` string, shared by construction.** A lakehouse row and its graph node
+carry the same `id`, so a value that names one names the other:
+
+| Lakehouse (Genie)                         | Graph (Neo4j)                          | Join |
+|-------------------------------------------|----------------------------------------|------|
+| `customers.id`                            | `Customer.id`                          | equal string |
+| `suppliers.id`                            | `Supplier.id`                          | equal string |
+| `invoices.id` (`.customerId` → customer)  | `Invoice.id` (`(:Customer)-[:HAS_INVOICE]->`) | equal string |
+| `business_units.id`                       | `BusinessUnit.id`                      | equal string |
+| `revenue_entries.id`                      | `RevenueEntry.id`                      | equal string |
+| `compliance_findings.id`                  | `ComplianceFinding.id`                 | equal string |
+| `supplier_business_units` bridge          | `(:Supplier)-[:SUPPLIES]->(:BusinessUnit)` | endpoint ids |
+| `supply_relationships` (`from`/`to`)      | `(:Supplier)-[:SUPPLIES]->(:Supplier)` | endpoint ids |
+| `owned_by` (`customer_id`/`parent_customer_id`, `ownershipPct`) | `(:Customer)-[:OWNED_BY]->(:Customer)` `{ownershipPct}` | endpoint ids |
+
+**Only the graph carries the knowledge layer.** The `Policy`, `Entity`, `BusinessRule`,
+`BusinessTerm`, `Measure`, `Threshold`, `DataSource`, and `GraphMetric` nodes, wired by
+`REALIZED_AS`, `DEFINED_BY`, `CLASSIFIED_AS`, and `MAPS_TO`, have no lakehouse equivalent. This is
+the grounding the tables alone do not hold. A `DataSource` node even records the `system` and
+`table` that each `Entity` maps back to, so the graph is where an authored definition points at the
+lakehouse column that realizes it. This layer is the whole reason a graph is in the demo. See the
+core-point section below.
+
+**Routing rule.** Relationship, path, chain, centrality, or "who connects to whom" and any
+definition-backed classification go to `neo4j-agentcore`. Totals, counts, rankings, amounts, and
+metric-view measures go to `genie-supplier-risk`. For a cross-source answer, get the `id` set from
+one server and look the rest up in the other on that key: graph for the structure, Genie for the
+figures, stitched on `id`.
+
 ## Read this before proposing anything about the demo
 
 Two files, and they are the whole reading list.

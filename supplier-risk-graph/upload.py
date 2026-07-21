@@ -94,6 +94,8 @@ class TableSpec:
     a dropped or renamed contract column fails offline instead of at upload.
     `inferred_types` names columns that land on the right type through inference
     alone and cannot be hinted, verified against the built table instead.
+    `exclude` names CSV columns to drop from the built table: they still ship in
+    the CSV so the graph loader keeps them, but never reach the lakehouse.
     """
 
     csv_name: str
@@ -101,6 +103,7 @@ class TableSpec:
     types: dict[str, str] = field(default_factory=dict)
     required: tuple[str, ...] = ()
     inferred_types: dict[str, str] = field(default_factory=dict)
+    exclude: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -141,14 +144,18 @@ BASE_SPECS = [
         "customers.csv",
         "customers",
         {
-            "upsellScore": "int",
-            "avgDaysLate": "float",
-            "overdueShare": "float",
             # defaultedPeriod is a string (inference is fine); only creditLimit
             # needs a hint so it lands DOUBLE, not string/int.
             "creditLimit": "number",
         },
         required=("creditLimit", "defaultedPeriod"),
+        # Predicted labels and derived scores. They stay in customers.csv so the
+        # graph loader keeps them on the Customer nodes, but they are withheld from
+        # the lakehouse table: Genie reading a pre-baked judgement that carries no
+        # authored definition is exactly the ungrounded shortcut the demo avoids.
+        # defaultedPeriod is deliberately not dropped, the Defaulted and Delinquent
+        # rules key on it.
+        exclude=("churnRisk", "profitabilityTrend", "upsellScore", "avgDaysLate", "overdueShare"),
     ),
     TableSpec("suppliers.csv", "suppliers", {"riskScore": "int"}, required=("subcategory",)),
     TableSpec("business_units.csv", "business_units"),
@@ -310,10 +317,6 @@ SEMANTICS: dict[str, TableSemantics] = {
         ),
         columns={
             "segment": "Commercial tier: platinum, gold, or silver.",
-            "profitabilityTrend": "Account profitability direction: improving, stable, or declining.",
-            "churnRisk": "Churn assessment: low, medium, or high.",
-            "avgDaysLate": "Mean days late across the customer's paid invoices.",
-            "overdueShare": "Fraction of the customer's invoices currently overdue, 0.0 to 1.0.",
             "creditLimit": "Total committed credit facility in EUR.",
             "defaultedPeriod": (
                 "Quarter in which the customer recorded a default, format YYYY-Qn. "
@@ -458,13 +461,6 @@ fields:
     expr: source.segment
     display_name: "Segment"
     synonyms: ['tier', 'customer segment']
-  - name: churn_risk
-    expr: source.churnRisk
-    display_name: "Churn Risk"
-    synonyms: ['attrition risk', 'churn']
-  - name: profitability_trend
-    expr: source.profitabilityTrend
-    display_name: "Profitability Trend"
   - name: defaulted_period
     expr: source.defaultedPeriod
     display_name: "Defaulted Period"
@@ -476,15 +472,6 @@ fields:
     expr: business_unit.region
     display_name: "Region"
     synonyms: ['geo', 'territory']
-  - name: upsell_score
-    expr: source.upsellScore
-    display_name: "Upsell Score"
-  - name: avg_days_late
-    expr: source.avgDaysLate
-    display_name: "Avg Days Late"
-  - name: overdue_share
-    expr: source.overdueShare
-    display_name: "Overdue Share"
 
 measures:
   - name: customer_count
@@ -557,6 +544,12 @@ class Config:
 
 
 def require_env(name: str, default: str | None = None) -> str:
+    """Read one env var, falling back to `default`, or exit with a usage hint.
+
+    The `or` rather than a two-argument `os.environ.get` is deliberate: an empty
+    string in .env is a variable someone left blank, not a value, so it falls
+    through to the default the same way an absent one does.
+    """
     value = os.environ.get(name) or default
     if value is None:
         sys.exit(f"Missing {name}: copy .env.sample to .env and fill it in.")
@@ -564,7 +557,13 @@ def require_env(name: str, default: str | None = None) -> str:
 
 
 def read_config() -> Config:
-    """Read connection settings from the environment (.env already loaded)."""
+    """Read connection settings from the environment (.env already loaded).
+
+    The two Databricks auth modes are exclusive. A profile names an entry in
+    ~/.databrickscfg that already carries a host and credentials, so host and
+    token are left unset rather than demanded and ignored; without a profile both
+    are required and a missing one exits here rather than at the first API call.
+    """
     profile = os.environ.get("DATABRICKS_CONFIG_PROFILE") or None
     if profile:
         host, token = None, None
@@ -589,19 +588,37 @@ def read_config() -> Config:
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
+    """Read a CSV into row dicts, values left as strings.
+
+    Only `--check` uses this. The upload path never parses the CSVs in Python: it
+    ships the bytes to the volume and lets `read_files` do the typing, so this
+    reader exists to inspect headers offline, not to feed the tables.
+    """
     with path.open(newline="") as handle:
         return list(csv.DictReader(handle))
 
 
 def schema_hints(types: dict[str, str]) -> str | None:
-    """Render a read_files schemaHints clause from a type map, or None."""
+    """Render a read_files schemaHints clause from a type map, or None.
+
+    Hints are per-column and partial: a column named here is forced to the given
+    type and every other column still goes through inference. None rather than an
+    empty string so `create_table` can leave the option off entirely for the
+    all-string tables.
+    """
     if not types:
         return None
     return ", ".join(f"{column} {SPARK_TYPES[kind]}" for column, kind in types.items())
 
 
 def rows_to_csv(columns: list[str], rows: list[dict[str, Any]]) -> bytes:
-    """Serialize query rows to CSV bytes; None becomes an empty field."""
+    """Serialize query rows to CSV bytes; None becomes an empty field.
+
+    `columns` fixes the field order rather than trusting the order the driver
+    returns, so the built table's columns match the DerivedSpec that declared
+    them. A null property in Neo4j writes as an empty field, which `read_files`
+    then reads back as NULL.
+    """
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(columns)
@@ -611,6 +628,11 @@ def rows_to_csv(columns: list[str], rows: list[dict[str, Any]]) -> bytes:
 
 
 def volume_path(cfg: Config, filename: str) -> str:
+    """The /Volumes path a CSV is uploaded to and read back from.
+
+    Unlike `fqn`, this is a filesystem path rather than an identifier, so the
+    hyphenated catalog name needs no quoting.
+    """
     return f"/Volumes/{cfg.catalog}/{cfg.schema}/{cfg.volume}/{filename}"
 
 
@@ -620,7 +642,17 @@ def fqn(cfg: Config, table: str) -> str:
 
 
 def run_sql(w: Any, cfg: Config, statement: str) -> Any:
-    """Execute one SQL statement on the warehouse, polling until it finishes."""
+    """Execute one SQL statement on the warehouse, polling until it finishes.
+
+    `wait_timeout` is the API's own maximum, so a fast statement returns
+    finished from the first call and the loop never runs. The poll covers the
+    slow cases: a warehouse cold-starting, or a CREATE TABLE over a volume file
+    that outlasts the wait. Anything other than SUCCEEDED raises, so a failed
+    statement stops the upload instead of leaving a half-built schema behind.
+
+    The SDK import is deferred to keep `--check` runnable with no databricks-sdk
+    installed and no network.
+    """
     from databricks.sdk.service.sql import StatementState
 
     response = w.statement_execution.execute_statement(
@@ -639,11 +671,22 @@ def run_sql(w: Any, cfg: Config, statement: str) -> Any:
 
 
 def count_rows(w: Any, cfg: Config, table: str) -> int:
+    """Row count of a built table, read back so the run reports what landed.
+
+    Counting the table rather than the CSV catches a load that silently dropped
+    rows, which the printed count would otherwise hide.
+    """
     response = run_sql(w, cfg, f"SELECT count(*) FROM {fqn(cfg, table)}")
     return int(response.result.data_array[0][0])
 
 
 def ensure_schema_and_volume(w: Any, cfg: Config) -> None:
+    """Create the target schema and volume if they are not already there.
+
+    Both are IF NOT EXISTS, so this is the first half of the script's
+    re-runnability: a fresh workspace and a workspace loaded ten times take the
+    same path. The catalog is not created here; it is assumed to exist.
+    """
     run_sql(w, cfg, f"CREATE SCHEMA IF NOT EXISTS `{cfg.catalog}`.`{cfg.schema}`")
     run_sql(
         w,
@@ -653,27 +696,44 @@ def ensure_schema_and_volume(w: Any, cfg: Config) -> None:
     print(f"Ensured schema `{cfg.catalog}`.`{cfg.schema}` and volume `{cfg.volume}`.")
 
 
-def create_table(w: Any, cfg: Config, table: str, filename: str, hints: str | None) -> None:
+def create_table(
+    w: Any,
+    cfg: Config,
+    table: str,
+    filename: str,
+    hints: str | None,
+    exclude: tuple[str, ...] = (),
+) -> None:
     """Build a Delta table from a CSV already uploaded to the volume.
 
     `read_files` always appends a `_rescued_data` column for values that did not
     match the inferred schema. It is null on every row here, but Genie reads it as
     a real column and the space had prompt matching switched on for it, so drop it
     rather than ship a column whose only effect is noise in the schema.
+
+    `exclude` names CSV columns to project out of the table. They are still parsed
+    by `read_files`, so the same CSV keeps feeding the graph loader, and dropped
+    from the SELECT so they never land in the lakehouse.
     """
     options = ["format => 'csv'", "header => true", "inferColumnTypes => true"]
     if hints:
         options.append(f"schemaHints => '{hints}'")
+    dropped = ", ".join(("_rescued_data", *exclude))
     run_sql(
         w,
         cfg,
         f"CREATE OR REPLACE TABLE {fqn(cfg, table)} AS "
-        f"SELECT * EXCEPT (_rescued_data) "
+        f"SELECT * EXCEPT ({dropped}) "
         f"FROM read_files('{volume_path(cfg, filename)}', {', '.join(options)})",
     )
 
 
 def upload_csv(w: Any, cfg: Config, filename: str, contents: bytes) -> None:
+    """Write CSV bytes to the volume, replacing any file already at that path.
+
+    `overwrite` is what lets a rerun pick up a regenerated dataset. Without it a
+    second run would keep the first run's file and build tables from stale rows.
+    """
     w.files.upload(volume_path(cfg, filename), io.BytesIO(contents), overwrite=True)
 
 
@@ -688,6 +748,12 @@ def sql_string(value: str) -> str:
 
 
 def apply_comments(w: Any, cfg: Config, table: str, semantics: TableSemantics) -> None:
+    """Attach one table's comment and its column comments.
+
+    One statement per comment, because Databricks has no batched form. The column
+    loop only visits columns SEMANTICS names, so a comment for a column the CSV
+    no longer has would fail here; `check_semantics` catches that offline first.
+    """
     target = fqn(cfg, table)
     run_sql(w, cfg, f"COMMENT ON TABLE {target} IS {sql_string(semantics.comment)}")
     for column, comment in semantics.columns.items():
@@ -741,11 +807,18 @@ def create_metric_view(w: Any, cfg: Config) -> None:
 
 
 def upload_base_tables(w: Any, cfg: Config, data_dir: Path) -> list[tuple[str, int]]:
+    """Upload every base CSV and build its Delta table, returning (table, rows).
+
+    The CSV is read straight to bytes and handed to the volume without being
+    parsed here, so the header stays verbatim and camelCase survives into the
+    column names. Comments and the metric view are applied afterwards, because
+    CREATE OR REPLACE TABLE inside `create_table` would drop them.
+    """
     print("Uploading base instance tables:")
     results = []
     for spec in BASE_SPECS:
         upload_csv(w, cfg, spec.csv_name, (data_dir / spec.csv_name).read_bytes())
-        create_table(w, cfg, spec.table, spec.csv_name, schema_hints(spec.types))
+        create_table(w, cfg, spec.table, spec.csv_name, schema_hints(spec.types), spec.exclude)
         rows = count_rows(w, cfg, spec.table)
         results.append((spec.table, rows))
         print(f"  {spec.table}: {rows} rows")
@@ -788,6 +861,13 @@ def verify_inferred_types(w: Any, cfg: Config) -> None:
 
 
 def read_graph_rows(cfg: Config, cypher: str) -> list[dict[str, Any]]:
+    """Run one read query against Neo4j and return the rows as dicts.
+
+    The result set is materialized inside the session because the driver's
+    records are only valid while it is open. Both gold tables are small enough
+    that holding them in memory costs nothing. As with the SDK, the neo4j import
+    is deferred so `--check` runs without the driver installed.
+    """
     from neo4j import GraphDatabase
 
     with GraphDatabase.driver(cfg.neo4j_uri, auth=cfg.neo4j_auth) as driver:
@@ -797,6 +877,12 @@ def read_graph_rows(cfg: Config, cypher: str) -> list[dict[str, Any]]:
 
 
 def upload_derived_table(w: Any, cfg: Config, spec: DerivedSpec) -> int:
+    """Query the graph, stage the answer as a CSV, and build the gold table.
+
+    The round trip through a volume CSV is what keeps this identical to the base
+    path: same `read_files` call, same schemaHints mechanism, one way that a
+    table in this schema comes into being.
+    """
     rows = read_graph_rows(cfg, spec.cypher)
     filename = f"{spec.table}.csv"
     upload_csv(w, cfg, filename, rows_to_csv(spec.columns, rows))
@@ -846,6 +932,16 @@ def check(data_dir: Path) -> None:
 
 
 def main() -> None:
+    """Parse arguments and run either the offline check or the full upload.
+
+    The upload order is not arbitrary. Schema and volume come first because
+    everything else writes into them; base tables next; type verification
+    immediately after, so a drifted column fails before anything is built on top
+    of it; then comments and the metric view, both of which CREATE OR REPLACE
+    TABLE would have discarded had they been applied earlier. Gold tables come
+    last because they depend on Neo4j rather than on anything above them, so a
+    graph that is down does not cost the lakehouse work already done.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--check",
