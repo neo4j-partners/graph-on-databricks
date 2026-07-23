@@ -1,9 +1,9 @@
 """Synthetic data generator for the supplier-risk-graph demo.
 
 Writes one CSV per node/table type and one per relationship type to data/, plus
-ground_truth.json describing the two demo stories and the new dataset counts.
+ground_truth.json describing the demo stories and the new dataset counts.
 
-The demo is built from scratch around two graph-native stories:
+The demo is built from scratch around three graph-native beats:
 
 - Story 1 (the hidden glassworks): five clean tier-1 bottle suppliers all feed
   the Americas business unit (BU-03) and are all fed by one middling-risk
@@ -15,11 +15,29 @@ The demo is built from scratch around two graph-native stories:
   further down. Nothing within two hops of Jade has failed, so no column and
   no proximity ranking ties Jade to the risk; only stake-weighted ownership
   propagation over the graph does.
+- The early-warning beat (Risky Customer): a planted near-miss cohort of
+  background customers carries payment behavior deliberately shaped to sit
+  close to the known Delinquent Customer cohort's, borderline-late invoices
+  capped just under the 60-day rule so none of them ever trips it. Paired with
+  Delinquent Customer rather than replacing it: one term is the rule that
+  already tripped, the other is the resemblance that has not tripped it yet.
+
+  What the lakehouse does and does not hold here matters, and the honest line
+  is narrower than "no column says so." The two features the rule reads,
+  avgDaysLate and overdueShare, are withheld from the lakehouse customers table
+  by upload.py, but the invoices table ships daysLate and status, so a lateness
+  ranking is available to anyone who asks for one and it will look reasonable.
+  What does not exist in the lakehouse is an authored definition of a Risky
+  Customer: which features, standardized how, against which cohort, at what
+  cutoff, under whose policy. That is the load-bearing claim and it is true by
+  construction. Do not upgrade it into a prediction about what a lateness query
+  returns; see proposals/CONTRACT.md section 2.
 
 The generator plants only the four column-findable classifications (Strategic
-Account, Defaulted Customer, Delinquent Customer, High-Risk Supplier). The two
-graph-native terms (Critical Supplier, Ownership Risk) are resolved live at
-demo time and are never pre-planted.
+Account, Defaulted Customer, Delinquent Customer, High-Risk Supplier), plus the
+near-miss cohort's payment behavior (not a classification itself). The three
+graph-native terms (Critical Supplier, Ownership Risk, Risky Customer) are
+resolved live at demo time and are never pre-planted.
 
 Reproducible: the RNG seed is fixed, and all daysLate values are computed once at
 generation time and stored. The as-of date defaults to today, so a run on a
@@ -37,6 +55,7 @@ import itertools
 import json
 import math
 import random
+import statistics
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
@@ -70,6 +89,11 @@ N_PLATINUM = 60
 N_GOLD = 140
 N_STRATEGIC_BG = 6  # background platinum accounts also flagged Strategic, for realism
 N_DELINQUENT = 15  # background customers planted to satisfy the Delinquent rule
+# Background customers planted with borderline-late payment behavior: close to
+# the Delinquent cohort's profile by construction, never over the 60-day line
+# that would trip RULE-03 itself. This is the raw material gds.py's kNN pass
+# resolves into the Risky Customer cohort; see near_miss_invoice.
+N_NEAR_MISS = 8
 # The supplier-to-supplier network is SUP_CLUSTERS regional clusters, each webbed
 # internally and joined to the others by several bridges. SUP_WEB_CHORD_RATIO
 # sets how many extra edges each cluster gets beyond the spanning tree that
@@ -196,6 +220,28 @@ MIN_SUPPLY_TIERS = 4
 # known until betweenness has run. The resolved cutoff is an output. This is the
 # input.
 SUPPLY_CONCENTRATION_PERCENTILE = 95
+
+# THR-05, the Customer Similarity Threshold, and the neighbourhood size it reads.
+# Both are governed parameters fixed here before any similarity is computed, the
+# same ordering THR-03 is built on and for the same reason.
+#
+# THR-05 deliberately does NOT follow THR-04's shape. THR-04 is a fitted cutoff
+# placed between a protagonist and the runner-up, kept only because
+# proposals/CONTRACT.md section 8 bans redesigning Story 2, and section 8 bans
+# post-hoc thresholds everywhere else. A new threshold copying it would import
+# the one pattern the contract grandfathers rather than endorses.
+#
+# Unlike THR-03 this needs no resolution pass. A percentile has to be mapped onto
+# a betweenness distribution before it names a number, but a neighbour share is
+# already on the metric's own scale, so the governed parameter and the cutoff are
+# the same value and gds.py reads it rather than fitting it. That makes the
+# "authored before the data was scored" claim checkable from this file alone.
+#
+# Both are conventional round values, not tuned ones: 10 is the GDS topK default,
+# and half is the plainest governed English a committee would write. Who clears
+# the threshold is an output, and the cohort is not the planted list.
+DELINQUENCY_NEIGHBOURS = 10
+DELINQUENCY_NEIGHBOUR_SHARE = 0.5
 
 # Filler risk scores are remapped from a uniform draw onto this right-skewed
 # triangular shape (low, high, mode). Most filler suppliers land in a healthy
@@ -383,7 +429,7 @@ BU_IDS = [bu["id"] for bu in BUSINESS_UNITS]
 
 # --- The rebuilt knowledge layer (ontology). Entities and data sources are
 # contiguous and paired by position; every governed concept earns its place in
-# one of the two stories or the background contrast. ---
+# one of the three stories or the background contrast. ---
 ENTITIES = [
     {"id": "ENT-01", "name": "Customer", "description": "A party that buys goods or services from the company."},
     {"id": "ENT-02", "name": "Supplier", "description": "A party that provides goods or services to the company."},
@@ -412,6 +458,12 @@ BUSINESS_TERMS = [
     {"id": "TERM-04", "name": "High-Risk Supplier", "definition": "A supplier whose procurement risk score meets or exceeds the threshold."},
     {"id": "TERM-05", "name": "Critical Supplier", "definition": "A supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it. A Critical Supplier need not sell to a business unit directly, and often does not."},
     {"id": "TERM-06", "name": "Ownership Risk", "definition": "An active customer with a clean record of its own (it carries its own invoices and is neither defaulted nor delinquent) that absorbs more failure through its ownership stakes than any other trading customer. Risk propagates from every defaulted customer in the book along OWNED_BY edges in proportion to the size of each stake, so a small holding next to a failure transmits little and a controlling chain several levels long transmits a great deal. Defaulted members and invoice-less holding companies are excluded, so the clean operating account is the headline."},
+    # "half" is written out rather than computed from
+    # DELINQUENCY_NEIGHBOUR_SHARE for the same reason THR-03's basis spells out
+    # its percentile suffix: this is the sentence a risk committee reads aloud,
+    # and "at least 50% of the 10" is not how one is written. If the constant
+    # ever moves off a half, this string is a place that has to move with it.
+    {"id": "TERM-07", "name": "Risky Customer", "definition": f"An active customer, neither defaulted nor already Delinquent, whose payment behavior places it among the delinquent cohort's nearest neighbours: at least half of the {DELINQUENCY_NEIGHBOURS} customers it most resembles on how late it pays and how much of its book sits overdue have already been classified Delinquent. The early-warning counterpart to Delinquent Customer, catching the resemblance before the last-three-invoices rule trips."},
 ]
 
 BUSINESS_RULES = [
@@ -450,6 +502,14 @@ BUSINESS_RULES = [
      "expression": "customers.creditLimit as the committed facility, with sum(invoices.amount WHERE status = 'open') as the drawn portion",
      "description": "The credit exposure on a customer is its total committed credit facility. The open invoice balance is the drawn portion of that facility, never an addition to it.",
      "threshold": ""},
+    # RULE-09 carries its threshold inline from here, the way the four
+    # column-findable rules do and unlike RULE-05/RULE-06, which ship empty and
+    # are backfilled by gds.py. The difference is that THR-05 is knowable before
+    # the run: see the DELINQUENCY_NEIGHBOUR_SHARE comment.
+    {"id": "RULE-09", "name": "Risky Customer Rule",
+     "expression": f"A customer is a Risky Customer when it is neither defaulted nor already classified Delinquent, and at least the Customer Similarity Threshold share of its {DELINQUENCY_NEIGHBOURS} nearest neighbours by payment behavior (standardized avgDaysLate and overdueShare, k-nearest-neighbor over the Customer set) are themselves classified Delinquent Customers.",
+     "description": "The early-warning counterpart to Delinquent Customer: customers whose payment behavior already sits inside the delinquent cohort's neighbourhood, surfaced by graph similarity before the last-three-invoices rule catches them. Read from the precomputed delinquency similarity score and compared against the Customer Similarity Threshold. It catches a cohort rather than a single name, and the cohort is an output of the scoring rather than a list.",
+     "threshold": DELINQUENCY_NEIGHBOUR_SHARE},
 ]
 
 POLICIES = [
@@ -484,6 +544,13 @@ THRESHOLDS = [
     # redesigning Story 2. Leaving it empty documents which thresholds are
     # governed and which are not.
     {"id": "THR-04", "name": "Ownership Contagion Threshold", "value": "", "currency": "", "basis": ""},
+    # THR-05 is the third shape and the only one that carries both columns. Its
+    # governed parameter is a neighbour share, which is already on the scale of
+    # the metric it governs, so there is nothing for gds.py to resolve and the
+    # value is authored here alongside the basis. See the
+    # DELINQUENCY_NEIGHBOUR_SHARE comment for why it does not copy THR-04.
+    {"id": "THR-05", "name": "Customer Similarity Threshold", "value": DELINQUENCY_NEIGHBOUR_SHARE, "currency": "",
+     "basis": f"Review any active customer where at least half of its {DELINQUENCY_NEIGHBOURS} nearest neighbours by payment behavior are already Delinquent Customers."},
 ]
 
 # term -> defining rule, stated explicitly. RULE-07/RULE-08 define measures rather
@@ -497,6 +564,7 @@ DEFINED_BY = [
     {"term_id": "TERM-04", "rule_id": "RULE-04"},
     {"term_id": "TERM-05", "rule_id": "RULE-05"},
     {"term_id": "TERM-06", "rule_id": "RULE-06"},
+    {"term_id": "TERM-07", "rule_id": "RULE-09"},
 ]
 
 # rule -> entities it reads.
@@ -514,6 +582,7 @@ EVALUATES = [
     {"rule_id": "RULE-07", "entity_id": "ENT-03"},  # Supply Exposure -> BusinessUnit
     {"rule_id": "RULE-08", "entity_id": "ENT-04"},  # Credit Exposure -> Invoice
     {"rule_id": "RULE-08", "entity_id": "ENT-01"},  # Credit Exposure -> Customer
+    {"rule_id": "RULE-09", "entity_id": "ENT-01"},  # Risky Customer -> Customer
 ]
 
 CONSTRAINS = [
@@ -533,6 +602,7 @@ GOVERNS = [
     {"policy_id": "POL-02", "rule_id": "RULE-05"},  # Supply Chain -> Critical Supplier
     {"policy_id": "POL-02", "rule_id": "RULE-07"},  # Supply Chain -> Supply Exposure
     {"policy_id": "POL-01", "rule_id": "RULE-08"},  # Credit Risk -> Credit Exposure
+    {"policy_id": "POL-01", "rule_id": "RULE-09"},  # Credit Risk -> Risky Customer
 ]
 
 APPLIES_TO = [
@@ -540,6 +610,7 @@ APPLIES_TO = [
     {"threshold_id": "THR-02", "term_id": "TERM-03"},  # Late Payment -> Delinquent
     {"threshold_id": "THR-03", "term_id": "TERM-05"},  # Supply Concentration -> Critical Supplier
     {"threshold_id": "THR-04", "term_id": "TERM-06"},  # Ownership Contagion -> Ownership Risk
+    {"threshold_id": "THR-05", "term_id": "TERM-07"},  # Customer Similarity -> Risky Customer
 ]
 
 # Each logical entity maps 1:1 to the data source in the same position.
@@ -563,9 +634,10 @@ RULE_THRESHOLDS = [
     {"rule_id": "RULE-04", "threshold_id": "THR-01"},  # High-Risk Supplier -> Supplier Risk
     {"rule_id": "RULE-05", "threshold_id": "THR-03"},  # Critical Supplier -> Supply Concentration
     {"rule_id": "RULE-06", "threshold_id": "THR-04"},  # Ownership Risk -> Ownership Contagion
+    {"rule_id": "RULE-09", "threshold_id": "THR-05"},  # Risky Customer -> Customer Similarity
 ]
 
-# The graph metrics behind the two graph-native terms. These name formally what
+# The graph metrics behind the three graph-native terms. These name formally what
 # the rule text only says in prose, so the governed vocabulary is reachable from
 # the metric a result set carries (Supplier.betweenness, Customer.pagerank).
 GRAPH_METRICS = [
@@ -575,12 +647,16 @@ GRAPH_METRICS = [
     {"id": "GM-02", "name": "Ownership Contagion", "nodeLabel": "Customer",
      "property": "pagerank", "algorithm": "weighted personalized gds.pageRank",
      "description": "Stake-weighted personalized PageRank seeded on every defaulted customer in the book and propagated over OWNED_BY, with ownershipPct as the relationship weight. Stored on Customer.pagerank and governs the Ownership Risk term: the higher the score, the more failure actually reaches that customer through the stakes held in it. Distance alone does not raise the score, because a token holding transmits almost nothing."},
+    {"id": "GM-03", "name": "Delinquency Similarity", "nodeLabel": "Customer",
+     "property": "delinquencySimilarity", "algorithm": "gds.knn",
+     "description": f"The share of a customer's {DELINQUENCY_NEIGHBOURS} nearest neighbours that are already classified Delinquent Customers. Neighbours are found by k-nearest-neighbor over the Customer set on two standardized payment-behavior features, avgDaysLate and overdueShare; standardizing first is what stops the feature on the wider scale from deciding the neighbourhood on its own. Stored on Customer.delinquencySimilarity and governs the Risky Customer term. Because it is a share of a fixed neighbourhood it runs from 0 to 1 and is directly comparable against the Customer Similarity Threshold."},
 ]
 
 # term -> the graph metric that detects it (how the risk is found).
 SCORED_BY = [
     {"term_id": "TERM-05", "metric_id": "GM-01"},  # Critical Supplier -> betweenness
     {"term_id": "TERM-06", "metric_id": "GM-02"},  # Ownership Risk -> pagerank
+    {"term_id": "TERM-07", "metric_id": "GM-03"},  # Risky Customer -> kNN similarity
 ]
 
 # The governed measures (C2): what a risk is worth, as opposed to what it is.
@@ -602,6 +678,10 @@ MEASURES = [
 MEASURED_BY = [
     {"term_id": "TERM-05", "measure_id": "MEAS-01"},  # Critical Supplier -> Supply Exposure
     {"term_id": "TERM-06", "measure_id": "MEAS-02"},  # Ownership Risk -> Credit Exposure
+    # Risky Customer reuses Credit Exposure rather than earning its own measure:
+    # RULE-08 reaches the invoices table, which RULE-09 alone (Customer only)
+    # does not, so the fourth hop still buys something new for Beat 4.
+    {"term_id": "TERM-07", "measure_id": "MEAS-02"},  # Risky Customer -> Credit Exposure
 ]
 
 # measure -> defining rule. Kept in its own file because defined_by.csv is keyed
@@ -732,8 +812,16 @@ def make_customers(rng: random.Random) -> tuple[list[dict], dict[str, list[str]]
     strategic_bg = rng.sample(platinum, N_STRATEGIC_BG)
     delinquent_pool = [c["id"] for c in customers if c["segment"] in ("gold", "silver")]
     delinquent_bg = rng.sample(delinquent_pool, N_DELINQUENT)
+    # Drawn from the same pool, minus the delinquents themselves, so a near-miss
+    # customer is never also the planted-delinquent one.
+    near_miss_pool = [cid for cid in delinquent_pool if cid not in set(delinquent_bg)]
+    near_miss_bg = rng.sample(near_miss_pool, N_NEAR_MISS)
 
-    cohorts = {"strategic_bg": strategic_bg, "delinquent_bg": delinquent_bg}
+    cohorts = {
+        "strategic_bg": strategic_bg,
+        "delinquent_bg": delinquent_bg,
+        "near_miss_bg": near_miss_bg,
+    }
     return customers, cohorts
 
 
@@ -1264,7 +1352,34 @@ def open_ontime_invoice(rng: random.Random, inv_id: str, customer_id: str) -> di
     return _invoice(inv_id, customer_id, rng.uniform(40_000, 90_000), issue, due, None, 0, "open")
 
 
-def make_invoices(rng: random.Random, customers: list[dict], delinquent: set[str]) -> list[dict]:
+def near_miss_invoice(rng: random.Random, inv_id: str, customer_id: str) -> dict:
+    """A borderline-late invoice for the planted near-miss cohort.
+
+    daysLate is drawn from 45-60, the top of the range background_invoice ever
+    produces and never past it, so compute_delinquent's strict `> 60` never
+    trips no matter how the last three sort. Status is "overdue" (still unpaid)
+    far more often than a background invoice's, which is what pushes
+    overdueShare toward the delinquent cohort's without moving daysLate past
+    the line. issue is old enough that dueDate always falls before AS_OF, so
+    every invoice in this customer's book actually carries the skew instead of
+    diluting it with a share of not-yet-due invoices.
+    """
+    issue = AS_OF - timedelta(days=rng.randint(90, 380))
+    due = issue + timedelta(days=30)
+    amount = rng.uniform(800, 45_000)
+    days_late = rng.randint(45, 60)
+    if rng.random() < 0.7:
+        return _invoice(inv_id, customer_id, amount, issue, due, None, days_late, "overdue")
+    return _invoice(inv_id, customer_id, amount, issue, due,
+                    due + timedelta(days=days_late), days_late, "paid")
+
+
+def make_invoices(
+    rng: random.Random,
+    customers: list[dict],
+    delinquent: set[str],
+    near_miss: set[str],
+) -> list[dict]:
     invoices = []
     counter = 0
 
@@ -1287,6 +1402,9 @@ def make_invoices(rng: random.Random, customers: list[dict], delinquent: set[str
                 invoices.append(settled_invoice(rng, next_id(), cid))
             for days_late in sorted(rng.sample(range(65, 121), 3), reverse=True):
                 invoices.append(overdue_invoice(rng, next_id(), cid, days_late))
+        elif cid in near_miss:
+            for _ in range(n):
+                invoices.append(near_miss_invoice(rng, next_id(), cid))
         else:
             for _ in range(n):
                 invoices.append(background_invoice(rng, next_id(), cid))
@@ -1712,6 +1830,68 @@ def check_story2(customers: list[dict], invoices: list[dict],
             f"{holdco} is a holding company and has no findings"
 
 
+def check_near_miss(
+    customers: list[dict],
+    delinquent: set[str],
+    defaulted: set[str],
+    near_miss: set[str],
+) -> None:
+    """The planted near-miss cohort must resemble Delinquent without having failed.
+
+    Two failure directions, and both would silently break the Risky Customer
+    beat without failing anything else.
+
+    The first is that a near-miss customer has already failed. If a near-miss id
+    lands in `delinquent`, near_miss_invoice's 45-60 day cap slipped and RULE-03
+    fired on a customer this beat needs to read as not-yet-delinquent. The
+    defaulted check covers the same hole from the other side: `near_miss_pool`
+    excludes the delinquents by construction, but `defaultedPeriod` is set later
+    during ownership-group assembly from an independent draw, so nothing stops a
+    near-miss id also becoming a default. An already-defaulted account cannot be
+    an early warning about anything.
+
+    The second is that the plant did not take. The whole point of
+    near_miss_invoice is to push these customers into the delinquent cohort's
+    neighbourhood, and if their payment behavior stays with the background
+    population then gds.py's kNN pass has nothing to find.
+
+    That second check is stated as a relationship between the three populations,
+    per proposals/CONTRACT.md section 9, and not as a floor on either feature.
+    Absolute floors were what this function used to assert, and they were both
+    unreseedable and weaker than the thing they stood in for: what the beat needs
+    is not that avgDaysLate cleared some number, it is that the near-miss cohort
+    reads as delinquent-like rather than as ordinary. Comparing medians says
+    exactly that and survives a reseed that moves every underlying figure.
+    """
+    for cid, why in ((delinquent, "delinquent"), (defaulted, "defaulted")):
+        overlap = near_miss & cid
+        assert not overlap, (
+            f"near-miss customers must never already be {why}: {sorted(overlap)}. "
+            f"The Risky Customer term is an early warning about accounts that "
+            f"have not failed yet.")
+
+    by_id = {c["id"]: c for c in customers}
+    failed = delinquent | defaulted
+    background = [
+        c for c in customers if c["id"] not in near_miss and c["id"] not in failed
+    ]
+    for feature in ("avgDaysLate", "overdueShare"):
+        planted = statistics.median(by_id[cid][feature] for cid in near_miss)
+        delinquent_median = statistics.median(by_id[cid][feature] for cid in delinquent)
+        background_median = statistics.median(c[feature] for c in background)
+        # Inside the delinquent cohort's range, and clear of the background's.
+        # Stated against medians so one extreme customer on either side cannot
+        # decide it.
+        assert planted >= background_median, (
+            f"the planted near-miss cohort's median {feature} ({planted}) does not "
+            f"exceed the ordinary background population's ({background_median}), so "
+            f"it reads as an ordinary customer and the kNN pass has nothing to catch")
+        assert planted >= delinquent_median / 2, (
+            f"the planted near-miss cohort's median {feature} ({planted}) has "
+            f"drifted far below the Delinquent cohort's ({delinquent_median}), so "
+            f"it no longer sits in that cohort's neighbourhood")
+
+
 def check_ownership(customers: list[dict], owned_by: list[dict]) -> None:
     """The two shortcuts that would let SQL answer Story 2 must both be dead.
 
@@ -1929,8 +2109,8 @@ def check_ontology() -> None:
         grounded = entities & mapped_entities
         assert grounded, f"{measure_id} -> {rule_id} reaches no mapped data source"
 
-    # Both graph-native terms carry exactly one metric and exactly one measure.
-    for term_id in ("TERM-05", "TERM-06"):
+    # Every graph-native term carries exactly one metric and exactly one measure.
+    for term_id in ("TERM-05", "TERM-06", "TERM-07"):
         metrics = [r for r in SCORED_BY if r["term_id"] == term_id]
         measures = [r for r in MEASURED_BY if r["term_id"] == term_id]
         assert len(metrics) == 1, f"{term_id} must have exactly one SCORED_BY metric"
@@ -1973,7 +2153,7 @@ def check_ontology() -> None:
     # Term-name salience: each graph-native rule must name its own term.
     by_rule = {r["id"]: r for r in BUSINESS_RULES}
     for term in BUSINESS_TERMS:
-        if term["id"] not in ("TERM-05", "TERM-06"):
+        if term["id"] not in ("TERM-05", "TERM-06", "TERM-07"):
             continue
         rule = by_rule[term_rule[term["id"]]]
         assert term["name"] in rule["expression"], \
@@ -1985,7 +2165,7 @@ def check_ontology() -> None:
 
     # Every new rule is governed by a policy, so the governance shape stays whole.
     governed = {row["rule_id"] for row in GOVERNS}
-    for rule_id in ("RULE-07", "RULE-08"):
+    for rule_id in ("RULE-07", "RULE-08", "RULE-09"):
         assert rule_id in governed, f"{rule_id} is governed by no policy"
 
     # Path depth from a term to its tables, which is not the same on both paths.
@@ -2071,7 +2251,8 @@ def main() -> None:
     owned_by = make_ownership(rng, customers)
 
     delinquent_set = set(cohorts["delinquent_bg"])
-    invoices = make_invoices(rng, customers, delinquent_set)
+    near_miss_set = set(cohorts["near_miss_bg"])
+    invoices = make_invoices(rng, customers, delinquent_set, near_miss_set)
 
     # Finalize Jade's credit line. creditLimit means the same thing on every row:
     # the total committed facility. Jade's is pinned to the top of the platinum
@@ -2110,9 +2291,9 @@ def main() -> None:
     strategic_accounts = [JADE_ID] + cohorts["strategic_bg"]
     defaulted_customers = sorted(c["id"] for c in customers if c["defaultedPeriod"])
 
-    # Pre-planted classifications: only the four column-findable terms. The two
-    # graph-native terms (Critical Supplier, Ownership Risk) resolve live and
-    # are never planted here.
+    # Pre-planted classifications: only the four column-findable terms. The
+    # graph-native terms are never planted here: gds.py derives Critical
+    # Supplier and Risky Customer, while Ownership Risk resolves live.
     classified_as = []
     for cid in strategic_accounts:
         classified_as.append({
@@ -2156,6 +2337,12 @@ def main() -> None:
     check_supply_structure(supply_rels)
     check_story1(suppliers, supplies, supply_rels)
     check_story2(customers, invoices, findings, delinquent_set, strategic_ids)
+    check_near_miss(
+        customers,
+        set(delinquent),
+        {c["id"] for c in customers if c["defaultedPeriod"]},
+        near_miss_set,
+    )
     check_ownership(customers, owned_by)
     check_exposure(revenue_entries, customers, bu03_last_quarter, jade_exposure)
     check_referential(customers, suppliers, supply_rels, owned_by)
@@ -2271,6 +2458,12 @@ def main() -> None:
             "delinquent_customers": sorted(delinquent),
             "strategic_accounts": sorted(strategic_accounts),
             "defaulted_customers": sorted(defaulted_customers),
+            # Planted raw material for the Risky Customer beat, not a
+            # classification itself: gds.py's kNN pass derives its own cohort
+            # from the score distribution and checks these ids land in it,
+            # the same way assert_betweenness checks Cascade against THR-03
+            # rather than writing CLASSIFIED_AS from a hand-picked id.
+            "near_miss_customers": sorted(near_miss_set),
         },
     }
     gt_path = DATA_DIR / "ground_truth.json"

@@ -333,6 +333,21 @@ Put to both engines:
   are holding companies: they buy nothing and carry no invoices, so there is no receivable to act on
   and no facility to cut. The definition says "an active customer" for exactly this reason. The demo
   answers which trading account is most exposed, and that is Jade.
+
+#### Keep the customer status simple
+
+For the demo output, present one mutually exclusive status per customer:
+
+- **Defaulted:** the customer has a recorded default.
+- **High Risk:** the customer has not defaulted and qualifies for Ownership Risk.
+- **Other:** every remaining customer.
+
+Apply the statuses in that order so a defaulted customer never also appears as High Risk. **High Risk
+is a presentation label, not another business term in the ontology.** The graph can retain the richer
+definitions and provenance behind the result while the audience sees three action queues. Story 2 then
+has one simple reveal: Jade moves from Other in an account-level view to High Risk in the governed
+graph view.
+
 - **Ask for the governed term by name.** The neutral Beat 1 question can route Genie + Graph into a
   loose delinquency-and-holdco list that never resolves the definition, the same way loose phrasing
   routes Story 1 to whichever term sounds closest. Name Ownership Risk instead, the way Story 1 names

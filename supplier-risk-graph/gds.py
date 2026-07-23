@@ -1,6 +1,6 @@
 """Phase 2 graph analytics for the sharpened supplier-risk-graph demo.
 
-Runs the two graph algorithms that the two demo stories turn on, with the
+Runs the three graph algorithms that the three demo stories turn on, with the
 graphdatascience Python client, and writes the results back into Neo4j as node
 properties only. Nothing here is ever synced to Delta: the whole point of the
 sharpened demo is that these graph-native signals live in the graph and no
@@ -29,8 +29,24 @@ lakehouse column carries them, so plain Genie cannot see them.
      accounts sitting next door to a default hold only a few percent of it.
      Written back as a pagerank property on every Customer node.
 
-Both algorithms then set the two graph-native thresholds that had no value until
-the scores existed, and they are set by opposite logic. The Supply Concentration
+  3. Payment-behaviour kNN (the Risky Customer early warning). Projects the
+     Customer nodes with their two payment-behaviour features, avgDaysLate and
+     overdueShare, scales the pair to z-scores as one vector, and runs gds.knn
+     to find each customer's nearest neighbours in that space. The metric is
+     then the share of those neighbours already classified Delinquent, so a
+     customer scores by the company its payment behaviour keeps rather than by
+     any threshold on its own columns. Written back as a delinquencySimilarity
+     property on every Customer node.
+
+     This is the early-warning counterpart to the Delinquent Customer rule: one
+     term is the rule that already tripped, the other is the resemblance that
+     has not tripped it yet. The neighbourhoods are computed over every
+     customer, because the delinquent accounts have to be in the candidate set
+     for anything to be near them, while the classification is applied only to
+     customers that have not already failed.
+
+Algorithms 1 and 2 then set the two graph-native thresholds that had no value
+until the scores existed, and they are set by opposite logic. The Supply Concentration
 Threshold (THR-03) resolves a governed percentile, fixed in the generator before
 any score existed, against the distribution this run produced; it catches a
 cohort, and how many suppliers are in it is an output. The Ownership Contagion
@@ -40,22 +56,31 @@ THR-03: that is a redesign of Story 2 rather than a tidy-up. Both are written
 onto the live Threshold nodes and back into data/thresholds.csv (graph-only,
 never uploaded to Unity Catalog), so a reload carries them.
 
-Two knowledge-layer bindings follow, both from the same computed values. The
+THR-05, the Customer Similarity Threshold, is the exception and is the shape to
+copy for anything new. Its governed parameter is a neighbour share, already on
+the same scale as the metric it governs, so there is nothing to resolve: it is
+authored in the generator before any similarity is computed and this file only
+verifies that the graph carries the value it screened against. Do not convert it
+to a fitted cutoff for symmetry with THR-04.
+
+Knowledge-layer bindings follow from the same computed values. The
 cutoffs are backfilled onto RULE-05 and RULE-06 as an inline threshold property,
 so the graph-native rules carry their number the way the four column-findable
 rules already do. And the governing term name is written onto every node that
 carries the metric, so the governed vocabulary travels with the score into any
-result set. Neither materializes a classification: every Supplier carries the
-same term string whether or not it clears the cutoff.
+result set. Risky Customer also materializes a governed `CLASSIFIED_AS` edge and
+its delinquent-neighbour evidence because it is an operational early-warning
+cohort. The governing property still travels on every Customer, whether or not
+the customer clears the screen.
 
 The build fails loud if either plant is wrong: Cascade must clear THR-03 in a
 cohort with more than one member, and Jade must be the top trading customer by
 weighted contagion. Where Cascade ranks is reported and is not a pass
 condition. PageRank convergence is checked before its scores are used, since
 the contagion cutoff is placed from them to six decimal places. Deterministic
-given the fixed-seed data. Re-runnable: both graph
-projections are dropped on entry and exit, and the write-backs overwrite in
-place.
+given the fixed-seed data. Re-runnable: all three graph projections are dropped
+on entry and exit, derived Risky Customer evidence and labels are replaced, and
+the remaining write-backs overwrite in place.
 
 Run from the project directory after load.py:
 
@@ -84,7 +109,8 @@ from graphdatascience import GraphDataScience
 # place it can be changed and one commit that shows when it was fixed. The
 # generator is import-safe: everything below its main guard is data.
 from generate_data import (
-    EVALUATED_AT,
+    DELINQUENCY_NEIGHBOUR_SHARE,
+    DELINQUENCY_NEIGHBOURS,
     RULE_VERSION,
     SUPPLY_CONCENTRATION_PERCENTILE,
 )
@@ -93,17 +119,21 @@ HERE = Path(__file__).parent
 
 SUPPLIER_GRAPH = "supplierNetwork"
 OWNERSHIP_GRAPH = "ownershipNetwork"
+BEHAVIOUR_GRAPH = "customerBehaviour"
 
 CONCENTRATION_THRESHOLD_ID = "THR-03"  # Supply Concentration Threshold
 CONTAGION_THRESHOLD_ID = "THR-04"  # Ownership Contagion Threshold
+SIMILARITY_THRESHOLD_ID = "THR-05"  # Customer Similarity Threshold
 
 CONCENTRATION_RULE_ID = "RULE-05"  # Critical Supplier Rule
 CONTAGION_RULE_ID = "RULE-06"  # Ownership Risk Rule
+RISKY_CUSTOMER_RULE_ID = "RULE-09"  # Risky Customer Rule
 
 DELINQUENT_TERM_ID = "TERM-03"  # Delinquent Customer, a CLASSIFIED_AS edge
 
 CRITICAL_SUPPLIER_TERM = "Critical Supplier"  # TERM-05, governs Supplier.betweenness
 OWNERSHIP_RISK_TERM = "Ownership Risk"  # TERM-06, governs Customer.pagerank
+RISKY_CUSTOMER_TERM = "Risky Customer"  # TERM-07, governs Customer.delinquencySimilarity
 
 TOP_N_PRINT = 6  # how many ranked rows to echo for eyeballing on stage
 # How deep report_degree_overlap compares the two rankings. Wider than
@@ -129,6 +159,42 @@ PAGERANK_CONFIG = {
     "dampingFactor": 0.85,
     "maxIterations": 200,
     "tolerance": 1e-9,
+    "concurrency": 1,
+}
+
+# The scaled feature vector kNN reads, and the two raw properties behind it.
+#
+# Standardizing first is not a tidy-up, it decides the answer. GDS scores each
+# nodeProperty separately and averages, and for scalars it uses 1/(1+|a-b|), so
+# on the raw columns a typical overdueShare gap of 0.1 scores about 0.91 while a
+# typical avgDaysLate gap of 10 scores about 0.09. Passing the two raw properties
+# would therefore rank customers on overdueShare alone with avgDaysLate reduced to
+# a near-constant. Scaling both to z-scores and comparing the pair as one vector
+# is what makes the neighbourhood mean "similar payment behaviour" rather than
+# "similar on whichever feature happens to have the narrower range".
+BEHAVIOUR_FEATURES = ["avgDaysLate", "overdueShare"]
+BEHAVIOUR_VECTOR = "paymentBehaviour"
+
+# kNN config, pinned for determinism the way PAGERANK_CONFIG is and for the same
+# reason: the cohort that clears THR-05 is read off these neighbourhoods, so two
+# runs that disagree would move who gets classified.
+#
+# GDS kNN uses neighbour descent rather than a brute-force all-pairs comparison.
+# sampleRate 1.0 considers every candidate the algorithm encounters, while
+# deltaThreshold 0.0 disables early convergence; together they favour recall but
+# do not turn the implementation into an exact search. randomSeed pins the
+# initial neighbourhoods and tie-breaking, which matters more here than the node
+# count suggests: many customers pay on time and carry identical feature pairs.
+# GDS requires concurrency 1 for randomSeed to be honoured, so the two always
+# travel together. The result is deterministic, and the validation below proves
+# that it is complete at topK for every customer before any classification is
+# written.
+KNN_CONFIG = {
+    "nodeProperties": {BEHAVIOUR_VECTOR: "EUCLIDEAN"},
+    "topK": DELINQUENCY_NEIGHBOURS,
+    "sampleRate": 1.0,
+    "deltaThreshold": 0.0,
+    "randomSeed": 42,
     "concurrency": 1,
 }
 
@@ -159,16 +225,13 @@ class Protagonists:
 
 
 class Score(NamedTuple):
-    """One node's score from one of the two algorithms.
+    """One node's score from a graph algorithm.
 
-    Both algorithms produce the same shape, a node id, a display name and a
-    number, and everything downstream of them (the cutoff placement, the
-    assertions, the write-backs, the stage printing) only ever needs those three
-    fields. Carrying them as dicts meant two parallel vocabularies for identical
-    data, supplier_id/betweenness against customer_id/pagerank, which forced the
-    cutoff and assertion logic to be written twice. The field is called `value`
-    rather than the metric name for that reason: what it means is fixed by which
-    algorithm produced the list, not by the key it is read under.
+    The scoring stages share the same shape: a node id, a display name, and a
+    number. Downstream cutoff placement, assertions, write-backs, and stage
+    printing only need those three fields. The field is called `value` because
+    its meaning is fixed by the algorithm that produced the list, not by the key
+    it is read under.
     """
 
     node_id: str
@@ -198,6 +261,45 @@ class Cohort(NamedTuple):
     percentile: int
     value: float
     members: list[Score]
+
+
+class Screen(NamedTuple):
+    """A governed cutoff applied on the metric's own scale to an eligible set.
+
+    The third threshold shape in this file, and distinct from both of the others
+    for a reason that is easy to collapse. A Cutoff is fitted between a named
+    node and the runner-up. A Cohort resolves a percentile against the run's
+    distribution, so its `value` is an output. A Screen's cutoff is neither
+    fitted nor resolved: THR-05 is a share of a fixed neighbourhood, already on
+    the same 0-to-1 scale as the metric it governs, so the governed parameter and
+    the cutoff are the same number and it is authored in the generator before any
+    similarity is computed.
+
+    `eligible` is carried because a Screen is applied to a population rather than
+    to the whole field. Risky Customer can only describe an account that has not
+    already failed, so the count of who was even considered is part of reading the
+    result honestly: a cohort of seven means something different out of four
+    hundred candidates than out of ten.
+    """
+
+    cutoff: float
+    members: list[Score]
+    eligible: int
+
+
+class Neighbourhood(NamedTuple):
+    """The kNN pass's two outputs, which are needed by different consumers.
+
+    `scores` is the metric itself, one delinquency-similarity value for every
+    Customer, and it is written to every node the way betweenness and pagerank
+    are. `delinquent_links` is the evidence behind it: the individual (customer,
+    already-delinquent neighbour, similarity, rank) tuples the score counts up.
+    The score answers which customers are Risky Customers, and only the links
+    answer why this one, which is the Explanation step.
+    """
+
+    scores: list[Score]
+    delinquent_links: list[tuple[str, str, float, int]]
 
 
 def require_env(name: str, default: str | None = None) -> str:
@@ -336,7 +438,9 @@ def write_betweenness(gds: GraphDataScience, scores: list[Score]) -> None:
     print(f"  wrote betweenness to {written} Supplier nodes")
 
 
-def write_critical_supplier_labels(gds: GraphDataScience, conc: Cohort) -> None:
+def write_critical_supplier_labels(
+    gds: GraphDataScience, conc: Cohort, evaluated_at: str
+) -> None:
     """Materialize CLASSIFIED_AS edges from the THR-03 cohort to TERM-05.
 
     This simulates what a production deployment does on a schedule: a batch GDS
@@ -391,7 +495,7 @@ def write_critical_supplier_labels(gds: GraphDataScience, conc: Cohort) -> None:
             "term": CRITICAL_SUPPLIER_TERM,
             "ids": [s.node_id for s in conc.members],
             "reason": reason,
-            "evaluatedAt": EVALUATED_AT,
+            "evaluatedAt": evaluated_at,
             "ruleVersion": RULE_VERSION,
         },
     )
@@ -825,6 +929,25 @@ def write_governed_terms(gds: GraphDataScience) -> None:
         f"{int(customers['written'].iloc[0])} Customer nodes"
     )
 
+    # Risky Customer is the one graph-native term that also carries CLASSIFIED_AS
+    # edges, so unlike the two above this property is not the only way the
+    # vocabulary travels. It is set anyway, for the same reason the score is
+    # written to every Customer: the binding says which term governs the metric,
+    # not which customers qualify under it, and a model reading the score off an
+    # unclassified customer should still learn what the number is called.
+    similarity = gds.run_cypher(
+        """
+        MATCH (c:Customer)
+        SET c.delinquencySimilarityGovernedTerm = $term
+        RETURN count(c) AS written
+        """,
+        params={"term": RISKY_CUSTOMER_TERM},
+    )
+    print(
+        f"  bound '{RISKY_CUSTOMER_TERM}' to delinquencySimilarity on "
+        f"{int(similarity['written'].iloc[0])} Customer nodes"
+    )
+
 
 def update_thresholds_csv(path: Path, cutoffs: dict[str, float]) -> None:
     """Fill the two blank graph-native threshold rows in thresholds.csv.
@@ -1067,6 +1190,636 @@ def assert_pagerank(
     )
 
 
+def compute_delinquency_similarity(gds: GraphDataScience) -> Neighbourhood:
+    """Algorithm 3: kNN over payment behaviour (the Risky Customer early warning).
+
+    The projection keeps Customer nodes carrying the two payment-behaviour
+    features, scales them to z-scores as one vector, and asks each customer who
+    its k nearest neighbours are in that space. The metric is then the share of
+    those neighbours already classified Delinquent.
+
+    **The neighbourhood is computed over every Customer, and that is
+    load-bearing.** The delinquent customers have to be in the candidate set or
+    there is nothing for a near neighbour to be near. Eligibility, meaning who
+    the resulting classification may apply to, is a separate question answered by
+    risky_candidates below. Filtering the delinquents out here instead would
+    silently produce a metric that is zero for everybody.
+
+    The score is written to every Customer for the same reason betweenness is
+    written to every Supplier: it is a metric, not a verdict. A customer paying
+    perfectly on time gets a delinquency similarity of zero, which is a fact
+    about it rather than an absence of one.
+
+    OWNED_BY is projected only because gds.graph.project refuses an empty
+    relationship projection. kNN reads node properties and ignores relationships
+    entirely, so which type is projected has no effect on the result.
+    """
+    header("Algorithm 3: payment-behaviour kNN (the Risky Customer early warning)")
+    feature_stats = gds.run_cypher(
+        """
+        MATCH (c:Customer)
+        RETURN count(c) AS total,
+               count(c.avgDaysLate) AS withAvgDaysLate,
+               count(c.overdueShare) AS withOverdueShare
+        """
+    ).iloc[0]
+    customer_count = int(feature_stats["total"])
+    if customer_count <= DELINQUENCY_NEIGHBOURS:
+        sys.exit(
+            f"Payment-behaviour kNN needs more than {DELINQUENCY_NEIGHBOURS} "
+            f"customers to return that many neighbours, found {customer_count}."
+        )
+    incomplete = {
+        "avgDaysLate": customer_count - int(feature_stats["withAvgDaysLate"]),
+        "overdueShare": customer_count - int(feature_stats["withOverdueShare"]),
+    }
+    incomplete = {name: count for name, count in incomplete.items() if count}
+    if incomplete:
+        sys.exit(
+            "Payment-behaviour kNN cannot score customers with missing features: "
+            + ", ".join(f"{name} missing on {count}" for name, count in incomplete.items())
+        )
+
+    drop_graph(gds, BEHAVIOUR_GRAPH)
+    gds.run_cypher(
+        "CALL gds.graph.project($graph, {Customer: {properties: $features}}, "
+        "['OWNED_BY'])",
+        params={"graph": BEHAVIOUR_GRAPH, "features": BEHAVIOUR_FEATURES},
+    )
+    try:
+        scaled = gds.run_cypher(
+            """
+            CALL gds.scaleProperties.mutate($graph, {
+                nodeProperties: $features,
+                scaler: 'StdScore',
+                mutateProperty: $vector
+            })
+            YIELD nodePropertiesWritten
+            RETURN nodePropertiesWritten AS written
+            """,
+            params={
+                "graph": BEHAVIOUR_GRAPH,
+                "features": BEHAVIOUR_FEATURES,
+                "vector": BEHAVIOUR_VECTOR,
+            },
+        )
+        print(
+            f"  scaled {', '.join(BEHAVIOUR_FEATURES)} to z-scores on "
+            f"{int(scaled['written'].iloc[0])} Customer nodes"
+        )
+
+        # One row per (customer, neighbour) pair, carrying whether the neighbour
+        # is already Delinquent. The share is aggregated below in Python rather
+        # than in Cypher so the raw pairs survive for the Explanation step.
+        rows = gds.run_cypher(
+            """
+            CALL gds.knn.stream($graph, {
+                nodeProperties: $nodeProperties,
+                topK: $topK,
+                sampleRate: $sampleRate,
+                deltaThreshold: $deltaThreshold,
+                randomSeed: $randomSeed,
+                concurrency: $concurrency
+            })
+            YIELD node1, node2, similarity
+            WITH gds.util.asNode(node1) AS c, gds.util.asNode(node2) AS n, similarity
+            RETURN c.id AS customerId, c.name AS name, n.id AS neighbourId,
+                   similarity,
+                   EXISTS {
+                       (n)-[:CLASSIFIED_AS]->(:BusinessTerm {id: $delinquentTerm})
+                   } AS neighbourDelinquent
+            ORDER BY customerId, similarity DESC, neighbourId
+            """,
+            params={
+                "graph": BEHAVIOUR_GRAPH,
+                "delinquentTerm": DELINQUENT_TERM_ID,
+                **KNN_CONFIG,
+            },
+        )
+    finally:
+        drop_graph(gds, BEHAVIOUR_GRAPH)
+
+    totals: dict[str, int] = {}
+    delinquent_neighbours: dict[str, int] = {}
+    names: dict[str, str] = {}
+    links: list[tuple[str, str, float, int]] = []
+    pairs: set[tuple[str, str]] = set()
+    for _, row in rows.iterrows():
+        cid = row["customerId"]
+        neighbour_id = row["neighbourId"]
+        pair = (cid, neighbour_id)
+        if cid == neighbour_id:
+            sys.exit(f"Payment-behaviour kNN returned a self-neighbour for {cid}.")
+        if pair in pairs:
+            sys.exit(
+                f"Payment-behaviour kNN returned duplicate neighbour pair "
+                f"{cid} -> {neighbour_id}."
+            )
+        pairs.add(pair)
+        names[cid] = row["name"]
+        totals[cid] = totals.get(cid, 0) + 1
+        similarity = float(row["similarity"])
+        if not math.isfinite(similarity) or not 0 <= similarity <= 1:
+            sys.exit(
+                f"Payment-behaviour kNN returned invalid similarity {similarity} "
+                f"for {cid} -> {neighbour_id}."
+            )
+        if row["neighbourDelinquent"]:
+            delinquent_neighbours[cid] = delinquent_neighbours.get(cid, 0) + 1
+            links.append((cid, neighbour_id, round(similarity, 4), totals[cid]))
+
+    if len(totals) != customer_count:
+        sys.exit(
+            f"Payment-behaviour kNN returned neighbourhoods for {len(totals)} of "
+            f"{customer_count} customers."
+        )
+    short = {
+        cid: total
+        for cid, total in totals.items()
+        if total != DELINQUENCY_NEIGHBOURS
+    }
+    if short:
+        sample = ", ".join(
+            f"{cid}={total}" for cid, total in sorted(short.items())[:TOP_N_PRINT]
+        )
+        sys.exit(
+            f"Payment-behaviour kNN did not return exactly "
+            f"{DELINQUENCY_NEIGHBOURS} neighbours for every customer: {sample}. "
+            f"The governed share cannot be compared with a changing denominator."
+        )
+
+    # The rule says "share of 10", so the configured neighbourhood size is the
+    # denominator. The completeness check above makes that statement true for
+    # every score instead of silently adapting the rule to partial output.
+    scores = [
+        Score(
+            cid,
+            names[cid],
+            round(
+                delinquent_neighbours.get(cid, 0) / DELINQUENCY_NEIGHBOURS,
+                4,
+            ),
+        )
+        for cid in sorted(totals)
+    ]
+    scores.sort(key=lambda s: (-s.value, s.node_id))
+    print(
+        f"  scored {len(scores)} customers on the share of their "
+        f"{DELINQUENCY_NEIGHBOURS} nearest neighbours already classified "
+        f"'{DELINQUENT_TERM_ID}'"
+    )
+    return Neighbourhood(scores, links)
+
+
+def risky_candidates(gds: GraphDataScience) -> set[str]:
+    """Customers the Risky Customer term can apply to at all.
+
+    TERM-07 is an early warning, so it can only describe an account that has not
+    already failed. Three clauses, all of them from the definition rather than
+    carved out for the demo: a customer that already carries a defaultedPeriod
+    has defaulted, a customer already classified Delinquent has tripped RULE-03
+    and needs no warning, and a customer with no invoices has no payment
+    behaviour to resemble anything.
+
+    Deliberately parallel to trading_customers, including the landmine assert.
+    A filter that silently matches everybody looks identical to a filter that
+    works, and here it would classify already-delinquent customers as an early
+    warning about themselves.
+    """
+    rows = gds.run_cypher(
+        """
+        MATCH (c:Customer)
+        WHERE c.defaultedPeriod IS NULL
+          AND EXISTS { (c)-[:HAS_INVOICE]->(:Invoice) }
+          AND NOT EXISTS {
+              (c)-[:CLASSIFIED_AS]->(:BusinessTerm {id: $delinquentTerm})
+          }
+        RETURN c.id AS cid
+        """,
+        params={"delinquentTerm": DELINQUENT_TERM_ID},
+    )
+    candidates = set(rows["cid"])
+    if not candidates:
+        sys.exit(
+            "No Risky Customer candidates found: every customer has already "
+            "defaulted, is already delinquent, or has no invoices. The screen "
+            "would pass having considered nobody."
+        )
+
+    total = int(gds.run_cypher("MATCH (c:Customer) RETURN count(c) AS n")["n"].iloc[0])
+    excluded = total - len(candidates)
+    if excluded <= 0:
+        sys.exit(
+            f"The Risky Customer candidate filter excluded nobody: {total} "
+            f"customers in, {len(candidates)} out. The already-failed accounts "
+            f"would be classified as an early warning about themselves."
+        )
+    print(f"  candidates: {len(candidates)} of {total} ({excluded} already failed)")
+    return candidates
+
+
+def risky_screen(scores: list[Score], candidates: set[str]) -> Screen:
+    """THR-05 applied to the eligible customers. Nothing here is fitted.
+
+    The contrast with concentration_cutoff is the point. That function has to
+    resolve a percentile against the run's distribution before it names a number.
+    This one does not, because a neighbour share is already on the metric's
+    scale, so the authored constant IS the cutoff and this is a filter rather
+    than a placement. Who clears it is the only output.
+    """
+    members = [
+        s for s in scores if s.node_id in candidates and s.value >= DELINQUENCY_NEIGHBOUR_SHARE
+    ]
+    return Screen(DELINQUENCY_NEIGHBOUR_SHARE, members, len(candidates))
+
+
+def write_delinquency_similarity(gds: GraphDataScience, scores: list[Score]) -> None:
+    rows = [{"cid": s.node_id, "score": s.value} for s in scores]
+    result = gds.run_cypher(
+        """
+        UNWIND $rows AS row
+        MATCH (c:Customer {id: row.cid})
+        SET c.delinquencySimilarity = row.score
+        RETURN count(c) AS written
+        """,
+        params={"rows": rows},
+    )
+    written = int(result["written"].iloc[0])
+    if written != len(rows):
+        sys.exit(
+            f"Delinquency similarity write set {written} of {len(rows)} Customer "
+            f"nodes; every scored customer must exist under MATCH (c:Customer {{id}})."
+        )
+    print(f"  wrote delinquencySimilarity to {written} Customer nodes")
+
+
+def write_similarity_edges(
+    gds: GraphDataScience,
+    screen: Screen,
+    links: list[tuple[str, str, float, int]],
+    evaluated_at: str,
+) -> None:
+    """Materialize the neighbour evidence behind each classified customer.
+
+    Without this the Risky Customer beat can say who and cannot say why. The
+    score alone is a number that has to be taken on trust, and "why this
+    customer" is the Explanation step that Beat 3 answers with a supply path.
+    These edges are that path's counterpart: they name the already-delinquent
+    accounts whose payment behaviour this customer's most resembles, so the
+    answer on screen is a list of real customers rather than a decimal.
+
+    Only the classified cohort's links are written. Every customer has nearest
+    neighbours, but an edge from a customer nobody classified is evidence for a
+    conclusion that was never drawn, and writing all of them would put roughly
+    one edge per customer into the graph to no purpose.
+
+    Neo4j only, like every other output in this file. Nothing here is synced to
+    Delta.
+    """
+    member_ids = {s.node_id for s in screen.members}
+    rows = [
+        {"cid": cid, "nid": nid, "similarity": similarity, "rank": rank}
+        for cid, nid, similarity, rank in links
+        if cid in member_ids
+    ]
+    if not rows:
+        sys.exit(
+            "No delinquent-neighbour links for the Risky Customer cohort, yet the "
+            "cohort is non-empty. Every member cleared THR-05 by counting "
+            "delinquent neighbours, so each must have at least one."
+        )
+    # A supported pipeline run starts from a wiped graph, but gds.py is also
+    # documented as runnable on its own. Clear the previous derived evidence so
+    # a rerun cannot leave links from customers that no longer clear the screen.
+    gds.run_cypher(
+        "MATCH ()-[r:SIMILAR_PAYMENT_BEHAVIOR]->() DELETE r"
+    )
+    result = gds.run_cypher(
+        """
+        UNWIND $rows AS row
+        MATCH (c:Customer {id: row.cid})
+        MATCH (n:Customer {id: row.nid})
+        MERGE (c)-[r:SIMILAR_PAYMENT_BEHAVIOR]->(n)
+        SET r.similarity = row.similarity,
+            r.neighbourRank = row.rank,
+            r.evaluatedAt = datetime($evaluatedAt)
+        RETURN count(r) AS written
+        """,
+        params={
+            "rows": rows,
+            "evaluatedAt": evaluated_at,
+        },
+    )
+    written = int(result["written"].iloc[0])
+    if written != len(rows):
+        sys.exit(
+            f"Payment-behaviour explanation wrote {written} of {len(rows)} "
+            f"SIMILAR_PAYMENT_BEHAVIOR edges."
+        )
+    print(
+        f"  wrote {written} SIMILAR_PAYMENT_BEHAVIOR edges from the cohort to the "
+        f"delinquent customers they resemble"
+    )
+
+
+def write_risky_customer_labels(
+    gds: GraphDataScience, screen: Screen, evaluated_at: str
+) -> None:
+    """Materialize CLASSIFIED_AS edges from the THR-05 screen to TERM-07.
+
+    Same reasoning as write_critical_supplier_labels, including the Delta
+    write-back note: these edges do reach the `classifications` gold table, and
+    what keeps them away from the lakehouse-only engine is `banned_tables` in
+    guard.py holding that table out of the Genie space. Do not add a term filter
+    to CLASSIFICATIONS_SPEC to "fix" it.
+
+    **The cohort is derived and never enumerated.** Membership comes from the
+    scored neighbourhoods, so the edges are an output of this run. The generator
+    plants payment behaviour for a near-miss cohort and it plants no
+    classification, which is why the two sets are allowed to differ and on the
+    current data do: the screen catches customers nobody planted and misses
+    planted ones whose neighbourhoods came out just under the line. Writing the
+    planted ids here instead would be the plant CONTRACT.md section 8 bans.
+    """
+    reason = (
+        f"at least {screen.cutoff:.0%} of its {DELINQUENCY_NEIGHBOURS} nearest "
+        f"neighbours by payment behaviour are already classified Delinquent"
+    )
+    # Remove the previous derived cohort before writing this run's screen. This
+    # makes a standalone rerun replace the classification instead of accumulating
+    # stale Risky Customer labels.
+    gds.run_cypher(
+        """
+        MATCH (:Customer)-[r:CLASSIFIED_AS]->(:BusinessTerm {name: $term})
+        DELETE r
+        """,
+        params={"term": RISKY_CUSTOMER_TERM},
+    )
+    result = gds.run_cypher(
+        """
+        MATCH (t:BusinessTerm {name: $term})
+        UNWIND $ids AS cid
+        MATCH (c:Customer {id: cid})
+        MERGE (c)-[r:CLASSIFIED_AS]->(t)
+        SET r.reason = $reason,
+            r.evaluatedAt = datetime($evaluatedAt),
+            r.ruleVersion = $ruleVersion
+        RETURN count(r) AS written
+        """,
+        params={
+            "term": RISKY_CUSTOMER_TERM,
+            "ids": [s.node_id for s in screen.members],
+            "reason": reason,
+            "evaluatedAt": evaluated_at,
+            "ruleVersion": RULE_VERSION,
+        },
+    )
+    written = int(result["written"].iloc[0])
+    if written != len(screen.members):
+        sys.exit(
+            f"Risky Customer labelling wrote {written} of {len(screen.members)} "
+            f"CLASSIFIED_AS edges. Every screen member must exist as a Customer "
+            f"node and '{RISKY_CUSTOMER_TERM}' must exist as a BusinessTerm, or "
+            f"the early-warning beat resolves to an empty result."
+        )
+    print(
+        f"  labelled {written} customer(s) as '{RISKY_CUSTOMER_TERM}' "
+        f"(CLASSIFIED_AS, screened at {screen.cutoff})"
+    )
+
+
+def check_governed_threshold(gds: GraphDataScience) -> None:
+    """THR-05 and RULE-09 must carry the value this file screened against.
+
+    Unlike THR-03 and THR-04, nothing in this file writes THR-05: it is authored
+    in the generator and arrives through load.py. That is the property worth
+    having, and it is also a new way to be wrong. If data/ is regenerated with a
+    different governed share and Neo4j is not reloaded, the screen above runs on
+    the imported constant while the graph serves the stale one, so the demo shows
+    a threshold that does not match the cohort standing next to it. Nothing else
+    would notice.
+    """
+    rows = gds.run_cypher(
+        """
+        MATCH (h:Threshold {id: $thresholdId})
+        MATCH (r:BusinessRule {id: $ruleId})
+        RETURN h.value AS thresholdValue, h.basis AS basis, r.threshold AS ruleValue
+        """,
+        params={
+            "thresholdId": SIMILARITY_THRESHOLD_ID,
+            "ruleId": RISKY_CUSTOMER_RULE_ID,
+        },
+    )
+    if rows.empty:
+        sys.exit(
+            f"{SIMILARITY_THRESHOLD_ID} or {RISKY_CUSTOMER_RULE_ID} is missing from "
+            f"the graph. Reload from data/ before running this."
+        )
+    row = rows.iloc[0]
+    for field, what in (("thresholdValue", SIMILARITY_THRESHOLD_ID),
+                        ("ruleValue", RISKY_CUSTOMER_RULE_ID)):
+        if row[field] is None or float(row[field]) != DELINQUENCY_NEIGHBOUR_SHARE:
+            sys.exit(
+                f"{what} carries {row[field]} but this run screened against "
+                f"{DELINQUENCY_NEIGHBOUR_SHARE}. Neo4j holds a stale snapshot of "
+                f"data/; reload before running this."
+            )
+    if not row["basis"]:
+        sys.exit(
+            f"{SIMILARITY_THRESHOLD_ID} has no authored basis. It is the sentence "
+            f"that answers the room's next question after the rule, and the "
+            f"early-warning beat opens on it."
+        )
+    print(
+        f"  {SIMILARITY_THRESHOLD_ID} and {RISKY_CUSTOMER_RULE_ID} both carry the "
+        f"authored share {DELINQUENCY_NEIGHBOUR_SHARE}, basis present"
+    )
+
+
+def assert_risky_customers(
+    screen: Screen, near_miss: set[str], candidates: set[str]
+) -> None:
+    """The screen must catch a cohort, and the plant must be findable in it.
+
+    Three asserts, and none of them is about which customers come out. What the
+    beat claims is that an authored definition, applied to a graph metric, finds
+    accounts heading for delinquency before the rule trips. Each assert covers
+    one way that claim could be false while everything else still passed.
+
+    The cohort-size assert is the same one assert_betweenness makes and is there
+    for the same reason: a threshold exactly one entity clears is a post-hoc
+    threshold however it was derived, and RULE-09's cohort language would be
+    false on stage.
+
+    The eligibility assert covers the failure where the screen classifies
+    somebody who has already failed, which would make an early warning about a
+    customer that needs no warning.
+
+    The plant assert is the analogue of Cascade clearing THR-03. The generator
+    shapes a near-miss cohort's payment behaviour specifically so this pass has
+    something to find, and if none of it surfaces then either the plant did not
+    take or the scoring is not measuring what the term claims. It asserts that
+    the plant is findable and deliberately does not assert how much of it is
+    found: requiring all of it would be fitting the threshold to the plant, and
+    the planted customers that fall just under the line are evidence the cohort
+    is derived rather than enumerated.
+
+    **What is read from the output and never asserted:** how many customers clear,
+    how the cohort splits between planted and emergent members, and who ranks
+    where. Those are printed below. An emergent member is a good sign and not a
+    pass condition, and turning it into one would be fitting the data.
+    """
+    if len(screen.members) < 2:
+        sys.exit(
+            f"Risky Customer: the THR-05 screen caught {len(screen.members)} "
+            f"customer(s), so the threshold names a single account and RULE-09's "
+            f"cohort language does not describe what the graph does."
+        )
+    ineligible = [s.node_id for s in screen.members if s.node_id not in candidates]
+    if ineligible:
+        sys.exit(
+            f"Risky Customer: {sorted(ineligible)} cleared THR-05 but are not "
+            f"eligible candidates. An account that has already defaulted or is "
+            f"already Delinquent cannot be an early warning about itself."
+        )
+    caught = [s.node_id for s in screen.members if s.node_id in near_miss]
+    if not caught:
+        sys.exit(
+            f"Risky Customer: none of the {len(near_miss)} planted near-miss "
+            f"customers cleared THR-05, so either the plant did not take or the "
+            f"similarity is not measuring payment behaviour. Per CONTRACT.md "
+            f"section 7 the data is what gets fixed, the governed share does not "
+            f"move, and there are two honest iterations before this is a finding "
+            f"rather than a bug."
+        )
+    emergent = [s.node_id for s in screen.members if s.node_id not in near_miss]
+    print(
+        f"  assert OK: {len(screen.members)} customer(s) of {screen.eligible} "
+        f"eligible clear THR-05 ({screen.cutoff}); {len(caught)} of "
+        f"{len(near_miss)} planted near-miss customers among them"
+    )
+    print(
+        f"  cohort composition: {len(caught)} planted, {len(emergent)} emergent "
+        f"(found by the metric, planted by nobody)"
+    )
+    for row in screen.members:
+        tag = "planted" if row.node_id in near_miss else "emergent"
+        print(
+            f"    {row.node_id} {row.name:<28} "
+            f"delinquencySimilarity={row.value:<6} {tag}"
+        )
+
+
+def check_risky_customer_legs(gds: GraphDataScience, screen: Screen) -> None:
+    """The early-warning beat's three steps resolve, in the Beat 3 shape.
+
+    Deliberately parallel to check_three_legs. Beat 3 established that a grounded
+    answer needs all three of Definition, Discovery and Explanation, and a second
+    grounded beat that only reaches two of them is a weaker version of the first
+    rather than a second one. The mechanical half only: that the three produce
+    three distinct visible outputs on a screen is a re-probe check, not a build
+    one.
+    """
+    header("The early-warning beat: the three steps resolve")
+
+    # Definition. Term to rule to threshold, matched by term name because that is
+    # how the question arrives.
+    definition = gds.run_cypher(
+        """
+        MATCH (t:BusinessTerm {name: $term})-[:DEFINED_BY]->(r:BusinessRule)
+        OPTIONAL MATCH (r)-[:USES_THRESHOLD]->(h:Threshold)
+        RETURN t.definition AS definition, r.id AS rule_id,
+               r.expression AS expression, h.id AS threshold_id,
+               h.basis AS basis, h.value AS value
+        """,
+        params={"term": RISKY_CUSTOMER_TERM},
+    )
+    if definition.empty:
+        sys.exit(
+            f"Definition does not resolve: no BusinessTerm named "
+            f"'{RISKY_CUSTOMER_TERM}' reaches a rule. The beat opens by asking "
+            f"what a Risky Customer is, and the graph cannot answer."
+        )
+    row = definition.iloc[0]
+    for field, what in (
+        ("definition", "the term's definition"),
+        ("expression", "the rule's expression"),
+        ("threshold_id", "the governing threshold"),
+        ("basis", "the threshold's authored basis"),
+        ("value", "the threshold's value"),
+    ):
+        if not row[field] and row[field] != 0:
+            sys.exit(
+                f"Definition resolves but {what} is empty ({field})."
+            )
+    print(f"  definition:  {row['rule_id']} -> {row['threshold_id']}, "
+          f"basis present, cutoff {row['value']}")
+
+    # Discovery. The classified cohort is reachable from the term, the way the
+    # four column-findable terms are, and each edge carries its reason.
+    discovery = gds.run_cypher(
+        """
+        MATCH (c:Customer)-[r:CLASSIFIED_AS]->(:BusinessTerm {name: $term})
+        RETURN count(c) AS classified, count(r.reason) AS withReason
+        """,
+        params={"term": RISKY_CUSTOMER_TERM},
+    )
+    classified = int(discovery["classified"].iloc[0])
+    with_reason = int(discovery["withReason"].iloc[0])
+    if classified != len(screen.members) or with_reason != classified:
+        sys.exit(
+            f"Discovery does not resolve: {classified} customers carry a "
+            f"'{RISKY_CUSTOMER_TERM}' classification ({with_reason} with a "
+            f"reason), but the screen caught {len(screen.members)}."
+        )
+    print(f"  discovery:   {classified} classified customers, each with a reason")
+
+    # Explanation. Every classified customer names the delinquent accounts it
+    # resembles. Presence and coverage only: which neighbours, and how similar,
+    # are read from the output.
+    explanation = gds.run_cypher(
+        """
+        MATCH (c:Customer)-[:CLASSIFIED_AS]->(:BusinessTerm {name: $term})
+        OPTIONAL MATCH (c)-[s:SIMILAR_PAYMENT_BEHAVIOR]->(n:Customer)
+        WITH c, count(s) AS neighbours,
+             count(s.similarity) AS withSimilarity,
+             count(s.neighbourRank) AS withRank,
+             count(CASE WHEN EXISTS {
+                 (n)-[:CLASSIFIED_AS]->(:BusinessTerm {id: $delinquentTerm})
+             } THEN 1 END) AS delinquentNeighbours
+        RETURN c.id AS cid, c.delinquencySimilarity AS score, neighbours,
+               withSimilarity, withRank, delinquentNeighbours
+        ORDER BY cid
+        """,
+        params={
+            "term": RISKY_CUSTOMER_TERM,
+            "delinquentTerm": DELINQUENT_TERM_ID,
+        },
+    )
+    for _, explained in explanation.iterrows():
+        neighbours = int(explained["neighbours"])
+        expected = round(float(explained["score"]) * DELINQUENCY_NEIGHBOURS)
+        if (
+            neighbours != expected
+            or int(explained["delinquentNeighbours"]) != expected
+            or int(explained["withSimilarity"]) != expected
+            or int(explained["withRank"]) != expected
+        ):
+            sys.exit(
+                f"Explanation does not resolve for {explained['cid']}: score "
+                f"implies {expected} delinquent neighbours, but the graph has "
+                f"{neighbours} links ({int(explained['delinquentNeighbours'])} "
+                f"to Delinquent customers, {int(explained['withSimilarity'])} "
+                f"with similarity, {int(explained['withRank'])} with rank)."
+            )
+    fewest = int(explanation["neighbours"].min())
+    total = int(explanation["neighbours"].sum())
+    print(
+        f"  explanation: {total} neighbour links across "
+        f"the cohort, fewest {fewest} on any member"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -1079,6 +1832,12 @@ def main() -> None:
 
     ground_truth = json.loads((args.data_dir / "ground_truth.json").read_text())
     protags = Protagonists.from_ground_truth(ground_truth)
+    evaluated_at = f"{ground_truth['as_of_date']}T00:00:00Z"
+    # The planted near-miss cohort, read rather than hardcoded. It is a cohort
+    # and not a protagonist, so it stays out of Protagonists: nothing here names
+    # one of these customers, and the only question asked of the set is whether
+    # the screen found any of it.
+    near_miss = set(ground_truth["classification_cohorts"]["near_miss_customers"])
 
     load_dotenv(HERE / ".env")
     uri = require_env("NEO4J_URI")
@@ -1096,7 +1855,7 @@ def main() -> None:
         assert_betweenness(betweenness, conc, protags)
         report_degree_overlap(gds, betweenness, protags)
         write_betweenness(gds, betweenness)
-        write_critical_supplier_labels(gds, conc)
+        write_critical_supplier_labels(gds, conc, evaluated_at)
 
         pagerank = compute_pagerank(gds, protags)
         trading = trading_customers(gds)
@@ -1104,6 +1863,14 @@ def main() -> None:
         cont = contagion_cutoff(pagerank, protags, trading)
         assert_pagerank(pagerank, cont, protags, trading)
         write_pagerank(gds, pagerank)
+
+        knn = compute_delinquency_similarity(gds)
+        candidates = risky_candidates(gds)
+        screen = risky_screen(knn.scores, candidates)
+        assert_risky_customers(screen, near_miss, candidates)
+        write_delinquency_similarity(gds, knn.scores)
+        write_similarity_edges(gds, screen, knn.delinquent_links, evaluated_at)
+        write_risky_customer_labels(gds, screen, evaluated_at)
 
         header("Graph-native thresholds (set from the computed distributions)")
         cutoffs = {
@@ -1119,6 +1886,9 @@ def main() -> None:
                 CONTAGION_RULE_ID: cont.value,
             },
         )
+        # THR-05 is authored rather than computed, so it is verified here instead
+        # of written. See check_governed_threshold.
+        check_governed_threshold(gds)
 
         header("Governed vocabulary bound to the metrics (Neo4j only)")
         write_governed_terms(gds)
@@ -1126,11 +1896,13 @@ def main() -> None:
         # Last, because leg 1 walks to the threshold value that only exists once
         # the cutoffs above have been written.
         check_three_legs(gds, protags)
+        check_risky_customer_legs(gds, screen)
 
     print(
-        "\nGDS analytics complete: betweenness and pagerank written to Neo4j as "
-        "node properties, THR-03/THR-04 set, RULE-05/RULE-06 thresholds backfilled, "
-        "governing terms bound to both metrics. Nothing synced to Delta."
+        "\nGDS analytics complete: betweenness, pagerank and delinquency "
+        "similarity written to Neo4j as node properties, THR-03/THR-04 set and "
+        "THR-05 verified, RULE-05/RULE-06 thresholds backfilled, governing terms "
+        "bound to all three metrics. Nothing synced to Delta."
     )
 
 

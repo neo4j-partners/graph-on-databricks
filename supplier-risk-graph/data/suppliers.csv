@@ -1,170 +1,170 @@
 id,name,category,subcategory,riskScore
-SUP-001,Umber Consulting,services,consulting,47
-SUP-002,Grove Labels,packaging,labels,22
-SUP-003,Maple Consulting,services,consulting,43
-SUP-004,Verdant Canning,packaging,cans,35
-SUP-005,Ash Warehousing,logistics,warehousing,40
-SUP-006,Granite Warehousing,logistics,warehousing,44
-SUP-007,Bramble Freight,logistics,freight,22
-SUP-008,Slate Canning,packaging,cans,54
-SUP-009,Dune Hops Co,ingredients,hops,25
-SUP-010,Pinnacle Labels,packaging,labels,45
-SUP-011,Alder Warehousing,logistics,warehousing,26
-SUP-012,Slate Maintenance,services,maintenance,31
-SUP-013,Thistle Cooling Systems,equipment,cooling systems,45
-SUP-014,Indigo Freight,logistics,freight,24
-SUP-015,Frost Closures,packaging,caps,76
-SUP-016,Ember Consulting,services,consulting,31
-SUP-017,Thistle Freight,logistics,freight,24
-SUP-018,Wren Closures,packaging,caps,40
-SUP-019,Tidal Consulting,services,consulting,65
-SUP-020,Pinnacle Warehousing,logistics,warehousing,29
-SUP-021,Hazel Flavor Co,ingredients,flavorings,44
-SUP-022,Ash Consulting,services,consulting,24
-SUP-023,Basalt Brewing Systems,equipment,brewing equipment,27
-SUP-024,Ridgeline Malt Supply,ingredients,malt,21
-SUP-025,Kelvin Canning,packaging,cans,31
-SUP-026,Ash Cooling Systems,equipment,cooling systems,66
-SUP-027,Northwind Sugar Co,ingredients,sugar,22
-SUP-028,Yarrow Malt Supply,ingredients,malt,31
-SUP-029,Glacier Brewing Systems,equipment,brewing equipment,24
-SUP-030,Verdant Freight,logistics,freight,19
-SUP-031,Zephyr Brewing Systems,equipment,brewing equipment,29
-SUP-032,Vector Maintenance,services,maintenance,40
-SUP-033,Grove Brewing Systems,equipment,brewing equipment,40
-SUP-034,Juniper Brewing Systems,equipment,brewing equipment,38
-SUP-035,Maple Canning,packaging,cans,34
-SUP-036,Jasper Warehousing,logistics,warehousing,28
-SUP-037,Drift Hops Co,ingredients,hops,60
-SUP-038,Ember Warehousing,logistics,warehousing,41
-SUP-039,Fern Maintenance,services,maintenance,21
-SUP-040,Glacier Sugar Co,ingredients,sugar,40
-SUP-041,Linden Labels,packaging,labels,31
-SUP-042,Poplar Consulting,services,consulting,58
-SUP-043,Thistle Consulting,services,consulting,40
-SUP-044,Juniper Warehousing,logistics,warehousing,50
-SUP-045,Larch Cooling Systems,equipment,cooling systems,52
-SUP-046,Reed Maintenance,services,maintenance,40
-SUP-047,Yarrow Freight,logistics,freight,17
-SUP-048,Basalt Freight,logistics,freight,17
-SUP-049,Ember Freight,logistics,freight,45
-SUP-050,Willow Maintenance,services,maintenance,54
-SUP-051,Thistle Canning,packaging,cans,24
-SUP-052,Zephyr Canning,packaging,cans,34
-SUP-053,Vale Consulting,services,consulting,32
-SUP-054,Zephyr Maintenance,services,maintenance,38
-SUP-055,Raven Canning,packaging,cans,32
-SUP-056,Fjord Maintenance,services,maintenance,70
-SUP-057,Grove Freight,logistics,freight,76
-SUP-058,Nimbus Freight,logistics,freight,52
-SUP-059,Wisp Labels,packaging,labels,50
-SUP-060,Elm Freight,logistics,freight,46
-SUP-061,Quartz Malt Supply,ingredients,malt,21
-SUP-062,Indigo Glass Furnaces,packaging,raw glass,32
-SUP-063,Slate Flavor Co,ingredients,flavorings,10
-SUP-064,Pinnacle Freight,logistics,freight,26
-SUP-065,Glacier Freight,logistics,freight,37
-SUP-066,Willow Malt Supply,ingredients,malt,27
-SUP-067,Kelvin Consulting,services,consulting,25
-SUP-068,Onyx Maintenance,services,maintenance,22
-SUP-069,Quill Warehousing,logistics,warehousing,54
-SUP-070,Hollow Sugar Co,ingredients,sugar,36
-SUP-071,Fern Freight,logistics,freight,28
-SUP-072,Fern Cooling Systems,equipment,cooling systems,61
-SUP-073,Kelvin Freight,logistics,freight,76
-SUP-074,Indigo Maintenance,services,maintenance,32
-SUP-075,Indigo Consulting,services,consulting,40
-SUP-076,Quartz Warehousing,logistics,warehousing,26
-SUP-077,Quill Glass Co,packaging,glass bottles,70
-SUP-078,Alder Maintenance,services,maintenance,52
-SUP-079,Coral Hops Co,ingredients,hops,56
-SUP-080,Umber Freight,logistics,freight,59
-SUP-081,Larch Consulting,services,consulting,47
-SUP-082,Kelvin Closures,packaging,caps,22
-SUP-083,Cinder Closures,packaging,caps,36
-SUP-084,Elm Glass Co,packaging,glass bottles,76
-SUP-085,Maple Warehousing,logistics,warehousing,14
-SUP-086,Zephyr Freight,logistics,freight,33
-SUP-087,Onyx Sugar Co,ingredients,sugar,33
-SUP-088,Wren Malt Supply,ingredients,malt,20
-SUP-089,Frost Cooling Systems,equipment,cooling systems,42
-SUP-090,Hazel Labels,packaging,labels,47
-SUP-091,Glacier Cooling Systems,equipment,cooling systems,50
-SUP-092,Ridgeline Brewing Systems,equipment,brewing equipment,46
-SUP-093,Cobalt Consulting,services,consulting,28
-SUP-094,Umber Brewing Systems,equipment,brewing equipment,18
-SUP-095,Vector Freight,logistics,freight,36
-SUP-096,Atlas Freight,logistics,freight,22
-SUP-097,Onyx Freight,logistics,freight,40
-SUP-098,Nimbus Glass Co,packaging,glass bottles,51
-SUP-099,Terra Sugar Co,ingredients,sugar,55
-SUP-100,Cobalt Maintenance,services,maintenance,76
-SUP-101,Atlas Flavor Co,ingredients,flavorings,61
-SUP-102,Grove Glass Furnaces,packaging,raw glass,43
-SUP-103,Larch Glass Co,packaging,glass bottles,24
-SUP-104,Poplar Freight,logistics,freight,30
-SUP-105,Yarrow Cooling Systems,equipment,cooling systems,62
-SUP-106,Wren Warehousing,logistics,warehousing,32
-SUP-107,Linden Malt Supply,ingredients,malt,40
-SUP-108,Orchid Maintenance,services,maintenance,28
-SUP-109,Larch Sugar Co,ingredients,sugar,10
-SUP-110,Ochre Brewing Systems,equipment,brewing equipment,35
-SUP-111,Wisp Maintenance,services,maintenance,31
-SUP-112,Fjord Malt Supply,ingredients,malt,31
-SUP-113,Ash Closures,packaging,caps,23
-SUP-114,Fjord Brewing Systems,equipment,brewing equipment,36
-SUP-115,Elm Cooling Systems,equipment,cooling systems,46
-SUP-116,Juniper Freight,logistics,freight,60
-SUP-117,Poplar Maintenance,services,maintenance,30
-SUP-118,Hollow Warehousing,logistics,warehousing,39
-SUP-119,Delta Labels,packaging,labels,19
-SUP-120,Vale Warehousing,logistics,warehousing,45
-SUP-121,Vale Freight,logistics,freight,34
-SUP-122,Delta Consulting,services,consulting,28
-SUP-123,Ochre Malt Supply,ingredients,malt,63
-SUP-124,Coral Warehousing,logistics,warehousing,54
-SUP-125,Pinnacle Glass Furnaces,packaging,raw glass,21
-SUP-126,Fjord Cooling Systems,equipment,cooling systems,50
-SUP-127,Reed Brewing Systems,equipment,brewing equipment,45
-SUP-128,Cinder Freight,logistics,freight,40
-SUP-129,Juniper Hops Co,ingredients,hops,26
-SUP-130,Onyx Brewing Systems,equipment,brewing equipment,29
-SUP-131,Dune Canning,packaging,cans,26
-SUP-132,Hollow Flavor Co,ingredients,flavorings,23
-SUP-133,Raven Brewing Systems,equipment,brewing equipment,58
-SUP-134,Maple Glass Furnaces,packaging,raw glass,34
-SUP-135,Terra Freight,logistics,freight,24
-SUP-136,Cinder Cooling Systems,equipment,cooling systems,51
-SUP-137,Yarrow Warehousing,logistics,warehousing,48
-SUP-138,Drift Brewing Systems,equipment,brewing equipment,70
-SUP-139,Cinder Maintenance,services,maintenance,25
-SUP-140,Bramble Brewing Systems,equipment,brewing equipment,27
-SUP-141,Hazel Consulting,services,consulting,25
-SUP-142,Reed Consulting,services,consulting,35
-SUP-143,Sable Maintenance,services,maintenance,41
-SUP-144,Atlas Warehousing,logistics,warehousing,61
-SUP-145,Nimbus Cooling Systems,equipment,cooling systems,18
-SUP-146,Moss Closures,packaging,caps,41
-SUP-147,Jasper Glass Furnaces,packaging,raw glass,56
-SUP-148,Coral Brewing Systems,equipment,brewing equipment,40
-SUP-149,Delta Freight,logistics,freight,20
-SUP-150,Terra Cooling Systems,equipment,cooling systems,39
+SUP-001,Ochre Freight,logistics,freight,24
+SUP-002,Nimbus Closures,packaging,caps,76
+SUP-003,Frost Consulting,services,consulting,31
+SUP-004,Cobalt Freight,logistics,freight,24
+SUP-005,Pinnacle Closures,packaging,caps,40
+SUP-006,Wisp Consulting,services,consulting,65
+SUP-007,Thistle Warehousing,logistics,warehousing,29
+SUP-008,Cinder Flavor Co,ingredients,flavorings,44
+SUP-009,Bramble Consulting,services,consulting,24
+SUP-010,Alder Brewing Systems,equipment,brewing equipment,27
+SUP-011,Dune Malt Supply,ingredients,malt,21
+SUP-012,Kelvin Canning,packaging,cans,31
+SUP-013,Yarrow Cooling Systems,equipment,cooling systems,66
+SUP-014,Poplar Sugar Co,ingredients,sugar,22
+SUP-015,Cinder Malt Supply,ingredients,malt,31
+SUP-016,Tidal Brewing Systems,equipment,brewing equipment,24
+SUP-017,Tidal Freight,logistics,freight,19
+SUP-018,Pinnacle Brewing Systems,equipment,brewing equipment,29
+SUP-019,Maple Maintenance,services,maintenance,40
+SUP-020,Cedar Brewing Systems,equipment,brewing equipment,40
+SUP-021,Delta Brewing Systems,equipment,brewing equipment,38
+SUP-022,Thistle Canning,packaging,cans,34
+SUP-023,Coral Warehousing,logistics,warehousing,28
+SUP-024,Fern Hops Co,ingredients,hops,60
+SUP-025,Lumen Warehousing,logistics,warehousing,41
+SUP-026,Ridgeline Maintenance,services,maintenance,21
+SUP-027,Maple Sugar Co,ingredients,sugar,40
+SUP-028,Dune Labels,packaging,labels,31
+SUP-029,Zephyr Consulting,services,consulting,58
+SUP-030,Umber Consulting,services,consulting,40
+SUP-031,Frost Warehousing,logistics,warehousing,50
+SUP-032,Alder Cooling Systems,equipment,cooling systems,52
+SUP-033,Frost Maintenance,services,maintenance,40
+SUP-034,Fjord Freight,logistics,freight,17
+SUP-035,Wisp Freight,logistics,freight,17
+SUP-036,Verdant Freight,logistics,freight,45
+SUP-037,Kelvin Maintenance,services,maintenance,54
+SUP-038,Nimbus Canning,packaging,cans,24
+SUP-039,Yarrow Canning,packaging,cans,34
+SUP-040,Linden Consulting,services,consulting,32
+SUP-041,Delta Maintenance,services,maintenance,38
+SUP-042,Ochre Canning,packaging,cans,32
+SUP-043,Lumen Maintenance,services,maintenance,70
+SUP-044,Cinder Freight,logistics,freight,76
+SUP-045,Meridian Freight,logistics,freight,52
+SUP-046,Hollow Labels,packaging,labels,50
+SUP-047,Delta Freight,logistics,freight,46
+SUP-048,Onyx Malt Supply,ingredients,malt,21
+SUP-049,Coral Glass Furnaces,packaging,raw glass,32
+SUP-050,Poplar Flavor Co,ingredients,flavorings,10
+SUP-051,Elm Freight,logistics,freight,26
+SUP-052,Thistle Freight,logistics,freight,37
+SUP-053,Jasper Malt Supply,ingredients,malt,27
+SUP-054,Ember Consulting,services,consulting,25
+SUP-055,Ash Maintenance,services,maintenance,22
+SUP-056,Sable Warehousing,logistics,warehousing,54
+SUP-057,Meridian Sugar Co,ingredients,sugar,36
+SUP-058,Willow Freight,logistics,freight,28
+SUP-059,Meridian Cooling Systems,equipment,cooling systems,61
+SUP-060,Bramble Freight,logistics,freight,76
+SUP-061,Umber Maintenance,services,maintenance,32
+SUP-062,Poplar Consulting,services,consulting,40
+SUP-063,Wren Warehousing,logistics,warehousing,26
+SUP-064,Hollow Glass Co,packaging,glass bottles,70
+SUP-065,Fjord Maintenance,services,maintenance,52
+SUP-066,Zephyr Hops Co,ingredients,hops,56
+SUP-067,Yarrow Freight,logistics,freight,59
+SUP-068,Cobalt Consulting,services,consulting,47
+SUP-069,Glacier Closures,packaging,caps,22
+SUP-070,Granite Closures,packaging,caps,36
+SUP-071,Cobalt Glass Co,packaging,glass bottles,76
+SUP-072,Hollow Warehousing,logistics,warehousing,14
+SUP-073,Quartz Freight,logistics,freight,33
+SUP-074,Wren Sugar Co,ingredients,sugar,33
+SUP-075,Delta Malt Supply,ingredients,malt,20
+SUP-076,Kelvin Cooling Systems,equipment,cooling systems,42
+SUP-077,Ember Labels,packaging,labels,47
+SUP-078,Basalt Cooling Systems,equipment,cooling systems,50
+SUP-079,Grove Brewing Systems,equipment,brewing equipment,46
+SUP-080,Iris Consulting,services,consulting,28
+SUP-081,Elm Brewing Systems,equipment,brewing equipment,18
+SUP-082,Glacier Freight,logistics,freight,36
+SUP-083,Moss Freight,logistics,freight,22
+SUP-084,Terra Freight,logistics,freight,40
+SUP-085,Elm Glass Co,packaging,glass bottles,51
+SUP-086,Dune Sugar Co,ingredients,sugar,55
+SUP-087,Cedar Maintenance,services,maintenance,76
+SUP-088,Orchid Flavor Co,ingredients,flavorings,61
+SUP-089,Sable Glass Furnaces,packaging,raw glass,43
+SUP-090,Indigo Glass Co,packaging,glass bottles,24
+SUP-091,Granite Freight,logistics,freight,30
+SUP-092,Maple Cooling Systems,equipment,cooling systems,62
+SUP-093,Pinnacle Warehousing,logistics,warehousing,32
+SUP-094,Thistle Malt Supply,ingredients,malt,40
+SUP-095,Quartz Maintenance,services,maintenance,28
+SUP-096,Vale Sugar Co,ingredients,sugar,10
+SUP-097,Larch Brewing Systems,equipment,brewing equipment,35
+SUP-098,Cinder Maintenance,services,maintenance,31
+SUP-099,Alder Malt Supply,ingredients,malt,31
+SUP-100,Coral Closures,packaging,caps,23
+SUP-101,Vector Brewing Systems,equipment,brewing equipment,36
+SUP-102,Reed Cooling Systems,equipment,cooling systems,46
+SUP-103,Alder Freight,logistics,freight,60
+SUP-104,Vale Maintenance,services,maintenance,30
+SUP-105,Fjord Warehousing,logistics,warehousing,39
+SUP-106,Thistle Labels,packaging,labels,19
+SUP-107,Granite Warehousing,logistics,warehousing,45
+SUP-108,Pinnacle Freight,logistics,freight,34
+SUP-109,Larch Consulting,services,consulting,28
+SUP-110,Yarrow Malt Supply,ingredients,malt,63
+SUP-111,Juniper Warehousing,logistics,warehousing,54
+SUP-112,Terra Glass Furnaces,packaging,raw glass,21
+SUP-113,Grove Cooling Systems,equipment,cooling systems,50
+SUP-114,Thistle Brewing Systems,equipment,brewing equipment,45
+SUP-115,Jasper Freight,logistics,freight,40
+SUP-116,Birch Hops Co,ingredients,hops,26
+SUP-117,Ash Brewing Systems,equipment,brewing equipment,29
+SUP-118,Northwind Canning,packaging,cans,26
+SUP-119,Quill Flavor Co,ingredients,flavorings,23
+SUP-120,Linden Brewing Systems,equipment,brewing equipment,58
+SUP-121,Orchid Glass Furnaces,packaging,raw glass,34
+SUP-122,Ember Freight,logistics,freight,24
+SUP-123,Bramble Cooling Systems,equipment,cooling systems,51
+SUP-124,Drift Warehousing,logistics,warehousing,48
+SUP-125,Frost Brewing Systems,equipment,brewing equipment,70
+SUP-126,Yarrow Maintenance,services,maintenance,25
+SUP-127,Glacier Brewing Systems,equipment,brewing equipment,27
+SUP-128,Wren Consulting,services,consulting,25
+SUP-129,Delta Consulting,services,consulting,35
+SUP-130,Cobalt Maintenance,services,maintenance,41
+SUP-131,Iris Warehousing,logistics,warehousing,61
+SUP-132,Tidal Cooling Systems,equipment,cooling systems,18
+SUP-133,Moss Closures,packaging,caps,41
+SUP-134,Hollow Glass Furnaces,packaging,raw glass,56
+SUP-135,Yarrow Brewing Systems,equipment,brewing equipment,40
+SUP-136,Juniper Freight,logistics,freight,20
+SUP-137,Vale Cooling Systems,equipment,cooling systems,39
+SUP-138,Juniper Sugar Co,ingredients,sugar,36
+SUP-139,Quill Warehousing,logistics,warehousing,46
+SUP-140,Thistle Hops Co,ingredients,hops,27
+SUP-141,Dune Warehousing,logistics,warehousing,37
+SUP-142,Basalt Warehousing,logistics,warehousing,56
+SUP-143,Umber Hops Co,ingredients,hops,43
+SUP-144,Grove Labels,packaging,labels,46
+SUP-145,Indigo Maintenance,services,maintenance,21
+SUP-146,Northwind Consulting,services,consulting,22
+SUP-147,Glacier Warehousing,logistics,warehousing,27
+SUP-148,Quartz Consulting,services,consulting,29
+SUP-149,Onyx Canning,packaging,cans,21
+SUP-150,Fern Glass Co,packaging,glass bottles,44
 SUP-901,Cascade Glassworks,packaging,raw glass,60
-SUP-902,Harbor Bottling Supply,packaging,glass bottles,20
-SUP-903,Summit Glass Packaging,packaging,glass bottles,36
-SUP-904,Ironbridge Containers,packaging,glass bottles,35
-SUP-905,Clearwater Bottles,packaging,glass bottles,19
-SUP-906,Aurora Packaging Co,packaging,glass bottles,19
-SUP-907,Fairview Container Works,packaging,container glass,37
-SUP-908,Oakline Container Works,packaging,container glass,51
-SUP-909,Brackwater Container Works,packaging,container glass,64
-SUP-910,Redstone Glassworks,packaging,raw glass,63
-SUP-911,Pinehurst Glassworks,packaging,raw glass,26
-SUP-912,Calder Glassworks,packaging,raw glass,34
-SUP-913,Thornbury Glassworks,packaging,raw glass,28
-SUP-914,Halden Cullet Recovery,packaging,cullet,39
-SUP-915,Westmoor Cullet Recovery,packaging,cullet,48
-SUP-916,Kelbrook Silica,packaging,silica sand,40
-SUP-917,Ardenne Silica,packaging,silica sand,37
-SUP-918,Ravensmoor Soda Ash,packaging,soda ash,46
-SUP-919,Lowfield Soda Ash,packaging,soda ash,58
+SUP-902,Harbor Bottling Supply,packaging,glass bottles,39
+SUP-903,Summit Glass Packaging,packaging,glass bottles,21
+SUP-904,Ironbridge Containers,packaging,glass bottles,32
+SUP-905,Clearwater Bottles,packaging,glass bottles,16
+SUP-906,Aurora Packaging Co,packaging,glass bottles,18
+SUP-907,Fairview Container Works,packaging,container glass,43
+SUP-908,Oakline Container Works,packaging,container glass,49
+SUP-909,Brackwater Container Works,packaging,container glass,52
+SUP-910,Redstone Glassworks,packaging,raw glass,45
+SUP-911,Pinehurst Glassworks,packaging,raw glass,60
+SUP-912,Calder Glassworks,packaging,raw glass,27
+SUP-913,Thornbury Glassworks,packaging,raw glass,63
+SUP-914,Halden Cullet Recovery,packaging,cullet,21
+SUP-915,Westmoor Cullet Recovery,packaging,cullet,35
+SUP-916,Kelbrook Silica,packaging,silica sand,43
+SUP-917,Ardenne Silica,packaging,silica sand,51
+SUP-918,Ravensmoor Soda Ash,packaging,soda ash,58
+SUP-919,Lowfield Soda Ash,packaging,soda ash,48

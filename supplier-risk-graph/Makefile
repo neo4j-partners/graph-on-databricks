@@ -60,7 +60,7 @@ demo:
 	$(UV) run generate_data.py
 	@echo "==> [2/5] load.py: WIPING Neo4j and reloading from data/"
 	$(UV) run load.py
-	@echo "==> [3/5] gds.py: computing betweenness and pageRank into Neo4j"
+	@echo "==> [3/5] gds.py: computing betweenness, PageRank, and customer kNN"
 	$(UV) run gds.py
 	@echo "==> [4/5] upload.py: rebuilding Unity Catalog tables and metric view"
 	$(UV) run upload.py

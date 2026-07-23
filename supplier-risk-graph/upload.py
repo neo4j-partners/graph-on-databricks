@@ -10,7 +10,7 @@ stakes (owned_by) — into a UC volume and builds one Delta table each with
 `read_files`, then reads the two graph-derived tables back out of Neo4j:
 
   - `classifications`         — every CLASSIFIED_AS edge (the four column-findable
-                                terms only; the graph-native terms are never planted)
+                                terms plus derived Critical Supplier and Risky Customer)
   - `business_unit_exposure`  — each business unit's aggregate supplier-risk exposure
 
 The `supply_relationships` and `owned_by` tables carry the raw edges behind the
@@ -208,13 +208,12 @@ BASE_SPECS = [
 
 # Gold table: the CLASSIFIED_AS edges written back from the graph. The four
 # column-findable terms are planted by the generator, each carrying rule
-# provenance (reason, evaluatedAt, ruleVersion). Critical Supplier is written by
-# `write_critical_supplier_labels` in `gds.py` after the cutoff resolves, which
-# is why it cannot be planted with the others: its cohort does not exist until
-# the scores do.
+# provenance (reason, evaluatedAt, ruleVersion). Critical Supplier and Risky
+# Customer are written by `gds.py` only after their scores resolve, which is why
+# neither can be planted with the others.
 #
-# **Do not add a term filter here.** Critical Supplier rows in this table look
-# like write-back leakage and are not. The gold tables are never attached to the
+# **Do not add a term filter here.** The graph-native rows in this table look like
+# write-back leakage and are not. The gold tables are never attached to the
 # Genie space, which `banned_tables` in `guard.py` enforces against the space's
 # declared data sources on every run, so the lakehouse-only engine cannot read
 # them. Filtering the term out instead would return the graph to the state where

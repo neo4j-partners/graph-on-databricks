@@ -4,7 +4,7 @@ The demo models a global beverage producer. Its suppliers specialize by subcateg
 
 The demo uses a dual data architecture. The Databricks lakehouse owns the instance layer as Unity Catalog Delta tables. Neo4j owns the knowledge layer and holds a mirror of the instance data so multi-hop and provenance queries run in one graph. One set of CSVs in `data/` is the single source for both sides.
 
-The point of the demo is a contrast between two engines. A Databricks Genie Agent over the Unity Catalog Delta tables is the lakehouse-only engine: it sees the facts and nothing else. Genie paired with the read-only Neo4j knowledge graph is the second engine: it sees the same facts plus the governed meaning. Both engines answer the everyday risk questions. The payoff is the two graph-native questions the lakehouse-only engine cannot answer, because their definitions live only in the graph.
+The point of the demo is a contrast between two engines. A Databricks Genie Agent over the Unity Catalog Delta tables is the lakehouse-only engine: it sees the facts and nothing else. Genie paired with the read-only Neo4j knowledge graph is the second engine: it sees the same facts plus the governed meaning. Both engines answer the everyday risk questions. The payoff is three graph-native questions the lakehouse-only engine cannot answer reproducibly, because their definitions live only in the graph.
 
 > **Where the numbers live.** The dataset regenerates from today's date on purpose, so the demo shows forward-looking risk rather than a historical snapshot. Names, ids, and the hand-set business thresholds come from the fixed seed and never move; so does the percentile behind the Supply Concentration Threshold, though the cutoff it resolves to does not. Every date, every euro amount, every row count, and every score-derived cutoff is re-derived on each run and recorded in `data/ground_truth.json`, which carries the `as_of_date` it was written with. This page quotes the stable values and points at `ground_truth.json` for the rest.
 >
@@ -12,9 +12,9 @@ The point of the demo is a contrast between two engines. A Databricks Genie Agen
 
 > **A note on "knowledge layer".** This demo uses the term narrowly, for the governed-meaning half of the graph: entities, business terms, business rules, policies, thresholds, and the semantic mapping (`MAPS_TO`), held distinct from the instance layer. The two are kept as sibling layers because the split maps directly onto the demo's division of labor: the lakehouse owns the facts, Neo4j owns the meaning.
 
-## The two stories
+## The three stories
 
-The dataset serves two contrasts. Each is a question the lakehouse-only engine gets wrong or misses, and the graph engine answers by resolving a governed definition that has no lakehouse column.
+The dataset serves three contrasts. Each is a question the lakehouse-only engine answers without the governed definition, and the graph engine resolves from meaning that has no lakehouse column.
 
 ### Story 1: the hidden glassworks
 
@@ -34,6 +34,14 @@ The graph engine flags Jade with stake-weighted personalized PageRank, seeded on
 
 The weighting is what makes this a graph question rather than a join. Defaults are scattered across the book, and many clean accounts sit one hop from one of them, but those accounts hold two to five percent of the company that failed, so almost nothing propagates to them. Kestrel's stakes run 65% to 90% at every level, so four failures reach Jade three hops away largely intact. Ranking by distance to the nearest default does not return Jade, and neither does counting defaults per ownership group, where another group holds more defaults than Kestrel's. Both shortcuts run fine against the lakehouse tables and both return the wrong account.
 
+### Story 3: the warning before delinquency
+
+The Delinquent Customer rule fires only after each of the last three invoices is more than 60 days late. Risky Customer is its governed early-warning counterpart: an active customer that has neither defaulted nor already become Delinquent qualifies when at least half of its ten nearest payment-behavior neighbours are already Delinquent Customers.
+
+The graph engine standardizes `avgDaysLate` and `overdueShare` into one two-dimensional vector, runs deterministic GDS kNN over every Customer, and stores the delinquent-neighbour share as `Customer.delinquencySimilarity`. Eligibility is applied after scoring so delinquent customers remain available as neighbours but cannot be classified as an early warning about themselves. The resulting cohort is derived rather than enumerated. The generator plants near-miss behavior, not labels, and the live score may also surface customers planted by nobody.
+
+Each classified customer retains `SIMILAR_PAYMENT_BEHAVIOR` edges to the delinquent neighbours behind its score. Those edges carry similarity, neighbour rank, and evaluation time, so the classification can answer both “who should we review?” and “which known delinquent accounts does this customer resemble?”
+
 ## Dual data architecture
 
 ![Dual data architecture](dual-data-architecture.png)
@@ -52,7 +60,7 @@ Every table also carries a comment, and the columns whose meaning cannot be read
 
 | Table | Business description | Columns (key) | Notes |
 |---|---|---|---|
-| `customers` | The accounts the enterprise sells to, with commercial segment and credit line | `id, businessUnitId, name, segment, creditLimit, defaultedPeriod, churnRisk, upsellScore, profitabilityTrend, avgDaysLate, overdueShare` | Ownership lives in its own `owned_by` table, not a parent column here, because a customer can have more than one owner. `creditLimit` (EUR) is the total committed credit facility on the account, set for every customer with one consistent meaning. The customer's open invoice balance is the drawn portion of that facility, never an addition to it, so the two are never summed. It feeds the Story 2 exposure figure. `defaultedPeriod` (format `YYYY-Qn`) is set only on defaulted customers, null otherwise |
+| `customers` | The accounts the enterprise sells to, with commercial segment and credit line | `id, businessUnitId, name, segment, creditLimit, defaultedPeriod` | Ownership lives in its own `owned_by` table, not a parent column here, because a customer can have more than one owner. `creditLimit` (EUR) is the total committed credit facility on the account, set for every customer with one consistent meaning. The customer's open invoice balance is the drawn portion of that facility, never an addition to it. Graph-only commercial predictions and payment-behavior features are excluded from the UC table by `upload.py` |
 | `suppliers` | The vendors the enterprise buys from, each carrying a procurement risk score and a specialty | `id, name, category, subcategory, riskScore` | `subcategory` is the supplier's specialty within its category (for example `glass bottles` or `raw glass` under `packaging`), never null. It is the column the lakehouse-only engine groups by in Story 1 (the "five glass-bottle suppliers, diversified" read); `riskScore` is what drives the High-Risk Supplier term |
 | `business_units` | The enterprise's own internal divisions; the pivot customers roll up into, suppliers feed, and revenue is booked to | `id, name, region` | Rolls up customers, suppliers, and revenue |
 | `invoices` | Bills the enterprise issued to its customers, each recording what was owed, when it was due, and how late it was paid | `id, customerId, amount, currency, issueDate, dueDate, paidDate, daysLate, status` | `customerId` joins to `customers.id`. Backs the Delinquent Customer term and Jade's open-balance exposure |
@@ -61,7 +69,7 @@ Every table also carries a comment, and the columns whose meaning cannot be read
 | `supply_relationships` | The supplier-to-supplier links: which supplier supplies which other supplier | `fromSupplierId, toSupplierId` | New table. A row means the supplier named in `fromSupplierId` supplies the one named in `toSupplierId`, and the direction runs the way the material does. One of two CSVs that load into both sides: UC gets the table so the lakehouse-only engine can see the raw links, and Neo4j gets the supplier-to-supplier `SUPPLIES` edges |
 | `owned_by` | The ownership stakes between customers: who owns whom, and how much of them | `customer_id, parent_customer_id, ownershipPct` | New table. A row `customer_id = CUST-904, parent_customer_id = CUST-901, ownershipPct = 0.85` means Kestrel owns 85% of Jade. A customer can appear as `customer_id` on several rows, so ownership is a multi-parent DAG, not a tree. Loads into both sides: UC gets the table so the lakehouse-only engine has the full structure and the stakes, and Neo4j gets the `OWNED_BY` edges with `ownershipPct` as a relationship property |
 
-The commercial and payment-behavior attributes on `customers` (`churnRisk`, `upsellScore`, `profitabilityTrend`, `avgDaysLate`, `overdueShare`) provide background realism so the population looks ordinary; no story depends on them.
+The source CSV and Neo4j Customer nodes also carry `churnRisk`, `upsellScore`, `profitabilityTrend`, `avgDaysLate`, and `overdueShare`. `upload.py` deliberately excludes these predicted and derived fields from the UC customer table. Story 3 depends on the last two inside Neo4j; the first three provide background realism only.
 
 One bridge table, `supplier_business_units` (`supplierId, businessUnitId`), carries the many-to-many supplier-to-unit link so the lakehouse can join suppliers to the units they supply. It mirrors the supplier-to-unit `SUPPLIES` edge and is uploaded to UC but not loaded into Neo4j.
 
@@ -77,7 +85,7 @@ It exists for correctness, not for meaning. `customers` has two independent one-
 
 | Table | Business description | Columns (key) | Notes |
 |---|---|---|---|
-| `classifications` | Business-term labels assigned to customers and suppliers, with the reason that produced them | `entity_id, entity_type, term, reason, evaluated_at, rule_version` | Materializes the `CLASSIFIED_AS` edges written back from Neo4j, each carrying rule provenance. The four column-findable terms carry these edges, and Critical Supplier now does too, written by `gds.py` from the governed threshold as a stand-in for a production batch job. Ownership Risk alone carries no edge and is resolved live, so it is the one term absent from this table. This table is held out of the Genie space by `banned_tables` in `guard.py`, which is what keeps the materialized Critical Supplier label from reaching the lakehouse-only engine |
+| `classifications` | Business-term labels assigned to customers and suppliers, with the reason that produced them | `entity_id, entity_type, term, reason, evaluated_at, rule_version` | Materializes `CLASSIFIED_AS` edges with rule provenance. The four column-findable terms are loaded, while `gds.py` derives Critical Supplier and Risky Customer. Ownership Risk alone has no materialized edge. This table is held out of the Genie space by `banned_tables` in `guard.py` |
 | `business_unit_exposure` | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_count, avg_supplier_risk, max_supplier_risk` | One row per business unit, reporting supplier count, average, and max feeding-supplier risk, ordered by supplier count |
 
 **The two gold tables must never be added to the Genie space.** They materialize the graph's answers into Delta. Re-adding them re-introduces write-back leakage, so the lakehouse-only engine could read the graph's conclusions straight from a column and tie. That leakage is the exact failure the demo is built to avoid, so the gold tables stay out of the space. See "GDS properties" below for the same rule applied to the graph algorithm scores.
@@ -125,7 +133,7 @@ RETURN c, bu, i, f LIMIT 25;
 | `BusinessTerm` | `name, definition` | A named business definition the organization agrees on | For example "Critical Supplier" or "Ownership Risk" |
 | `BusinessRule` | `name, expression, description` | The machine-evaluable logic that backs a term | Machine-evaluable logic behind a term |
 | `Measure` | `name, definition, grain, aggregation` | What a business term is worth, expressed as a governed euro quantity | Supply Exposure and Credit Exposure. A term says what something is; a measure says what it costs. `grain` names the level the figure is reported at; `aggregation` carries the arithmetic the lakehouse is asked for |
-| `GraphMetric` | `name, nodeLabel, property, algorithm, description` | The precomputed graph score a graph-native term is detected by | Supply Betweenness (`Supplier.betweenness`) and Ownership Contagion (`Customer.pagerank`). `nodeLabel` and `property` locate the score; `algorithm` names the GDS procedure that produced it. Detection, not valuation |
+| `GraphMetric` | `name, nodeLabel, property, algorithm, description` | The precomputed graph score a graph-native term is detected by | Supply Betweenness (`Supplier.betweenness`), Ownership Contagion (`Customer.pagerank`), and Delinquency Similarity (`Customer.delinquencySimilarity`). `nodeLabel` and `property` locate the score; `algorithm` names the GDS procedure that produced it |
 | `Policy` | `name, type` | A governance policy that scopes entities and rules | For example Credit Risk Policy, Supply Chain Resilience Policy |
 | `Threshold` | `name, value, currency` | A parameter value a business term depends on | For example the Supplier Risk Threshold |
 | `DataSource` | `name, system, table` | The physical table a logical entity is stored in | Lineage target; `table` holds the real Unity Catalog table name |
@@ -143,7 +151,7 @@ RETURN label, n;
 
 ## The knowledge layer (governed ontology)
 
-The knowledge layer is rebuilt from scratch so every governed concept earns its place in one of the two stories or the background contrast. Entities map to tables, terms are defined by rules, rules read entities, policies govern rules and constrain entities, thresholds apply to terms. The payoff is the two graph-native terms: their definitions and thresholds live only in the graph, and no lakehouse column carries them, which is exactly why the lakehouse-only engine cannot resolve them.
+The knowledge layer is rebuilt from scratch so every governed concept earns its place in one of the three stories or the background contrast. Entities map to tables, terms are defined by rules, rules read entities, policies govern rules and constrain entities, thresholds apply to terms. The payoff is the three graph-native terms: their definitions and thresholds live only in the graph, and no lakehouse column carries them.
 
 ### Entities and their table mappings
 
@@ -172,8 +180,9 @@ Each entity is a logical business object mapped to one Unity Catalog table by a 
 | High-Risk Supplier | A supplier whose procurement risk score meets or exceeds the threshold | Rule, column-findable |
 | Critical Supplier | A supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it; it need not sell to that business unit directly, and often does not | Graph-native, no column |
 | Ownership Risk | An active, clean-record customer (its own invoices, no default, not delinquent) that absorbs more failure through its ownership stakes than any other trading customer, where risk propagates from every default in proportion to the size of each stake; defaulted members and invoice-less holding companies are excluded | Graph-native, no column |
+| Risky Customer | An active customer, neither defaulted nor already Delinquent, with at least half of its ten nearest payment-behavior neighbours already classified Delinquent | Graph-native early warning, no lakehouse column |
 
-The two graph-native terms are the whole point. **Critical Supplier and Ownership Risk have no lakehouse column, and a governing cutoff that lives only in the graph.** Both algorithms are expressible in SQL. What no BI tool does is reach for an all-pairs shortest-path computation or an iterative weighted propagation, unprompted, from a business question, and the cutoff that decides each answer is a governed value in the graph rather than a column to sort on. Their definitions live in the graph. The four column-findable terms exist to make the contrast honest: they show what the lakehouse-only engine can govern, so the gap is clearly the two it cannot.
+The three graph-native terms are the point. Their metrics and governing cutoffs live only in the graph. The algorithms are expressible elsewhere, but no BI tool reaches unprompted for an all-pairs shortest-path computation, iterative weighted propagation, or governed nearest-neighbour screen from a business question. The four column-findable terms make the contrast honest by showing what the lakehouse-only engine can answer directly.
 
 ### Business rules
 
@@ -187,10 +196,11 @@ One rule defines each term, by a `DEFINED_BY` edge, and reads one or more entiti
 | High-Risk Supplier Rule | High-Risk Supplier | risk score is at least 70 | Supplier |
 | Critical Supplier Rule | Critical Supplier | a disproportionate share of the supply paths carrying a commodity into a business unit run through the supplier, leaving the unit few alternatives if it stops; measured as supply betweenness over the multi-tier `SUPPLIES` network (walked transitively) at or above the supply concentration threshold, which catches a cohort rather than a single name | Supplier, SupplyRelationship, BusinessUnit |
 | Ownership Risk Rule | Ownership Risk | stake-weighted propagated risk over `OWNED_BY` (walked transitively, weighted by `ownershipPct`, propagated from every Defaulted Customer) at or above the ownership contagion threshold | Customer |
+| Risky Customer Rule | Risky Customer | an eligible customer's share of already-Delinquent accounts among its ten nearest standardized payment-behavior neighbours is at least the customer similarity threshold | Customer |
 | Supply Exposure Rule | Supply Exposure measure | sum of recognized revenue for the most recent full quarter, over every business unit whose entire supply of the commodity at risk runs through the supplier, counting only paths on which every supplier trades in that commodity | RevenueEntry, BusinessUnit |
 | Credit Exposure Rule | Credit Exposure measure | the customer's total committed credit facility, reported alongside the open invoice balance drawn against it | Invoice, Customer |
 
-The two graph-native rules are expressed as traversals and graph metrics, never as a column predicate. Critical Supplier references betweenness over the supply network; Ownership Risk references stake-weighted propagation over transitive ownership. Both read the precomputed Neo4j node properties, not a Delta column. Neither reduces to an aggregate over the underlying tables: the most connected supplier is not Cascade, and the account nearest a default is not Jade.
+The three graph-native rules use graph metrics rather than a lakehouse column predicate. Critical Supplier references betweenness, Ownership Risk references stake-weighted propagation, and Risky Customer references a kNN-derived delinquent-neighbour share. All read precomputed Neo4j node properties.
 
 Two further rules define the measures rather than the terms. The Supply Exposure Rule reads `RevenueEntry` and `BusinessUnit`; the Credit Exposure Rule reads `Invoice` and `Customer`. Each rule carries its aggregation in its expression, the same way the High-Risk Supplier Rule carries `riskScore >= 70`.
 
@@ -205,7 +215,7 @@ BusinessTerm -MEASURED_BY-> Measure -DEFINED_BY-> BusinessRule -EVALUATES-> Enti
 | Measure | Measures term | Plain meaning | Defined by | Reads (EVALUATES) |
 |---|---|---|---|---|
 | Supply Exposure | Critical Supplier | The recognized revenue at risk behind a critical supplier: the most recent full quarter of recognized revenue for every business unit whose commodity-carrying supply of the material at risk all runs through that supplier | Supply Exposure Rule | RevenueEntry, BusinessUnit |
-| Credit Exposure | Ownership Risk | The total committed credit facility on a customer, with the open invoice balance being the drawn portion of that facility rather than an addition to it | Credit Exposure Rule | Invoice, Customer |
+| Credit Exposure | Ownership Risk, Risky Customer | The total committed credit facility on a customer, with the open invoice balance being the drawn portion of that facility rather than an addition to it | Credit Exposure Rule | Invoice, Customer |
 
 Supply Exposure is the revenue that stops when the supplier stops, not revenue attributable to the supplier. The dataset carries no supplier spend column, so no attribution is possible on either engine, and the measure does not claim one.
 
@@ -215,12 +225,13 @@ The graph holds no euros. A measure tells the graph engine which entity, which t
 
 ### Graph metrics
 
-Where a measure says what a term is worth, a `GraphMetric` says how the term is detected. The two graph-native terms each name their precomputed score formally through a `SCORED_BY` edge, so the governed vocabulary is reachable from the term rather than carried only in prose.
+Where a measure says what a term is worth, a `GraphMetric` says how the term is detected. The three graph-native terms each name their precomputed score formally through a `SCORED_BY` edge.
 
 | Graph metric | Scores term | Node property |
 |---|---|---|
 | Supply Betweenness | Critical Supplier | `Supplier.betweenness` |
 | Ownership Contagion | Ownership Risk | `Customer.pagerank` |
+| Delinquency Similarity | Risky Customer | `Customer.delinquencySimilarity` |
 
 The scores themselves stay Neo4j node properties and are never synced to Delta. See "GDS properties" below.
 
@@ -228,7 +239,7 @@ The scores themselves stay Neo4j node properties and are never synced to Delta. 
 
 | Policy | Governs (rules) | Constrains (entities) |
 |---|---|---|
-| Credit Risk Policy | Delinquent Customer Rule, Defaulted Customer Rule, Ownership Risk Rule, Credit Exposure Rule | Customer |
+| Credit Risk Policy | Delinquent Customer Rule, Defaulted Customer Rule, Ownership Risk Rule, Risky Customer Rule, Credit Exposure Rule | Customer |
 | Supply Chain Resilience Policy | High-Risk Supplier Rule, Critical Supplier Rule, Supply Exposure Rule | Supplier |
 | Compliance (KYC) Policy | (none) | Customer (via ComplianceFinding) |
 
@@ -242,10 +253,11 @@ The Compliance (KYC) Policy carries no rule. It is operationalized through compl
 | Late Payment Threshold | 60 days | Delinquent Customer |
 | Supply Concentration Threshold | a supply-betweenness cutoff, resolved from a percentile fixed before the run | Critical Supplier |
 | Ownership Contagion Threshold | a stake-weighted propagated-risk (weighted personalized PageRank) cutoff, set from the computed distribution | Ownership Risk |
+| Customer Similarity Threshold | 0.5 of ten nearest payment-behavior neighbours | Risky Customer |
 
-The two graph-native thresholds are governed values in the graph, never columns, but they are set by different routes. The Supply Concentration Threshold states a percentile of supply betweenness, hand-set in the generator before any score exists and before the topology it will be applied to exists, and the run resolves that percentile into a value. The resolved cutoff is therefore an output of the run and not a target it was aimed at, which is why the percentile is committed ahead of the data rather than alongside it. Cascade clears it, and so do the other suppliers at or above the same percentile: it selects a cohort rather than a single name, and `assert_betweenness` in `gds.py` fails the build if that cohort has fewer than two members. Where Cascade ranks is reported, never asserted. The Ownership Contagion Threshold is placed after weighted personalized PageRank runs, from the score distribution, so that Jade clears it and no other trading customer does.
+The three graph-native thresholds are governed values in the graph, never lakehouse columns, but they have different lifecycles. The Supply Concentration Threshold resolves a pre-authored percentile against the computed betweenness distribution. The Ownership Contagion Threshold is placed after weighted PageRank runs. The Customer Similarity Threshold is already on the metric's 0-to-1 scale, so its value is authored before kNN and only verified after scoring.
 
-That the two thresholds differ in shape is recorded rather than tidied. THR-03's `basis` column carries the authored percentile while its `value` carries the resolved cutoff, because one column cannot honestly hold both. THR-04's `basis` is left empty, since its honest text would describe a fitted cutoff rather than a governed parameter, and Story 2 is out of scope for redesign.
+That the three differ in shape is recorded rather than tidied. THR-03's `basis` column carries the authored percentile while its `value` carries the resolved cutoff, because one column cannot honestly hold both. THR-04's `basis` is left empty, since its honest text would describe a fitted cutoff rather than a governed parameter, and Story 2 is out of scope for redesign. THR-05 is the only one of the three that carries both columns truthfully: its `value` is the authored parameter and its `basis` is the plain English a credit committee would write, because a neighbour share needs no translation into the units of the score it governs. `gds.py` reads that value and asserts it still matches the constant the generator authored, which is how a stale graph snapshot read by a newer script gets caught.
 
 `APPLIES_TO` runs from the threshold to the term, so a traversal that starts at a term and follows outbound edges reaches the rule and the tables but never the number. The `USES_THRESHOLD` edge from rule to threshold closes that gap, and the graph-native rules also carry the value inline on a `threshold` property the way the column-findable rules already do. The redundancy is deliberate.
 
@@ -253,7 +265,7 @@ That the two thresholds differ in shape is recorded rather than tidied. THR-03's
 
 Column-findable classifications are pre-planted as `CLASSIFIED_AS` edges carrying provenance (reason, evaluated-at, rule version): Jade to Strategic Account; every customer carrying a recorded default, the four Kestrel members among them, to Defaulted Customer; the background high-risk suppliers to High-Risk Supplier; the background late payers to Delinquent Customer. These are deterministic facts, and the membership of each cohort is listed under `classification_cohorts` in `data/ground_truth.json`.
 
-**Ownership Risk is resolved live, never pre-planted. Critical Supplier is now pre-planted, on purpose.** No `CLASSIFIED_AS` edge is created for Ownership Risk: the graph engine resolves the governed definition from the ontology, then walks the graph live using the precomputed PageRank node properties to apply it, so that label never exists as a materializable row anywhere and cannot leak into a gold table by construction. Critical Supplier used to work the same way, and a re-probe killed that reasoning: an agent doing schema discovery saw four terms carrying classification edges and two without, applied the majority pattern to Critical Supplier, got zero rows, and reported that the system does not classify critical suppliers. So `gds.py` now writes Critical Supplier `CLASSIFIED_AS` edges from the THR-03 cohort, which materialize into the `classifications` gold table. For Critical Supplier the leak guarantee is no longer structural: the label does materialize, and what keeps it away from the lakehouse-only engine is `banned_tables` in `guard.py` holding the `classifications` table out of the Genie space. The GDS scores themselves are still never synced to Delta.
+**Ownership Risk is resolved live and carries no `CLASSIFIED_AS` edge. Critical Supplier and Risky Customer are derived by `gds.py` and materialized with provenance.** Risky Customer also carries neighbour-evidence edges so its classification is directly explainable. These labels can flow into the `classifications` gold table, which is why `guard.py` must keep that table out of the Genie space. The GDS scores themselves are never synced to Delta.
 
 ## Relationships
 
@@ -284,11 +296,11 @@ RETURN a, r, b;
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
 | `DEFINED_BY` | `(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)` and `(:Measure)-[:DEFINED_BY]->(:BusinessRule)` | A business term or a measure is backed by this rule | One rule per term, and one rule per measure. The same edge type serves both, so nothing new has to be discovered to walk from a measure down to its tables |
-| `MEASURED_BY` | `(:BusinessTerm)-[:MEASURED_BY]->(:Measure)` | A business term carries this governed euro measure | What the term is worth. Critical Supplier reaches Supply Exposure; Ownership Risk reaches Credit Exposure |
-| `SCORED_BY` | `(:BusinessTerm)-[:SCORED_BY]->(:GraphMetric)` | A graph-native term is detected by this precomputed graph score | How the term is detected. Critical Supplier reaches Supply Betweenness; Ownership Risk reaches Ownership Contagion. Distinct from `MEASURED_BY`, which is valuation rather than detection |
+| `MEASURED_BY` | `(:BusinessTerm)-[:MEASURED_BY]->(:Measure)` | A business term carries this governed euro measure | Critical Supplier reaches Supply Exposure; Ownership Risk and Risky Customer reach Credit Exposure |
+| `SCORED_BY` | `(:BusinessTerm)-[:SCORED_BY]->(:GraphMetric)` | A graph-native term is detected by this precomputed graph score | Critical Supplier reaches Supply Betweenness, Ownership Risk reaches Ownership Contagion, and Risky Customer reaches Delinquency Similarity |
 | `USES_THRESHOLD` | `(:BusinessRule)-[:USES_THRESHOLD]->(:Threshold)` | A rule applies this governed cutoff | Gives the cutoff a forward path from the rule, since `APPLIES_TO` runs the other way and a term-outbound traversal never reaches the number |
 | `EVALUATES` | `(:BusinessRule)-[:EVALUATES]->(:Entity)` | A rule operates over this logical entity | The rule reads one or more entities |
-| `GOVERNS` | `(:Policy)-[:GOVERNS]->(:BusinessRule)` | A policy operationalizes this rule | Credit Risk governs the Delinquent, Defaulted, Ownership Risk, and Credit Exposure rules; Supply Chain Resilience governs the High-Risk Supplier, Critical Supplier, and Supply Exposure rules; the Compliance (KYC) Policy governs no rule, since it is operationalized through `ComplianceFinding` records |
+| `GOVERNS` | `(:Policy)-[:GOVERNS]->(:BusinessRule)` | A policy operationalizes this rule | Credit Risk governs the Delinquent, Defaulted, Ownership Risk, Risky Customer, and Credit Exposure rules; Supply Chain Resilience governs the High-Risk Supplier, Critical Supplier, and Supply Exposure rules; the Compliance (KYC) Policy governs no rule, since it is operationalized through `ComplianceFinding` records |
 | `CONSTRAINS` | `(:Policy)-[:CONSTRAINS]->(:Entity)` | A policy governs this logical entity | Policy scope, the entity a policy governs |
 | `APPLIES_TO` | `(:Threshold)-[:APPLIES_TO]->(:BusinessTerm)` | A threshold parameterizes this term | Threshold that parameterizes a term |
 | `MAPS_TO` | `(:Entity)-[:MAPS_TO]->(:DataSource)` | The semantic mapping: a logical entity is stored in this physical source | Lineage from logical entity to physical source; `DataSource.table` points at the real UC table |
@@ -309,7 +321,8 @@ RETURN a, r, b;
 | Relationship | Pattern | Business description | Notes |
 |---|---|---|---|
 | `REALIZED_AS` | `(:Entity)-[:REALIZED_AS]->(:Customer\|:Supplier\|:BusinessUnit\|:Invoice\|:RevenueEntry\|:ComplianceFinding)` | A logical entity is realized by these physical instances | Logical entity to its physical instances. The six instance entities (Customer, Supplier, BusinessUnit, Invoice, RevenueEntry, ComplianceFinding) are realized; SupplyRelationship has a table mapping but no realized instance nodes |
-| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with a column-findable business term | Materialized classification with provenance; written back to the `classifications` Delta table. Only the four column-findable terms carry these edges. The two graph-native terms are never planted here |
+| `CLASSIFIED_AS` | `(:Customer\|:Supplier)-[:CLASSIFIED_AS {reason, evaluatedAt, ruleVersion}]->(:BusinessTerm)` | An instance is labeled with a governed business term | Four cohorts load from CSV; Critical Supplier and Risky Customer are derived by `gds.py` |
+| `SIMILAR_PAYMENT_BEHAVIOR` | `(:Customer)-[:SIMILAR_PAYMENT_BEHAVIOR {similarity, neighbourRank, evaluatedAt}]->(:Customer)` | Evidence linking a Risky Customer to a delinquent nearest neighbour | Derived by `gds.py`; every link contributes to the source customer's delinquency-similarity score |
 
 Sample the cross-layer edges that tie the knowledge layer to instances:
 
@@ -322,7 +335,7 @@ CALL (relType) {
 RETURN a, r, b;
 ```
 
-The `CLASSIFIED_AS` edge is the explainability payoff: every one traces instance to business term to rule to entity to data source. The four column-findable terms carry it, and Critical Supplier now does too. Ownership Risk is the exception, explainable through a live traversal over the precomputed graph metrics rather than a stored edge.
+The `CLASSIFIED_AS` edge traces an instance to its business term, rule, entity, and data source. Risky Customer adds a second explanation path through `SIMILAR_PAYMENT_BEHAVIOR` to the known delinquent accounts that made it qualify. Ownership Risk remains the exception, explained through a live ownership traversal.
 
 ## CSV Mapping
 
@@ -339,7 +352,7 @@ The `Measure` and `GraphMetric` nodes and their `MEASURED_BY`, `SCORED_BY`, and 
 
 ## GDS properties (precomputed, never synced to Delta)
 
-The two graph-native terms are resolved with two Graph Data Science passes, precomputed once and stored as Neo4j node properties.
+The three graph-native terms are resolved with three Graph Data Science passes, precomputed once and stored as Neo4j node properties.
 
 ### Betweenness centrality (Critical Supplier)
 
@@ -353,9 +366,19 @@ The two graph-native terms are resolved with two Graph Data Science passes, prec
 - **Why it matters:** the late-payment rule only catches customers who already trip it. Weighted PageRank propagates default risk along the ownership stakes, so Jade lights up even though nothing within two hops of it has failed: the four defaults are three levels away, reached through Harbour and Tern, and the stakes along that path run 65% to 90%, so the failures arrive largely intact. Jade's own record is spotless throughout.
 - **Story line:** the payment rule finds the late payers; the graph finds the clean payer holding the far end of a chain of wide stakes.
 
+### Payment-behavior kNN (Risky Customer)
+
+- **What it does:** standardizes `avgDaysLate` and `overdueShare` to z-scores, compares the pair as one vector, finds ten nearest neighbours for every Customer, and stores the share already classified Delinquent as `Customer.delinquencySimilarity`.
+- **Why the standardization is not cosmetic:** GDS scores each node property separately and averages, using `1/(1+|a-b|)` for a scalar. On the raw columns a typical gap in `overdueShare` scores an order of magnitude higher than a typical gap in `avgDaysLate`, so the neighbourhood would rank on overdue share alone with lateness flattened into a near-constant. Scaling both and passing them as one vector is what makes "nearest neighbour" mean similar payment behavior rather than similar on whichever feature has the narrower range.
+- **Why it matters:** the Delinquent rule only catches accounts after three severe misses. kNN surfaces similar behavior while the customer remains eligible for intervention.
+- **Why it is deterministic:** the pass pins full sampling, no early convergence, a fixed random seed, and single-threaded execution, because the cohort that clears the threshold is read straight off these neighbourhoods and two runs that disagreed would move who gets classified. The seed matters more than the customer count suggests, since many customers pay on time and carry identical feature pairs. The implementation stays neighbour-descent rather than a brute-force exact search, so the build validates that every customer came back with ten unique non-self neighbours before any classification is written.
+- **Why the delinquent accounts stay in the pool:** eligibility is applied after scoring, not before. Removing the delinquent customers up front would remove the very neighbours the score is looking for, so they remain scoreable neighbours while being excluded from classification themselves.
+- **Explainability:** each classified customer retains the specific delinquent neighbours behind its score, including similarity and rank.
+- **Story line:** the rule finds failure; the graph creates time to act.
+
 ### Why they never sync to Delta
 
-**Both scores stay as Neo4j node properties only. Neither is ever written into a Delta table.** Syncing them would re-materialize the graph's answers into a column the lakehouse-only engine could sort by, and the contrast the demo is built on would collapse: the lakehouse-only engine would tie. This is the same guardrail as the two gold tables staying out of the Genie space. The graph-native terms have no lakehouse column by design, and the GDS scores must stay in the graph to keep it that way.
+**All three scores stay as Neo4j node properties only. None is written into a Delta table.** Syncing them would re-materialize the graph's answers into columns the lakehouse-only engine could sort by. This is the same guardrail as keeping the two gold tables out of the Genie space.
 
 ## Lineage
 

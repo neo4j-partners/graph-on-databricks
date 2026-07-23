@@ -1,15 +1,15 @@
 {
   "schema_version": 2,
   "seed": 42,
-  "as_of_date": "2026-07-19",
+  "as_of_date": "2026-07-21",
   "summary": {
     "customers": 508,
     "suppliers": 169,
     "business_units": 5,
-    "invoices": 3007,
+    "invoices": 3026,
     "revenue_entries": 60,
-    "compliance_findings": 89,
-    "supply_relationships": 432,
+    "compliance_findings": 88,
+    "supply_relationships": 443,
     "owned_by_edges": 119
   },
   "story1_hidden_glassworks": {
@@ -23,15 +23,15 @@
       "SUP-906"
     ],
     "tier1_risk_scores": {
-      "SUP-902": 20,
-      "SUP-903": 36,
-      "SUP-904": 35,
-      "SUP-905": 19,
-      "SUP-906": 19
+      "SUP-902": 39,
+      "SUP-903": 21,
+      "SUP-904": 32,
+      "SUP-905": 16,
+      "SUP-906": 18
     },
     "business_unit": "BU-03",
     "last_quarter": "2026-Q2",
-    "bu03_last_quarter_revenue": 4251871.6
+    "bu03_last_quarter_revenue": 4273507.48
   },
   "story2_clean_payer": {
     "kestrel_id": "CUST-901",
@@ -53,18 +53,18 @@
       "CUST-908"
     ],
     "seed_ids": [
-      "CUST-072",
-      "CUST-126",
-      "CUST-175",
-      "CUST-187",
-      "CUST-203",
-      "CUST-240",
-      "CUST-254",
-      "CUST-296",
-      "CUST-329",
-      "CUST-338",
-      "CUST-456",
-      "CUST-461",
+      "CUST-010",
+      "CUST-016",
+      "CUST-052",
+      "CUST-074",
+      "CUST-118",
+      "CUST-135",
+      "CUST-177",
+      "CUST-242",
+      "CUST-281",
+      "CUST-347",
+      "CUST-358",
+      "CUST-399",
       "CUST-491",
       "CUST-902",
       "CUST-903",
@@ -72,20 +72,20 @@
       "CUST-908"
     ],
     "defaulted_period": "2026-Q2",
-    "jade_open_invoice_balance": 273242.24,
+    "jade_open_invoice_balance": 222153.66,
     "jade_credit_limit": 800000,
     "jade_exposure": 800000.0
   },
   "classification_cohorts": {
     "high_risk_suppliers": [
-      "SUP-015",
-      "SUP-056",
-      "SUP-057",
-      "SUP-073",
-      "SUP-077",
-      "SUP-084",
-      "SUP-100",
-      "SUP-138"
+      "SUP-002",
+      "SUP-043",
+      "SUP-044",
+      "SUP-060",
+      "SUP-064",
+      "SUP-071",
+      "SUP-087",
+      "SUP-125"
     ],
     "delinquent_customers": [
       "CUST-062",
@@ -114,23 +114,33 @@
       "CUST-904"
     ],
     "defaulted_customers": [
-      "CUST-072",
-      "CUST-126",
-      "CUST-175",
-      "CUST-187",
-      "CUST-203",
-      "CUST-240",
-      "CUST-254",
-      "CUST-296",
-      "CUST-329",
-      "CUST-338",
-      "CUST-456",
-      "CUST-461",
+      "CUST-010",
+      "CUST-016",
+      "CUST-052",
+      "CUST-074",
+      "CUST-118",
+      "CUST-135",
+      "CUST-177",
+      "CUST-242",
+      "CUST-281",
+      "CUST-347",
+      "CUST-358",
+      "CUST-399",
       "CUST-491",
       "CUST-902",
       "CUST-903",
       "CUST-906",
       "CUST-908"
+    ],
+    "near_miss_customers": [
+      "CUST-048",
+      "CUST-171",
+      "CUST-232",
+      "CUST-246",
+      "CUST-251",
+      "CUST-285",
+      "CUST-350",
+      "CUST-480"
     ]
   }
 }

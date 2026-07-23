@@ -153,6 +153,17 @@ SECTIONS = (
             ),
             Row("Strategic Account", "classification_cohorts.strategic_accounts"),
             Row("Defaulted Customer", "classification_cohorts.defaulted_customers"),
+            # Planted payment behaviour, not a planted classification, so this is
+            # the one row here that does not name a cohort the graph will return.
+            # The Risky Customer cohort is resolved by gds.py from the scored
+            # neighbourhoods and is deliberately not the same set: it catches
+            # customers nobody planted and misses planted ones that came in under
+            # the governed share. Read the cohort off the gds.py output, not here.
+            Row(
+                "Near-miss payment behaviour (planted)",
+                "classification_cohorts.near_miss_customers",
+                varies=True,
+            ),
         ),
     ),
 )
