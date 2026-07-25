@@ -52,7 +52,7 @@ Each classified customer retains `SIMILAR_PAYMENT_BEHAVIOR` edges to the delinqu
 
 ## Lakehouse Tables (Unity Catalog Delta)
 
-The lakehouse holds three kinds of table: the **core instance tables** that carry the facts, the two **gold write-back tables** the pipeline produces, and one **bridge table**, plus one **metric view** over the customer tables. Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC. The two gold tables are snake_case, built from Cypher `RETURN` aliases.
+The lakehouse holds two kinds of table: the **core instance tables** that carry the facts and one **bridge table**, plus one **metric view** over the customer tables. The pipeline materializes no gold tables: the graph's conclusions stay in Neo4j and never reach a Delta column. Instance-table columns are camelCase, since the CSV headers load verbatim into both Neo4j and UC.
 
 Every table also carries a comment, and the columns whose meaning cannot be read off the name carry one too. `upload.py` applies these on every run, since `CREATE OR REPLACE TABLE` drops them. There are deliberately no primary or foreign key constraints: Databricks' Genie guidance ranks descriptions, metric views, and example SQL as the levers that matter and does not mention constraints, and the aggregate fanout they were meant to prevent is prevented structurally by the metric view below.
 
@@ -79,16 +79,11 @@ One metric view, `customer_risk_exposure`, sits over `customers` joined to `invo
 
 It exists for correctness, not for meaning. `customers` has two independent one-to-many branches hanging off it, and a query joining both in one pass multiplies each by the other's row count: one customer's open exposure came back multiplied by its finding count, and its open findings came back multiplied by its invoice count. Declaring the cardinality makes each measure aggregate at its own source grain, so the fanout stops being something a query can express. Every measure in it is an aggregate over columns the lakehouse-only engine could already read, so it adds no knowledge the graph owns.
 
-`compliance_findings` is in the Genie space, given to the lakehouse-only engine like every other instance table, because the fairness rule is non-negotiable: both engines get every table and nothing is withheld. It carries no graph-derived conclusion, being raw instance data that already feeds the `customer_risk_exposure` metric view above, so it is unlike the two gold tables guarded out below, which materialize the graph's answers. When a question needs aggregated finding counts, the metric view's `open_finding_count` and `finding_count` are the right path, because they aggregate at their own source grain and so cannot fan a customer's finding count out by its invoice count the way a raw two-branch join off `customers` can; the raw table is present for any question that reads it directly. `ComplianceFinding` also maps to the table in the lineage layer.
+`compliance_findings` is in the Genie space, given to the lakehouse-only engine like every other instance table, because the fairness rule is non-negotiable: both engines get every table and nothing is withheld. It carries no graph-derived conclusion, being raw instance data that already feeds the `customer_risk_exposure` metric view above. No table in the space carries a graph-derived conclusion, because the pipeline materializes none: the graph's answers stay in the graph. When a question needs aggregated finding counts, the metric view's `open_finding_count` and `finding_count` are the right path, because they aggregate at their own source grain and so cannot fan a customer's finding count out by its invoice count the way a raw two-branch join off `customers` can; the raw table is present for any question that reads it directly. `ComplianceFinding` also maps to the table in the lineage layer.
 
-### Gold write-back tables
+### No gold tables
 
-| Table | Business description | Columns (key) | Notes |
-|---|---|---|---|
-| `classifications` | Business-term labels assigned to customers and suppliers, with the reason that produced them | `entity_id, entity_type, term, reason, evaluated_at, rule_version` | Materializes `CLASSIFIED_AS` edges with rule provenance. The four column-findable terms are loaded, while `gds.py` derives Critical Supplier and Risky Customer. Ownership Risk alone has no materialized edge. This table is held out of the Genie space by `banned_tables` in `guard.py` |
-| `business_unit_exposure` | Each internal division's aggregate supplier-risk exposure | `business_unit_id, name, supplier_count, avg_supplier_risk, max_supplier_risk` | One row per business unit, reporting supplier count, average, and max feeding-supplier risk, ordered by supplier count |
-
-**The two gold tables must never be added to the Genie space.** They materialize the graph's answers into Delta. Re-adding them re-introduces write-back leakage, so the lakehouse-only engine could read the graph's conclusions straight from a column and tie. That leakage is the exact failure the demo is built to avoid, so the gold tables stay out of the space. See "GDS properties" below for the same rule applied to the graph algorithm scores.
+**The pipeline materializes no gold tables.** The graph's conclusions, the `CLASSIFIED_AS` classification verdicts and the per-business-unit supplier-risk aggregates, live only in Neo4j and are never written back into Delta. Writing a graph answer into a Delta column is write-back leakage: the lakehouse-only engine could then read the conclusion straight from a column and tie, which is the exact failure the demo is built to avoid. Earlier builds published two graph-derived tables, `classifications` and `business_unit_exposure`, and fenced them out of the Genie space by hand. `upload.py` no longer builds either and drops any stale copy a prior build left in the schema, so the leak is gone by construction rather than held back by a guard. `guard.py` keeps both names in `banned_tables` as a defensive backstop only. See "GDS properties" below for the same rule applied to the graph algorithm scores.
 
 The six core instance tables are mirrored into Neo4j as nodes; `supply_relationships` is not a node type, it sources the supplier-to-supplier `SUPPLIES` edges. Sample a few of each mirrored instance label:
 
@@ -265,7 +260,7 @@ That the three differ in shape is recorded rather than tidied. THR-03's `basis` 
 
 Column-findable classifications are pre-planted as `CLASSIFIED_AS` edges carrying provenance (reason, evaluated-at, rule version): Jade to Strategic Account; every customer carrying a recorded default, the four Kestrel members among them, to Defaulted Customer; the background high-risk suppliers to High-Risk Supplier; the background late payers to Delinquent Customer. These are deterministic facts, and the membership of each cohort is listed under `classification_cohorts` in `data/ground_truth.json`.
 
-**Ownership Risk is resolved live and carries no `CLASSIFIED_AS` edge. Critical Supplier and Risky Customer are derived by `gds.py` and materialized with provenance.** Risky Customer also carries neighbour-evidence edges so its classification is directly explainable. These labels can flow into the `classifications` gold table, which is why `guard.py` must keep that table out of the Genie space. The GDS scores themselves are never synced to Delta.
+**Ownership Risk is resolved live and carries no `CLASSIFIED_AS` edge. Critical Supplier and Risky Customer are derived by `gds.py` and materialized with provenance.** Risky Customer also carries neighbour-evidence edges so its classification is directly explainable. These labels stay in the graph as `CLASSIFIED_AS` edges and are never written back to Delta, so the governed verdict lives only where the definition that produced it lives. The GDS scores themselves are likewise never synced to Delta.
 
 ## Relationships
 
@@ -378,7 +373,7 @@ The three graph-native terms are resolved with three Graph Data Science passes, 
 
 ### Why they never sync to Delta
 
-**All three scores stay as Neo4j node properties only. None is written into a Delta table.** Syncing them would re-materialize the graph's answers into columns the lakehouse-only engine could sort by. This is the same guardrail as keeping the two gold tables out of the Genie space.
+**All three scores stay as Neo4j node properties only. None is written into a Delta table.** Syncing them would materialize the graph's answers into columns the lakehouse-only engine could sort by. This is the same guardrail as the pipeline materializing no gold tables: no graph conclusion, score or classification verdict, is ever written back to Delta.
 
 ## Lineage
 

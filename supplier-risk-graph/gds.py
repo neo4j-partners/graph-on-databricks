@@ -466,15 +466,13 @@ def write_critical_supplier_labels(
     materialized computation into the plant CONTRACT.md section 8 bans, and it
     would be the same betrayal whether or not the ids happened to be right.
 
-    **On the Delta write-back, which looks like leakage and is not.** These
-    edges do flow into the `classifications` gold table, because
-    CLASSIFICATIONS_SPEC in `upload.py` selects every CLASSIFIED_AS edge. That
-    is the intended alternative surfacing pattern and not an oversight. The
-    protection is that the gold tables are never attached to the Genie space,
-    which `banned_tables` in `guard.py` enforces against the space's declared
-    data sources on every run. Do not add a term filter to CLASSIFICATIONS_SPEC
-    to "fix" this: the filter would restore the empty-result failure above while
-    looking like a safety improvement.
+    **These edges stay in the graph and are never materialized to Delta.**
+    Earlier builds wrote every CLASSIFIED_AS edge back into the `classifications`
+    gold table, so the Critical Supplier verdict lived in a column the
+    lakehouse-only engine was merely fenced away from. That table is gone:
+    `upload.py` no longer materializes it and drops any stale copy on upload, so
+    the classification exists only where it is resolved. `guard.py` keeps the
+    banned-table name as a defensive backstop for the standalone guard run.
     """
     reason = (
         f"supply betweenness at or above the {conc.percentile}th percentile "
@@ -505,7 +503,7 @@ def write_critical_supplier_labels(
             f"Critical Supplier labelling wrote {written} of "
             f"{len(conc.members)} CLASSIFIED_AS edges. Every cohort member must "
             f"exist as a Supplier node and '{CRITICAL_SUPPLIER_TERM}' must exist "
-            f"as a BusinessTerm, or Beat 3 resolves to an empty result."
+            f"as a BusinessTerm, or the grounded chapter resolves to an empty result."
         )
     print(
         f"  labelled {written} supplier(s) as '{CRITICAL_SUPPLIER_TERM}' "
@@ -979,23 +977,23 @@ def update_thresholds_csv(path: Path, cutoffs: dict[str, float]) -> None:
 
 
 def check_three_legs(gds: GraphDataScience, protags: Protagonists) -> None:
-    """Beat 3's three legs resolve against the loaded graph.
+    """The grounded chapter's three legs resolve against the loaded graph.
 
     CONTRACT.md section 4 says the graph grounds its answer through exactly
     three capabilities, and section 7 asserts each of them resolves. Nothing
     checked that until now. This file asserted the scores it computes, but
     nothing walked the ontology to confirm the walk arrives anywhere, and leg 1
     is the load-bearing leg of the load-bearing claim: if TERM-05 does not reach
-    RULE-05 and THR-03, Beat 3 opens on a broken query.
+    RULE-05 and THR-03, the grounded chapter opens on a broken query.
 
     This is the mechanical half only. That the three produce three DISTINCT
     visible outputs on a screen cannot be asserted by a build and is a re-probe
     phase exit check instead.
     """
-    header("Beat 3: the three legs resolve")
+    header("Grounded chapter: the three legs resolve")
 
     # Leg 1, definition. The full authored walk, term to rule to threshold,
-    # which is the path Beat 3 opens on. Matched by term NAME rather than by id,
+    # which is the path the grounded chapter opens on. Matched by term NAME rather than by id,
     # because the name is what a question arrives as.
     leg1 = gds.run_cypher(
         """
@@ -1010,7 +1008,7 @@ def check_three_legs(gds: GraphDataScience, protags: Protagonists) -> None:
     if leg1.empty:
         sys.exit(
             f"Leg 1 does not resolve: no BusinessTerm named "
-            f"'{CRITICAL_SUPPLIER_TERM}' reaches a rule. Beat 3 opens by asking "
+            f"'{CRITICAL_SUPPLIER_TERM}' reaches a rule. The grounded chapter opens by asking "
             f"what a Critical Supplier is, and the graph cannot answer."
         )
     row = leg1.iloc[0]
@@ -1461,9 +1459,9 @@ def write_similarity_edges(
 ) -> None:
     """Materialize the neighbour evidence behind each classified customer.
 
-    Without this the Risky Customer beat can say who and cannot say why. The
+    Without this the Risky Customer chapter can say who and cannot say why. The
     score alone is a number that has to be taken on trust, and "why this
-    customer" is the Explanation step that Beat 3 answers with a supply path.
+    customer" is the Explanation step that the grounded chapter answers with a supply path.
     These edges are that path's counterpart: they name the already-delinquent
     accounts whose payment behaviour this customer's most resembles, so the
     answer on screen is a list of real customers rather than a decimal.
@@ -1527,11 +1525,12 @@ def write_risky_customer_labels(
 ) -> None:
     """Materialize CLASSIFIED_AS edges from the THR-05 screen to TERM-07.
 
-    Same reasoning as write_critical_supplier_labels, including the Delta
-    write-back note: these edges do reach the `classifications` gold table, and
-    what keeps them away from the lakehouse-only engine is `banned_tables` in
-    guard.py holding that table out of the Genie space. Do not add a term filter
-    to CLASSIFICATIONS_SPEC to "fix" it.
+    Same reasoning as write_critical_supplier_labels: these edges stay in the
+    graph and are no longer materialized to Delta. Earlier builds wrote them into
+    the `classifications` gold table, so the Risky Customer verdict lived in a
+    column the lakehouse-only engine was only fenced away from. That table is
+    gone, dropped by `upload.py`, so the early-warning classification exists only
+    where the scoring wrote it.
 
     **The cohort is derived and never enumerated.** Membership comes from the
     scored neighbourhoods, so the edges are an output of this run. The generator
@@ -1580,7 +1579,7 @@ def write_risky_customer_labels(
             f"Risky Customer labelling wrote {written} of {len(screen.members)} "
             f"CLASSIFIED_AS edges. Every screen member must exist as a Customer "
             f"node and '{RISKY_CUSTOMER_TERM}' must exist as a BusinessTerm, or "
-            f"the early-warning beat resolves to an empty result."
+            f"the early-warning chapter resolves to an empty result."
         )
     print(
         f"  labelled {written} customer(s) as '{RISKY_CUSTOMER_TERM}' "
@@ -1628,7 +1627,7 @@ def check_governed_threshold(gds: GraphDataScience) -> None:
         sys.exit(
             f"{SIMILARITY_THRESHOLD_ID} has no authored basis. It is the sentence "
             f"that answers the room's next question after the rule, and the "
-            f"early-warning beat opens on it."
+            f"early-warning chapter opens on it."
         )
     print(
         f"  {SIMILARITY_THRESHOLD_ID} and {RISKY_CUSTOMER_RULE_ID} both carry the "
@@ -1642,7 +1641,7 @@ def assert_risky_customers(
     """The screen must catch a cohort, and the plant must be findable in it.
 
     Three asserts, and none of them is about which customers come out. What the
-    beat claims is that an authored definition, applied to a graph metric, finds
+    chapter claims is that an authored definition, applied to a graph metric, finds
     accounts heading for delinquency before the rule trips. Each assert covers
     one way that claim could be false while everything else still passed.
 
@@ -1711,16 +1710,16 @@ def assert_risky_customers(
 
 
 def check_risky_customer_legs(gds: GraphDataScience, screen: Screen) -> None:
-    """The early-warning beat's three steps resolve, in the Beat 3 shape.
+    """The early-warning chapter's three steps resolve, in the grounded-chapter shape.
 
-    Deliberately parallel to check_three_legs. Beat 3 established that a grounded
+    Deliberately parallel to check_three_legs. The grounded chapter established that a grounded
     answer needs all three of Definition, Discovery and Explanation, and a second
-    grounded beat that only reaches two of them is a weaker version of the first
+    grounded chapter that only reaches two of them is a weaker version of the first
     rather than a second one. The mechanical half only: that the three produce
     three distinct visible outputs on a screen is a re-probe check, not a build
     one.
     """
-    header("The early-warning beat: the three steps resolve")
+    header("The early-warning chapter: the three steps resolve")
 
     # Definition. Term to rule to threshold, matched by term name because that is
     # how the question arrives.
@@ -1737,7 +1736,7 @@ def check_risky_customer_legs(gds: GraphDataScience, screen: Screen) -> None:
     if definition.empty:
         sys.exit(
             f"Definition does not resolve: no BusinessTerm named "
-            f"'{RISKY_CUSTOMER_TERM}' reaches a rule. The beat opens by asking "
+            f"'{RISKY_CUSTOMER_TERM}' reaches a rule. The chapter opens by asking "
             f"what a Risky Customer is, and the graph cannot answer."
         )
     row = definition.iloc[0]

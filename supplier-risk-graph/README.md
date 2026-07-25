@@ -56,7 +56,7 @@ In a lakehouse the facts are clean, but the *meaning* is scattered. What counts 
 - **What it finds:** group credit exposure inherited through the parent, not through Jade's own record.
 - **The decoy:** ranking by distance to the nearest default returns someone else. Nothing within two hops of Jade has failed, and the accounts sitting next to a default hold only a few percent of it.
 
-### Story 3: the customer heading toward delinquency
+### Story 3: the warning before delinquency
 
 - **Who:** a derived cohort, not a hand-picked protagonist. The current build includes planted near-miss accounts and at least one emergent customer found by the metric.
 - **Business term:** Risky Customer.
@@ -81,7 +81,7 @@ See [`DEMO.md`](DEMO.md) for the walkthrough and the two-engine comparison, and 
 - **`REALIZED_AS`:** links a logical entity to its physical instances.
 - **`CLASSIFIED_AS`:** records a classification with provenance. The four column-findable terms carry these edges. `gds.py` also writes the derived Critical Supplier and Risky Customer cohorts from their governed thresholds. Ownership Risk alone carries none and is resolved live.
 
-Graph properties and the instance tables use camelCase, so the Cypher in the walkthrough runs unchanged against either side. The two graph-derived gold tables, `classifications` and `business_unit_exposure`, are snake_case.
+Graph properties and the instance tables use camelCase, so the Cypher in the walkthrough runs unchanged against either side.
 
 ## The dataset
 
@@ -141,7 +141,7 @@ Each step depends on the state the previous one leaves behind, and two of the gr
    uv run gds.py
    ```
 
-4. **Upload to Unity Catalog.** Uploads the instance CSVs as Delta tables, including `supply_relationships` and `owned_by`, applies the semantic metadata Genie reads, builds the `customer_risk_exposure` metric view, and materializes the two graph-derived gold tables. The comments and the metric view are rebuilt on every run, because `CREATE OR REPLACE TABLE` drops them, which is also what makes the script idempotent with no bookkeeping.
+4. **Upload to Unity Catalog.** Uploads the instance CSVs as Delta tables, including `supply_relationships` and `owned_by`, applies the semantic metadata Genie reads, and builds the `customer_risk_exposure` metric view. It also drops any stale graph-derived gold table a prior build left in the schema, so the graph's conclusions never sit in a column. The comments and the metric view are rebuilt on every run, because `CREATE OR REPLACE TABLE` drops them, which is also what makes the script idempotent with no bookkeeping.
 
    ```bash
    uv run upload.py
@@ -183,7 +183,7 @@ Scope this space to the instance tables and nothing else.
    - **`owned_by`** (`customer_id`, `parent_customer_id`, `ownershipPct`): the full ownership structure and every stake. Included for the same reason: the demo is won on a computation the lakehouse will not perform, not by withholding a table.
    - **`supplier_business_units`** (`supplierId`, `businessUnitId`): the many-to-many supplier-to-unit bridge.
    - **`customer_risk_exposure`:** a metric view over `customers`, joined to `invoices` and `compliance_findings` with `cardinality: one_to_many` on each. Two independent one-to-many branches hang off `customers`, and joining both in one pass multiplies each by the other's row count. The metric view aggregates each measure at its own source grain, so the fanout stops being something a query can express. This is a SQL-correctness fix, not an answer: every measure in it is an aggregate over columns Genie could already read.
-   - **Gold tables:** `classifications` and `business_unit_exposure`, produced by the pipeline but kept out of the Genie space.
+   - **No gold tables.** Earlier builds published `classifications` and `business_unit_exposure` and kept them out of the space by hand. `upload.py` no longer produces either and drops any stale copy on upload, so the graph's conclusions never reach a column.
 
    `upload.py` writes table and column comments but declares no primary or foreign keys. Databricks' Genie guidance ranks descriptions, metric views, and example SQL as the levers that matter and does not mention constraints. The fanout constraints were meant to prevent is prevented structurally by the metric view instead.
 
@@ -191,7 +191,7 @@ Scope this space to the instance tables and nothing else.
 
    **`compliance_findings` and `owned_by` are both in the space**, given to the lakehouse-only engine like every other instance table. Neither carries a graph-derived conclusion: `owned_by` is the raw ownership stakes, and `compliance_findings` is raw instance data that already feeds the `customer_risk_exposure` metric view, which is itself in the space. When a question needs aggregated finding counts, prefer the metric view's `open_finding_count`, which aggregates each measure at its own source grain and so cannot fan a customer's finding count out by its invoice count the way a raw two-branch join off `customers` can. The raw table is present for any question that reads it directly. The `ComplianceFinding` nodes stay in the graph for the same reason the table stays in Unity Catalog: removing them would leave ENT-06 mapping to nothing and POL-03 Compliance (KYC) governing no data. `constrains.csv` points POL-03 at ENT-01 Customer, not ENT-06, so DEMO.md's policy-scope example does not depend on the finding nodes.
 
-3. **Do not add `classifications` or `business_unit_exposure` to the space.** They materialize the graph's answers into Delta, so adding them re-introduces write-back leakage and the lakehouse-only engine could read the graph's conclusions straight from a column. For the same reason, the GDS scores are never synced to Delta and live only in the graph.
+3. **The pipeline materializes no gold tables.** Earlier builds wrote `classifications` and `business_unit_exposure` back into Delta and fenced them out of the space by hand. Materializing the graph's answers into a column is write-back leakage, so those answers now live only in the graph: `upload.py` no longer builds either table and drops any stale copy on upload. `guard.py` keeps both names in its banned list as a defensive backstop, and for the same reason the GDS scores are never synced to Delta.
 
 4. **Add sample-question SQL** for a handful of the column-findable questions. Databricks ranks these trusted assets above text instructions, so they are the strongest lever in the space. Cover the mechanics the stories need: a region-scoped supplier query through the `supplier_business_units` bridge, customer exposure and compliance findings via the metric view, overdue balances by customer, revenue by business unit and quarter deriving the quarter from the monthly `period` date, and suppliers above a governed threshold passed as a concrete value.
 

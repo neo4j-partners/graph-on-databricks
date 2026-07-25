@@ -165,6 +165,15 @@ FILLER_STAKE_RANGE = (0.03, 0.18)
 SUPPLIER_RISK_THRESHOLD = 70  # riskScore on a 0-100 scale
 LATE_DAYS_THRESHOLD = 60  # days
 
+# Chance a recently-due background invoice is left unpaid ("overdue") instead of
+# settled. This is cosmetic realism only: it never lets a background customer
+# reach the Delinquent rule (daysLate stays at or under the threshold) and the
+# delinquent and near-miss cohorts are planted separately by id. Kept low so the
+# ledger reads like a healthy AR book with a troubled minority, roughly one in
+# seven customers touching an overdue invoice, rather than half the book carrying
+# a stray late payment.
+BACKGROUND_OVERDUE_PROB = 0.11
+
 # The floor on how many suppliers are intermediate, meaning they appear on both
 # sides of supply_relationships. On a star forest every centrality measure
 # collapses into degree, betweenness becomes a group-by, and the graph adds
@@ -1320,7 +1329,7 @@ def background_invoice(rng: random.Random, inv_id: str, customer_id: str) -> dic
         return _invoice(inv_id, customer_id, amount, issue, due, None, 0, "open")
     days_past = (AS_OF - due).days
     if days_past <= LATE_DAYS_THRESHOLD:
-        if rng.random() < 0.35:
+        if rng.random() < BACKGROUND_OVERDUE_PROB:
             return _invoice(inv_id, customer_id, amount, issue, due, None, days_past, "overdue")
         late = rng.randint(0, min(days_past, 30))
         return _invoice(inv_id, customer_id, amount, issue, due,

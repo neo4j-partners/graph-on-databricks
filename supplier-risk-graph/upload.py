@@ -7,11 +7,8 @@ business_units, invoices, revenue_entries, compliance_findings), the
 supplier-to-business-unit bridge (supplier_business_units), the
 supplier-to-supplier link (supply_relationships), and the customer ownership
 stakes (owned_by) — into a UC volume and builds one Delta table each with
-`read_files`, then reads the two graph-derived tables back out of Neo4j:
-
-  - `classifications`         — every CLASSIFIED_AS edge (the four column-findable
-                                terms plus derived Critical Supplier and Risky Customer)
-  - `business_unit_exposure`  — each business unit's aggregate supplier-risk exposure
+`read_files`. The pipeline no longer materializes any graph-derived gold table:
+the graph's conclusions stay in Neo4j and never reach Delta.
 
 The `supply_relationships` and `owned_by` tables carry the raw edges behind the
 graph's two structural relationships, uploaded so plain Genie can see both
@@ -21,9 +18,12 @@ from those rows, not on tables it was never given. The `customers` table gains
 creditLimit (the Story 2 exposure figure) and defaultedPeriod (the quarter a
 customer defaulted), and `suppliers` gains subcategory (the supplier specialty).
 
-The two gold tables (`classifications`, `business_unit_exposure`) must never be
-added to the Genie space: they materialize the graph's answers, and re-adding
-them re-introduces write-back leakage and lets plain Genie tie.
+Earlier builds also wrote two graph-derived gold tables, `classifications` and
+`business_unit_exposure`, back into Delta. They are gone: materializing the
+graph's answers into a column is the write-back leakage the demo is built to
+avoid, so those answers now live only in the graph. On upload the script drops
+any stale copy a prior build left behind. `guard.py` keeps their names in its
+banned list as a defensive backstop for the standalone guard run.
 
 CSV headers stay verbatim (camelCase), so the demo's Cypher and the UC column
 names line up. Instance tables carry foreign-key columns (invoices.customerId,
@@ -44,7 +44,7 @@ for Genie multiplying customer aggregates: it declares the invoice and finding
 joins `one_to_many` so each measure aggregates at its own grain.
 
 Usage:
-    uv run upload.py            # upload CSVs, build tables, pull derived tables
+    uv run upload.py            # upload CSVs, build base tables and metric view
     uv run upload.py --check    # parse and validate the base CSVs only, offline
 
 Databricks auth comes from .env (see .env.sample): either DATABRICKS_CONFIG_PROFILE
@@ -104,16 +104,6 @@ class TableSpec:
     required: tuple[str, ...] = ()
     inferred_types: dict[str, str] = field(default_factory=dict)
     exclude: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class DerivedSpec:
-    """A gold table materialized from a Neo4j query."""
-
-    table: str
-    columns: list[str]
-    cypher: str
-    types: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -206,71 +196,14 @@ BASE_SPECS = [
     ),
 ]
 
-# Gold table: the CLASSIFIED_AS edges written back from the graph. The four
-# column-findable terms are planted by the generator, each carrying rule
-# provenance (reason, evaluatedAt, ruleVersion). Critical Supplier and Risky
-# Customer are written by `gds.py` only after their scores resolve, which is why
-# neither can be planted with the others.
-#
-# **Do not add a term filter here.** The graph-native rows in this table look like
-# write-back leakage and are not. The gold tables are never attached to the
-# Genie space, which `banned_tables` in `guard.py` enforces against the space's
-# declared data sources on every run, so the lakehouse-only engine cannot read
-# them. Filtering the term out instead would return the graph to the state where
-# an agent asking which suppliers are critical gets zero rows and truthfully
-# answers that the system does not classify them. That failure is recorded in
-# the re-probe worklog. Ownership Risk still carries no edges and still
-# materializes nowhere, so Story 2 has the failure this filter would recreate.
-CLASSIFICATIONS_SPEC = DerivedSpec(
-    table="classifications",
-    columns=[
-        "entity_id",
-        "entity_type",
-        "term",
-        "reason",
-        "evaluated_at",
-        "rule_version",
-    ],
-    cypher=(
-        "MATCH (e)-[r:CLASSIFIED_AS]->(t:BusinessTerm) "
-        "RETURN e.id AS entity_id, labels(e)[0] AS entity_type, t.name AS term, "
-        "r.reason AS reason, toString(r.evaluatedAt) AS evaluated_at, "
-        "r.ruleVersion AS rule_version"
-    ),
-    types={"evaluated_at": "datetime"},
-)
+# Names of the graph-derived gold tables earlier builds wrote back into Delta.
+# They are no longer materialized: the graph's conclusions stay in Neo4j so the
+# lakehouse-only engine cannot read a finding straight from a column. `main` drops
+# any stale copy on upload, and `guard.py` keeps the same names in its banned list
+# as a defensive backstop.
+STALE_GOLD_TABLES = ("classifications", "business_unit_exposure")
 
-# Gold table: each business unit's aggregate supplier-risk exposure, one row per
-# unit. The table reports supplier count, average, and max risk per unit, ordered
-# by supplier count.
-EXPOSURE_SPEC = DerivedSpec(
-    table="business_unit_exposure",
-    columns=[
-        "business_unit_id",
-        "name",
-        "supplier_count",
-        "avg_supplier_risk",
-        "max_supplier_risk",
-    ],
-    cypher=(
-        "MATCH (bu:BusinessUnit) "
-        "OPTIONAL MATCH (s:Supplier)-[:SUPPLIES]->(bu) "
-        "RETURN bu.id AS business_unit_id, bu.name AS name, "
-        "count(s) AS supplier_count, round(avg(s.riskScore), 1) AS avg_supplier_risk, "
-        "max(s.riskScore) AS max_supplier_risk "
-        "ORDER BY supplier_count DESC"
-    ),
-    types={
-        "supplier_count": "int",
-        "avg_supplier_risk": "float",
-        "max_supplier_risk": "int",
-    },
-)
-
-DERIVED_SPECS = [CLASSIFICATIONS_SPEC, EXPOSURE_SPEC]
-
-# Semantic metadata for the base tables, keyed by table name. The gold tables get
-# none: they stay out of the Genie space, so nothing reads their metadata.
+# Semantic metadata for the base tables, keyed by table name.
 #
 # These comments state schema facts: grain, units, join paths, and what a coded
 # value means. They deliberately stop short of analysis. The demo turns on Genie
@@ -610,22 +543,6 @@ def schema_hints(types: dict[str, str]) -> str | None:
     return ", ".join(f"{column} {SPARK_TYPES[kind]}" for column, kind in types.items())
 
 
-def rows_to_csv(columns: list[str], rows: list[dict[str, Any]]) -> bytes:
-    """Serialize query rows to CSV bytes; None becomes an empty field.
-
-    `columns` fixes the field order rather than trusting the order the driver
-    returns, so the built table's columns match the DerivedSpec that declared
-    them. A null property in Neo4j writes as an empty field, which `read_files`
-    then reads back as NULL.
-    """
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(columns)
-    for row in rows:
-        writer.writerow(["" if row.get(column) is None else row[column] for column in columns])
-    return buffer.getvalue().encode("utf-8")
-
-
 def volume_path(cfg: Config, filename: str) -> str:
     """The /Volumes path a CSV is uploaded to and read back from.
 
@@ -859,36 +776,17 @@ def verify_inferred_types(w: Any, cfg: Config) -> None:
     print(f"Verified {len(expected)} inferred column type(s).")
 
 
-def read_graph_rows(cfg: Config, cypher: str) -> list[dict[str, Any]]:
-    """Run one read query against Neo4j and return the rows as dicts.
+def drop_stale_gold_tables(w: Any, cfg: Config) -> None:
+    """Drop any graph-derived gold table a prior build materialized.
 
-    The result set is materialized inside the session because the driver's
-    records are only valid while it is open. Both gold tables are small enough
-    that holding them in memory costs nothing. As with the SDK, the neo4j import
-    is deferred so `--check` runs without the driver installed.
+    Earlier builds wrote `classifications` and `business_unit_exposure` back into
+    Delta. The pipeline no longer creates them, so `CREATE OR REPLACE` would never
+    touch a copy left in a workspace. Dropping them here removes the write-back
+    leakage rather than leaving it behind for the standalone guard to catch.
     """
-    from neo4j import GraphDatabase
-
-    with GraphDatabase.driver(cfg.neo4j_uri, auth=cfg.neo4j_auth) as driver:
-        driver.verify_connectivity()
-        with driver.session(database=cfg.neo4j_database) as session:
-            return [record.data() for record in session.run(cypher)]
-
-
-def upload_derived_table(w: Any, cfg: Config, spec: DerivedSpec) -> int:
-    """Query the graph, stage the answer as a CSV, and build the gold table.
-
-    The round trip through a volume CSV is what keeps this identical to the base
-    path: same `read_files` call, same schemaHints mechanism, one way that a
-    table in this schema comes into being.
-    """
-    rows = read_graph_rows(cfg, spec.cypher)
-    filename = f"{spec.table}.csv"
-    upload_csv(w, cfg, filename, rows_to_csv(spec.columns, rows))
-    create_table(w, cfg, spec.table, filename, schema_hints(spec.types))
-    count = count_rows(w, cfg, spec.table)
-    print(f"  {spec.table}: {count} rows")
-    return count
+    for table in STALE_GOLD_TABLES:
+        run_sql(w, cfg, f"DROP TABLE IF EXISTS {fqn(cfg, table)}")
+    print(f"Dropped stale gold tables if present: {', '.join(STALE_GOLD_TABLES)}.")
 
 
 def check_semantics(spec: TableSpec, header: set[str]) -> None:
@@ -924,22 +822,17 @@ def check(data_dir: Path) -> None:
         total += len(rows)
         print(f"  {spec.table}: {len(rows)} rows ({spec.csv_name})")
     print(f"Check passed: {len(BASE_SPECS)} base tables, {total} rows ready to upload.")
-    print(
-        f"Derived tables read from Neo4j at upload time: "
-        f"{', '.join(spec.table for spec in DERIVED_SPECS)}."
-    )
 
 
 def main() -> None:
     """Parse arguments and run either the offline check or the full upload.
 
     The upload order is not arbitrary. Schema and volume come first because
-    everything else writes into them; base tables next; type verification
-    immediately after, so a drifted column fails before anything is built on top
-    of it; then comments and the metric view, both of which CREATE OR REPLACE
-    TABLE would have discarded had they been applied earlier. Gold tables come
-    last because they depend on Neo4j rather than on anything above them, so a
-    graph that is down does not cost the lakehouse work already done.
+    everything else writes into them; any stale gold table a prior build left is
+    dropped next, before its rows can be read; base tables follow; type
+    verification immediately after, so a drifted column fails before anything is
+    built on top of it; then comments and the metric view, both of which CREATE OR
+    REPLACE TABLE would have discarded had they been applied earlier.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -970,16 +863,14 @@ def main() -> None:
         w = WorkspaceClient(host=cfg.host, token=cfg.token)
 
     ensure_schema_and_volume(w, cfg)
+    drop_stale_gold_tables(w, cfg)
     base_results = upload_base_tables(w, cfg, args.data_dir)
     verify_inferred_types(w, cfg)
     apply_semantics(w, cfg)
     create_metric_view(w, cfg)
 
-    print("Materializing gold tables from Neo4j:")
-    derived_results = [(spec.table, upload_derived_table(w, cfg, spec)) for spec in DERIVED_SPECS]
-
-    total = sum(rows for _, rows in base_results) + sum(rows for _, rows in derived_results)
-    tables = len(base_results) + len(derived_results)
+    total = sum(rows for _, rows in base_results)
+    tables = len(base_results)
     print(
         f"Upload complete: {tables} tables in "
         f"`{cfg.catalog}`.`{cfg.schema}`, {total} rows."

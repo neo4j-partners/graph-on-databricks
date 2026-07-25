@@ -1,15 +1,15 @@
 {
   "schema_version": 2,
   "seed": 42,
-  "as_of_date": "2026-07-21",
+  "as_of_date": "2026-07-22",
   "summary": {
     "customers": 508,
     "suppliers": 169,
     "business_units": 5,
-    "invoices": 3026,
+    "invoices": 3014,
     "revenue_entries": 60,
-    "compliance_findings": 88,
-    "supply_relationships": 443,
+    "compliance_findings": 90,
+    "supply_relationships": 427,
     "owned_by_edges": 119
   },
   "story1_hidden_glassworks": {
@@ -31,7 +31,7 @@
     },
     "business_unit": "BU-03",
     "last_quarter": "2026-Q2",
-    "bu03_last_quarter_revenue": 4273507.48
+    "bu03_last_quarter_revenue": 4248338.18
   },
   "story2_clean_payer": {
     "kestrel_id": "CUST-901",
@@ -72,7 +72,7 @@
       "CUST-908"
     ],
     "defaulted_period": "2026-Q2",
-    "jade_open_invoice_balance": 222153.66,
+    "jade_open_invoice_balance": 171796.91,
     "jade_credit_limit": 800000,
     "jade_exposure": 800000.0
   },

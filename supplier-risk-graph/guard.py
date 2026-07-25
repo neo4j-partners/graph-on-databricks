@@ -382,17 +382,16 @@ def check_unity_catalog(
 
     information_schema exposes names and comments but never row values, so a
     governed term name sitting as a plain row value under a bland column name
-    passes the metadata scan silently. classifications.term holds four governed
-    term names as row values right now, doing exactly its job, and the same
-    shape becomes a leak the moment it reaches a column of a table Run A can
-    read. So the row values of attached tables are scanned too.
+    would pass the metadata scan silently, and it becomes a leak the moment it
+    reaches a column of a table Run A can read. So the row values of attached
+    tables are scanned too.
 
     Two constraints on that row scan are load-bearing. First, only tables
     actually attached to the Genie space are scanned, taken from `attached`, the
-    same data_sources list banned_tables reads. classifications deliberately
-    holds governed term names as row values and is never attached, so scanning
-    the whole schema would fail the build forever for a table doing exactly its
-    job. Second, only scan_vocabulary runs over row values, never
+    same data_sources list banned_tables reads. A value in an unattached table is
+    not a surface Run A can read, and scanning the whole schema would risk failing
+    the build on a value doing exactly its job out of reach. Second, only
+    scan_vocabulary runs over row values, never
     scan_commodity_grouping. A single commodity member appearing as a row value
     is instance data and fine per scan_commodity_grouping's own docstring:
     suppliers.subcategory legitimately holds six members of the glass grouping,
@@ -464,13 +463,15 @@ def check_unity_catalog(
     return leaks
 
 
-# The two gold tables. upload.py's module docstring states they must never be
-# added to the Genie space: they materialize the graph's answers, so a space
-# that carries them lets Run A read the finding straight out of a table and tie.
-# That is not a vocabulary leak, it is the same claim failing by a different
-# route, and the plan's Phase 2.5 verify step asks for "banned tables absent" in
-# the same breath as "vocabulary guard clean". Both belong to whatever runs last
-# before the demo, which is this.
+# The two graph-derived gold tables earlier builds materialized into Delta.
+# upload.py no longer creates them and drops any stale copy on upload, so the
+# graph's answers stay in the graph. These names remain here as a defensive
+# backstop: a space that attached one would let Run A read the finding straight
+# out of a table and tie, which is not a vocabulary leak but the same claim
+# failing by a different route. The check matters most for the standalone guard
+# run, which can execute without a fresh upload having dropped a stale table
+# first. "Banned tables absent" belongs in the same breath as "vocabulary guard
+# clean", and both run last before the demo, which is here.
 BANNED_TABLES = frozenset({"classifications", "business_unit_exposure"})
 
 
