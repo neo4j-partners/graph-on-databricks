@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "seed": 42,
-  "as_of_date": "2026-07-22",
+  "as_of_date": "2026-08-11",
   "summary": {
     "customers": 508,
     "suppliers": 169,
@@ -31,7 +31,7 @@
     },
     "business_unit": "BU-03",
     "last_quarter": "2026-Q2",
-    "bu03_last_quarter_revenue": 4248338.18
+    "bu03_last_quarter_revenue": 4374199.28
   },
   "story2_clean_payer": {
     "kestrel_id": "CUST-901",
