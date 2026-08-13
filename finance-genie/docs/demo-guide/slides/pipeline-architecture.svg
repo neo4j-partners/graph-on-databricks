@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="810" viewBox="0 0 1440 810" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563EB"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6D28D9"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B45309"/>
+    </marker>
+    <filter id="sh" x="-8%" y="-8%" width="118%" height="126%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#172033" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="810" fill="#F8FAFC"/>
+
+  <!-- ===================== Title ===================== -->
+  <text x="720" y="56" text-anchor="middle" font-size="30" font-weight="700" fill="#172033">Pipeline Architecture &#8212; Graph-Enriched Lakehouse</text>
+  <text x="720" y="88" text-anchor="middle" font-size="18" font-style="italic" fill="#536174">Four stages turn a network of account relationships into plain Gold columns Genie can query.</text>
+
+  <!-- ===================== 1. Unity Catalog Silver ===================== -->
+  <rect x="48" y="120" width="260" height="310" rx="8" fill="#EFF4FE" stroke="#2563EB" stroke-width="1.25" filter="url(#sh)"/>
+  <path d="M48,164 V128 a8,8 0 0 1 8,-8 H300 a8,8 0 0 1 8,8 V164 Z" fill="#2563EB"/>
+  <text x="178" y="149" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">UNITY CATALOG SILVER</text>
+
+  <rect x="64" y="186" width="228" height="34" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="78" y="209" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">accounts</text>
+  <rect x="64" y="232" width="228" height="34" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="78" y="255" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">account_links</text>
+  <rect x="64" y="278" width="228" height="34" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="78" y="301" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">merchants</text>
+  <rect x="64" y="324" width="228" height="34" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="78" y="347" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">transactions</text>
+  <rect x="64" y="370" width="228" height="34" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="78" y="393" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">account_labels</text>
+
+  <!-- ===================== 2. Neo4j Aura + GDS ===================== -->
+  <rect x="440" y="120" width="364" height="310" rx="8" fill="#F4EFFD" stroke="#6D28D9" stroke-width="1.25" filter="url(#sh)"/>
+  <path d="M440,164 V128 a8,8 0 0 1 8,-8 H796 a8,8 0 0 1 8,8 V164 Z" fill="#6D28D9"/>
+  <text x="622" y="149" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">NEO4J AURA + GDS</text>
+
+  <rect x="456" y="190" width="332" height="60" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="470" y="216" font-size="19" font-weight="600" fill="#172033">PageRank</text>
+  <text x="470" y="240" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#6D28D9">&#8594; risk_score</text>
+
+  <rect x="456" y="270" width="332" height="60" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="470" y="296" font-size="19" font-weight="600" fill="#172033">Louvain</text>
+  <text x="470" y="320" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#6D28D9">&#8594; community_id</text>
+
+  <rect x="456" y="350" width="332" height="60" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="470" y="376" font-size="19" font-weight="600" fill="#172033">Node Similarity</text>
+  <text x="470" y="400" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#6D28D9">&#8594; similarity_score</text>
+
+  <!-- ===================== 3. Unity Catalog Gold (group of two tables) ===================== -->
+  <rect x="988" y="120" width="404" height="310" rx="8" fill="#FDF4E7" stroke="#B45309" stroke-width="1.25" filter="url(#sh)"/>
+  <path d="M988,164 V128 a8,8 0 0 1 8,-8 H1384 a8,8 0 0 1 8,8 V164 Z" fill="#B45309"/>
+  <text x="1190" y="149" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">UNITY CATALOG GOLD</text>
+
+  <rect x="1004" y="182" width="372" height="134" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="1018" y="210" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">gold_accounts</text>
+  <line x1="1018" y1="223" x2="1362" y2="223" stroke="#D7DEE8" stroke-width="1"/>
+  <circle cx="1024" cy="244" r="3.5" fill="#B45309"/>
+  <text x="1040" y="249" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">risk_score</text>
+  <circle cx="1024" cy="271" r="3.5" fill="#B45309"/>
+  <text x="1040" y="276" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">community_id</text>
+  <circle cx="1024" cy="298" r="3.5" fill="#B45309"/>
+  <text x="1040" y="303" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">similarity_score</text>
+
+  <rect x="1004" y="332" width="372" height="82" rx="8" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1"/>
+  <text x="1018" y="360" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">gold_account_similarity_pairs</text>
+  <line x1="1018" y1="373" x2="1362" y2="373" stroke="#D7DEE8" stroke-width="1"/>
+  <circle cx="1024" cy="394" r="3.5" fill="#B45309"/>
+  <text x="1040" y="399" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#172033">similarity_score<tspan font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="400" fill="#536174" dx="8">(per pair)</tspan></text>
+
+  <!-- ===================== 4. Databricks Genie ===================== -->
+  <rect x="436" y="520" width="568" height="190" rx="8" fill="#EDF7F0" stroke="#15803D" stroke-width="1.25" filter="url(#sh)"/>
+  <path d="M436,564 V528 a8,8 0 0 1 8,-8 H996 a8,8 0 0 1 8,8 V564 Z" fill="#15803D"/>
+  <text x="720" y="549" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">DATABRICKS GENIE</text>
+  <text x="720" y="594" text-anchor="middle" font-size="18" font-weight="500" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" fill="#536174">text-to-SQL</text>
+
+  <rect x="456" y="606" width="252" height="84" rx="8" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.25"/>
+  <text x="582" y="642" text-anchor="middle" font-size="19" font-weight="700" letter-spacing="0.4" fill="#2563EB">BEFORE</text>
+  <text x="582" y="668" text-anchor="middle" font-size="17" fill="#536174">Silver tables only</text>
+
+  <rect x="732" y="606" width="252" height="84" rx="8" fill="#FFFFFF" stroke="#B45309" stroke-width="1.25"/>
+  <text x="858" y="642" text-anchor="middle" font-size="19" font-weight="700" letter-spacing="0.4" fill="#B45309">AFTER</text>
+  <text x="858" y="668" text-anchor="middle" font-size="17" fill="#536174">Gold + GDS features</text>
+
+  <!-- ===================== Connectors ===================== -->
+  <!-- Silver -> Neo4j -->
+  <line x1="308" y1="275" x2="432" y2="275" stroke="#2563EB" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <text x="370" y="258" text-anchor="middle" font-size="18" fill="#2563EB">load (nb02)</text>
+
+  <!-- Neo4j -> Gold (Databricks does the pulling) -->
+  <line x1="804" y1="275" x2="980" y2="275" stroke="#6D28D9" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <text x="892" y="214" text-anchor="middle" font-size="18" fill="#6D28D9">pull via</text>
+  <text x="892" y="236" text-anchor="middle" font-size="18" fill="#6D28D9">Spark Connector</text>
+  <text x="892" y="258" text-anchor="middle" font-size="18" fill="#6D28D9">+ join (nb04)</text>
+
+  <!-- Silver -> Genie (BEFORE) -->
+  <path d="M178,430 V648 H428" fill="none" stroke="#2563EB" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <rect x="110" y="498" width="136" height="28" fill="#F8FAFC"/>
+  <text x="178" y="518" text-anchor="middle" font-size="18" font-weight="600" fill="#2563EB">BEFORE (nb01)</text>
+
+  <!-- Gold -> Genie (AFTER) -->
+  <path d="M1190,430 V648 H1012" fill="none" stroke="#B45309" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <rect x="1122" y="498" width="136" height="28" fill="#F8FAFC"/>
+  <text x="1190" y="518" text-anchor="middle" font-size="18" font-weight="600" fill="#B45309">AFTER (nb05)</text>
+
+  <!-- ===================== Footer ===================== -->
+  <text x="720" y="766" text-anchor="middle" font-size="17" fill="#536174">Pull direction: Databricks reads Neo4j through the Spark Connector. Neo4j never writes to Unity Catalog.</text>
+</svg>

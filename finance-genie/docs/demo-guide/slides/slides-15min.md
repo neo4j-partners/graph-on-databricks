@@ -238,7 +238,7 @@ slide shows the pull direction.
 
 ---
 
-![w:900 center](./pipeline-architecture.png)
+![w:900 center](./pipeline-architecture.svg)
 <!--
 The pull direction matters. Neo4j does not write to Unity Catalog
 directly; Databricks pulls from Neo4j via the Spark Connector in
@@ -320,7 +320,7 @@ The following slides apply when running the demo live or fielding detailed quest
 
 ---
 
-![bg contain](./silver-data-model.png)
+![bg contain](./silver-data-model.svg)
 
 <!--
 Backup: the Silver data model. Show if the audience wants to see

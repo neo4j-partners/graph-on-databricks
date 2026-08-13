@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563EB"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#15803D"/>
+    </marker>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0F766E"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B45309"/>
+    </marker>
+    <filter id="sh" x="-8%" y="-8%" width="118%" height="126%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#172033" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="#F8FAFC"/>
+
+  <!-- Title -->
+  <text x="800" y="66" text-anchor="middle" font-size="33" font-weight="700" fill="#172033">Data Model &#8212; Silver Layer</text>
+
+  <!-- ACCOUNTS -->
+  <g>
+    <rect x="80" y="124" width="320" height="292" rx="8" fill="#EFF4FE" stroke="#2563EB" stroke-width="1.25" filter="url(#sh)"/>
+    <path d="M80,172 V132 a8,8 0 0 1 8,-8 H392 a8,8 0 0 1 8,8 V172 Z" fill="#2563EB"/>
+    <text x="240" y="154" text-anchor="middle" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16.5" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">ACCOUNTS</text>
+    <text x="100" y="208.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">account_id</text>
+    <rect x="348" y="195" width="32" height="16" rx="3" fill="#2563EB"/>
+    <text x="364" y="207" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">PK</text>
+    <text x="100" y="234.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">account_hash</text>
+    <text x="100" y="260.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">account_name</text>
+    <text x="100" y="286.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">account_type</text>
+    <text x="100" y="312.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">region</text>
+    <text x="100" y="338.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">balance</text>
+    <text x="100" y="364.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">opened_date</text>
+    <text x="100" y="390.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">holder_age</text>
+  </g>
+
+  <!-- TRANSACTIONS -->
+  <g>
+    <rect x="640" y="124" width="320" height="240" rx="8" fill="#EDF7F0" stroke="#15803D" stroke-width="1.25" filter="url(#sh)"/>
+    <path d="M640,172 V132 a8,8 0 0 1 8,-8 H952 a8,8 0 0 1 8,8 V172 Z" fill="#15803D"/>
+    <text x="800" y="154" text-anchor="middle" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16.5" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">TRANSACTIONS</text>
+    <text x="660" y="208.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">txn_id</text>
+    <rect x="908" y="195" width="32" height="16" rx="3" fill="#15803D"/>
+    <text x="924" y="207" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">PK</text>
+    <text x="660" y="234.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">account_id</text>
+    <rect x="908" y="221" width="32" height="16" rx="3" fill="#FFFFFF" stroke="#15803D" stroke-width="1"/>
+    <text x="924" y="233" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#15803D">FK</text>
+    <text x="660" y="260.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">merchant_id</text>
+    <rect x="908" y="247" width="32" height="16" rx="3" fill="#FFFFFF" stroke="#15803D" stroke-width="1"/>
+    <text x="924" y="259" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#15803D">FK</text>
+    <text x="660" y="286.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">amount</text>
+    <text x="660" y="312.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">txn_timestamp</text>
+    <text x="660" y="338.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">txn_hour</text>
+  </g>
+
+  <!-- MERCHANTS -->
+  <g>
+    <rect x="1200" y="548" width="320" height="214" rx="8" fill="#EAF5F4" stroke="#0F766E" stroke-width="1.25" filter="url(#sh)"/>
+    <path d="M1200,596 V556 a8,8 0 0 1 8,-8 H1512 a8,8 0 0 1 8,8 V596 Z" fill="#0F766E"/>
+    <text x="1360" y="578" text-anchor="middle" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16.5" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">MERCHANTS</text>
+    <text x="1220" y="632.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">merchant_id</text>
+    <rect x="1468" y="619" width="32" height="16" rx="3" fill="#0F766E"/>
+    <text x="1484" y="631" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">PK</text>
+    <text x="1220" y="658.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">merchant_name</text>
+    <text x="1220" y="684.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">category</text>
+    <text x="1220" y="710.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">risk_tier</text>
+    <text x="1220" y="736.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">region</text>
+  </g>
+
+  <!-- ACCOUNT_LINKS -->
+  <g>
+    <rect x="640" y="548" width="320" height="214" rx="8" fill="#FDF4E7" stroke="#B45309" stroke-width="1.25" filter="url(#sh)"/>
+    <path d="M640,596 V556 a8,8 0 0 1 8,-8 H952 a8,8 0 0 1 8,8 V596 Z" fill="#B45309"/>
+    <text x="800" y="578" text-anchor="middle" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16.5" font-weight="700" letter-spacing="0.6" fill="#FFFFFF">ACCOUNT_LINKS</text>
+    <text x="660" y="632.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">link_id</text>
+    <rect x="908" y="619" width="32" height="16" rx="3" fill="#B45309"/>
+    <text x="924" y="631" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">PK</text>
+    <text x="660" y="658.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">src_account_id</text>
+    <rect x="908" y="645" width="32" height="16" rx="3" fill="#FFFFFF" stroke="#B45309" stroke-width="1"/>
+    <text x="924" y="657" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#B45309">FK</text>
+    <text x="660" y="684.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">dst_account_id</text>
+    <rect x="908" y="671" width="32" height="16" rx="3" fill="#FFFFFF" stroke="#B45309" stroke-width="1"/>
+    <text x="924" y="683" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#B45309">FK</text>
+    <text x="660" y="710.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">amount</text>
+    <text x="660" y="736.5" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="500" fill="#172033">transfer_timestamp</text>
+  </g>
+
+  <!-- ACCOUNTS -> TRANSACTIONS -->
+  <g>
+    <line x1="408" y1="229" x2="634" y2="229" stroke="#2563EB" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+    <rect x="472" y="218" width="98" height="22" fill="#F8FAFC"/>
+    <text x="521" y="233" text-anchor="middle" font-size="15" font-weight="500" fill="#2563EB">account_id</text>
+  </g>
+
+  <!-- MERCHANTS -> TRANSACTIONS -->
+  <g>
+    <path d="M1360,540 V255 H966" fill="none" stroke="#0F766E" stroke-width="1.5" marker-end="url(#arrow-teal)"/>
+    <rect x="1110" y="244" width="106" height="22" fill="#F8FAFC"/>
+    <text x="1163" y="259" text-anchor="middle" font-size="15" font-weight="500" fill="#0F766E">merchant_id</text>
+  </g>
+
+  <!-- ACCOUNTS -> ACCOUNT_LINKS -->
+  <g>
+    <path d="M240,424 V666 H634" fill="none" stroke="#2563EB" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+    <rect x="388" y="655" width="98" height="22" fill="#F8FAFC"/>
+    <text x="437" y="670" text-anchor="middle" font-size="15" font-weight="500" fill="#2563EB">account_id</text>
+  </g>
+
+  <!-- Row counts -->
+  <text x="800" y="858" text-anchor="middle" font-size="17" fill="#536174" xml:space="preserve">25,000 accounts  &#183;  7,500 merchants  &#183;  250,000 transactions  &#183;  300,000 account_links</text>
+</svg>
