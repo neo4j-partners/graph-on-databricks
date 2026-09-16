@@ -18,10 +18,9 @@ from __future__ import annotations
 
 import os
 
-from neo4j import GraphDatabase
-from neo4j.exceptions import AuthError, ServiceUnavailable
-
 from _common import fail, load_env
+from neo4j import GraphDatabase
+from neo4j.exceptions import AuthError, Neo4jError, ServiceUnavailable
 
 REQUIRED_VARS = ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD")
 
@@ -33,46 +32,38 @@ def main() -> None:
     user = os.environ["NEO4J_USERNAME"]
     password = os.environ["NEO4J_PASSWORD"]
 
-    print(f"OK    .env loaded")
+    print("OK    .env loaded")
     print(f"OK    NEO4J_URI      = {uri}")
     print(f"OK    NEO4J_USERNAME = {user}")
     print(f"OK    NEO4J_PASSWORD = <{len(password)} chars>")
 
     try:
-        driver = GraphDatabase.driver(uri, auth=(user, password))
-    except Exception as e:
-        fail(f"driver construction failed: {e}")
+        with GraphDatabase.driver(uri, auth=(user, password)) as driver:
+            driver.verify_connectivity()
+            print("OK    verify_connectivity() succeeded")
 
-    try:
-        driver.verify_connectivity()
-        print("OK    verify_connectivity() succeeded")
+            with driver.session() as session:
+                record = session.run("RETURN 1 AS ok").single(strict=True)
+                if not record or record["ok"] != 1:
+                    fail("test query did not return 1")
+                print("OK    test query RETURN 1 returned 1")
 
-        with driver.session() as session:
-            record = session.run("RETURN 1 AS ok").single()
-            if not record or record["ok"] != 1:
-                fail("test query did not return 1")
-            print("OK    test query RETURN 1 returned 1")
-
-            info = session.run(
-                "CALL dbms.components() YIELD name, versions, edition "
-                "RETURN name, versions[0] AS version, edition"
-            ).single()
-            if info:
-                print(
-                    f"OK    server: {info['name']} "
-                    f"{info['version']} ({info['edition']})"
+                components = session.run(
+                    "CALL dbms.components() YIELD name, versions, edition "
+                    "RETURN name, versions[0] AS version, edition"
                 )
+                info = next(iter(components), None)
+                if info:
+                    print(
+                        f"OK    server: {info['name']} "
+                        f"{info['version']} ({info['edition']})"
+                    )
     except AuthError as e:
         fail(f"authentication failed — check NEO4J_USERNAME / NEO4J_PASSWORD: {e}")
     except ServiceUnavailable as e:
         fail(f"cannot reach server — check NEO4J_URI / network: {e}")
-    except Exception as e:
-        fail(f"unexpected error: {e}")
-    finally:
-        try:
-            driver.close()
-        except Exception:
-            pass
+    except (Neo4jError, ValueError) as e:
+        fail(f"Neo4j validation failed: {e}")
 
     print("\nPASS  Neo4j credentials in .env are valid and working.")
 

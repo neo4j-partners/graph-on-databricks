@@ -119,6 +119,12 @@ uv run validation/validate_endpoint.py
 uv run python -m cli submit 02_validate_endpoint.py
 ```
 
+The CLI reduces the shared root environment to the explicit non-secret
+`JOB_PARAMETER_KEYS` allowlist before creating Databricks task parameters. Add
+new remote job settings to that allowlist only when they are safe to expose in
+run metadata. Credentials must stay in a Databricks secret scope or Unity
+Catalog connection, never in task parameters.
+
 ## Connect it to a Supervisor Agent
 
 The deployed endpoint is one specialist, not a complete multi-agent system.

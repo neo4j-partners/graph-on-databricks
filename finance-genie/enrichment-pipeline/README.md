@@ -71,7 +71,8 @@ uv run diagnostics/verify_fraud_patterns.py
   `org.neo4j:neo4j-connector-apache-spark_2.12:5.3.1_for_spark_3`
 - **graphdatascience** as a cluster library (PyPI)
 - **Databricks secret scope** `neo4j-graph-engineering` with `uri`, `username`,
-  `password`, `genie_space_id` (written by the root Common Setup)
+  `password`, and `genie_space_id` (written by the root Common Setup). The two
+  Neo4j jobs fetch these values directly from the scope at runtime.
 - **uv** installed locally (`brew install uv` or `pip install uv`)
 
 Confirm the cluster is ready before submitting any job:
@@ -112,6 +113,12 @@ uv run python -m cli submit <script>   # submit one stage
 uv run python -m cli logs              # inspect the most recent run
 uv run python -m cli clean --yes       # clean up workspace files and run history
 ```
+
+The submission CLI forwards only the non-secret names declared in
+`cli.JOB_PARAMETER_KEYS` and rejects secret-like task parameter names. When a
+job needs a new non-secret setting, add its name to that allowlist. When it
+needs a new secret, store the value in the secret scope and fetch it inside the
+specific job that needs it; never add the secret to the parameter allowlist.
 
 The numbered stages, in order:
 

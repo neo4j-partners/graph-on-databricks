@@ -45,10 +45,8 @@ if ! command -v databricks >/dev/null 2>&1; then
   exit 1
 fi
 
-set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
-set +a
 
 PROFILE="${PROFILE:-${DATABRICKS_CONFIG_PROFILE:-${DATABRICKS_PROFILE:-}}}"
 if [[ -z "$PROFILE" ]]; then
@@ -93,7 +91,8 @@ put_secret() {
   local key="$2"
   local value="$3"
   printf '  - %s/%s\n' "$scope" "$key"
-  databricks secrets put-secret "$scope" "$key" --string-value "$value"
+  # Feed values through stdin so they are not exposed in the local process list.
+  printf '%s' "$value" | databricks secrets put-secret "$scope" "$key"
 }
 
 echo
