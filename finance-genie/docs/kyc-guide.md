@@ -4,14 +4,14 @@ Finance Genie detects KYC violations inside Neo4j. Customer identity data flows 
 
 The story: money movement detects the fraud ring, identity resolution explains it, and a knowledge layer names the policy and data sources that classified it. Neither the lakehouse nor any single graph layer catches all three alone.
 
-Features it implements:
+## Overview
 
-- **Identity layer in the graph**: `Customer`, `Phone`, and `Address` nodes; each customer keeps its own `Customer` node, and customers who share a phone or address link to the same `Phone` or `Address` node
-- **GDS identity resolution**: Weakly Connected Components over the identity graph to find shared-identity clusters
-- **Shared-identifier metrics**: each customer gets counts of how many other customers share a phone or address with them; the counts are copied onto the customer's accounts for the gold pull, and the graph holds the detail of who and which identifier
-- **Gold write-back**: graph-derived KYC columns land in `gold_accounts` alongside the existing `risk_score` and `community_id`
-- **Knowledge-layer provenance**: a `Policy` / `BusinessTerm` / `BusinessRule` / `DataSource` layer plus `CLASSIFIED_AS` edges make each violation explainable as a traversal, returning the rule, definition, policy, and data-source lineage that flagged the customer
-- **Ground-truth verification**: automated checks that the planted KYC story ring is detected exactly, that only its customers are classified, and that background data stays clean
+- **Identity graph:** `Customer`, `Phone`, and `Address` nodes represent shared identifiers as structure.
+- **Identity resolution:** Weakly Connected Components finds groups connected by shared phones or addresses.
+- **Shared-identifier metrics:** Each account stores counts of related customers while Neo4j keeps the supporting paths.
+- **Gold write-back:** Graph-derived KYC columns land in `gold_accounts` beside the fraud features.
+- **Provenance:** Policy, business term, rule, and data source nodes explain each classification.
+- **Verification:** Automated checks compare the result with the planted KYC story ring.
 
 ## Features
 

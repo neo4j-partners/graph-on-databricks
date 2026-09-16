@@ -6,7 +6,12 @@ import json
 
 from neo4j import GraphDatabase
 
-from config import assert_local_semantic_store, load_demo_env, require_env
+from config import (
+    assert_no_operational_graph_nodes,
+    assert_semantic_store_target,
+    load_demo_env,
+    require_env,
+)
 
 NODE_COUNTS_QUERY = """
 UNWIND ['__neocarta_graph__', 'Database', 'Schema', 'Table', 'Column', 'Value'] AS label
@@ -63,7 +68,7 @@ def rows_by_key(records: list, key: str, value: str) -> dict[str, int]:
 def main() -> None:
     """Validate graph contents and print a machine-readable result."""
     load_demo_env()
-    assert_local_semantic_store()
+    assert_semantic_store_target()
 
     driver = GraphDatabase.driver(
         require_env("NEO4J_URI"),
@@ -72,6 +77,7 @@ def main() -> None:
     try:
         driver.verify_connectivity()
         database = require_env("NEO4J_DATABASE")
+        assert_no_operational_graph_nodes(driver, database)
         node_records, _, _ = driver.execute_query(NODE_COUNTS_QUERY, database_=database)
         relationship_records, _, _ = driver.execute_query(
             RELATIONSHIP_COUNTS_QUERY, database_=database

@@ -1,17 +1,23 @@
-# Finance Genie — Pipeline Architecture
+# Finance Genie Pipeline Architecture
 
-![Finance Genie data architecture](data-architecture.png)
+![Finance Genie data architecture](images/data-architecture.png)
 
 ## What this document covers
 
-This document describes the enrichment pipeline in `finance-genie/enrichment-pipeline/`. It covers each major stage, the configuration variables that control each stage, what those variables do and why they exist, and an honest assessment of what could be removed without losing the before/after GDS enrichment contrast at the center of the demo.
+This document explains the enrichment pipeline in `enrichment-pipeline/`. It
+describes each stage, its configuration, and its role in the demo.
+
+- **Input:** Silver tables with accounts, merchants, transactions, and transfers.
+- **Graph analysis:** Neo4j GDS calculates centrality, community, and similarity features.
+- **Output:** Databricks writes those features to Gold tables that Genie can query.
+- **Purpose:** The demo shows how graph features add relationship-based questions to Genie.
 
 Two runtime projects sit beside this pipeline:
 
-- [`fraud-signal-workbench/`](./fraud-signal-workbench/README.md) queries the
+- [`fraud-signal-workbench/`](../fraud-signal-workbench/README.md) queries the
   GDS-enriched Aura graph directly, materializes an investigator-selected
   subgraph into Delta, and sends analysis questions to Genie.
-- [`neo4j-mcp-graph-agent/`](./neo4j-mcp-graph-agent/README.md) provisions the
+- [`neo4j-mcp-graph-agent/`](../neo4j-mcp-graph-agent/README.md) provisions the
   external MCP connection and deploys a graph-only agent endpoint. It retrieves
   live graph evidence and does not depend on the Gold-table production stage.
 
@@ -28,7 +34,11 @@ The pipeline has one job: demonstrate what becomes answerable when GDS enriches 
 
 `setup/generate_data.py` produces five CSVs and a `ground_truth.json` file in `enrichment-pipeline/data/`. These become the Silver-layer Delta tables that the rest of the pipeline reads. The generator creates 25,000 accounts, 7,500 merchants, 250,000 account-to-merchant transactions, and 300,000 peer-to-peer transfers. Within those records it embeds ten fraud rings, each connected by elevated transaction density and shared merchant preferences -- the structural signals that GDS algorithms will later surface.
 
-The key constraint is that the fraud rings must be invisible to tabular aggregation. Transaction amounts for fraud accounts are deliberately set within 3% of normal amounts. On base tables, the structural-discovery questions asked in the BEFORE demo have no column-level handle — the answers live in network topology, not in any row-level aggregate. After GDS writes `risk_score`, `community_id`, and `similarity_score` back into the Gold tables, a different class of question becomes answerable: portfolio composition by community, cohort comparisons across risk tiers, community rollups, operational workload by region, and merchant-side analysis conditioned on structural membership. GDS does the structural discovery; Genie characterizes the labeled segment.
+The demo keeps fraud transaction amounts within 3% of normal amounts. This
+removes a simple tabular shortcut. The useful signal lives in the network
+topology. GDS writes `risk_score`, `community_id`, and `similarity_score` to the
+Gold tables. Genie can then answer portfolio, cohort, workload, and merchant
+questions with those columns.
 
 `diagnostics/verify_fraud_patterns.py` is an optional diagnostic. It reads the CSVs and checks four structural properties against fixed thresholds, which is useful when re-tuning parameters. It is not a required pipeline stage: the downstream GDS verification in `validation/verify_gds.py` covers the same structural ground, so a stable-parameter run does not need to invoke it.
 
@@ -55,15 +65,15 @@ These control dataset size. They do not affect signal quality directly, but they
 
 Three variables determine whether the GDS algorithms produce clean, separable outputs. They are calibrated together and documented in `worklog/PARAMETER_CALIBRATION.md`. Each controls a specific algorithm's signal, and each has a documented lower bound below which that algorithm's verification check fails.
 
-**Louvain community detection — `WITHIN_RING_PROB` (default 0.35)**
+**Louvain community detection: `WITHIN_RING_PROB`, default 0.35**
 
 The fraction of peer-to-peer transfers that stay within a ring, and the primary driver of the within-ring edge density ratio. At 0.35, roughly 93% of edges originating from a ring member stay inside the ring, producing a within-ring density approximately 3,400 times higher than the background density. Louvain detects the community boundary from that density contrast. Below 0.25 the internal edge ratio drops below 89% and ring boundaries blur enough that some rings merge into large background communities. `WITHIN_RING_PROB` also controls the absolute inbound count received by ring captains, which is why it interacts with the hardcoded captain constants below.
 
-**PageRank centrality — `WHALE_INBOUND` (default 0.14)**
+**PageRank centrality: `WHALE_INBOUND`, default 0.14**
 
 The fraction of all P2P transfers directed toward whale accounts. At 300,000 total transfers and 200 whales, this gives each whale approximately 210 inbound transfers on average. That number must stay above the inbound count of ring captains so that naive inbound-count sorting finds whales, not ring captains -- establishing that tabular analysis fails and graph analysis is required.
 
-**Node Similarity (Jaccard) — `RING_ANCHOR_PREF` (default 0.35)**
+**Node Similarity using Jaccard: `RING_ANCHOR_PREF`, default 0.35**
 
 The probability that a fraud account visits a ring-specific "anchor" merchant on any given transaction, and the primary driver of Jaccard similarity between ring members. At 0.35, the fraud-to-normal Jaccard ratio is approximately 1.98x, clearing the verification threshold of 1.9x. Below 0.25 the ratio drops to roughly 1.50x and the Node Similarity gate fails.
 
@@ -234,9 +244,22 @@ The validation job also uses two `.env` variables:
 
 Two jobs ask different classes of question against the two Genie Spaces and write independent JSON artifacts to the UC Volume.
 
-`jobs/genie_run_before.py` queries the BEFORE space (base Silver tables only) with three structural-discovery questions and one teaser. The three structural questions ask about transfer-network hubs, groups of accounts transferring heavily among themselves, and accounts with common merchant histories. On base tables, none of these questions can be resolved from row-level SQL. The answers live in network topology, not in any base-table column. Genie will answer, but it answers a different question than the one asked: it ranks by transfer volume rather than eigenvector centrality, or groups by a shared attribute rather than interaction density. Transfer volume is not network centrality. No amount of SQL over flat rows produces eigenvector centrality. This substitution is silent; the response looks plausible. That is the structural gap the BEFORE run captures. Each response is measured against `ground_truth.json` and reported as evidence of the gap rather than a test failure. The verdict label for a result that does not meet the post-GDS criterion is `STRUCTURAL GAP CONFIRMED`, the expected outcome. `UNEXPECTED SIGNAL FOUND` appears only when base-table SQL accidentally meets the threshold, which would indicate a calibration issue. The teaser question asks what share of accounts sits in ring-candidate communities by region. It is reported as `NOT AVAILABLE ON THIS CATALOG — answered in AFTER run`, previewing the AFTER question class without requiring columns that do not yet exist. The BEFORE summary closes with a statement of the structural gap and a pointer to the AFTER artifact.
+`jobs/genie_run_before.py` queries the Silver-only space with three structural
+questions and one preview question. The structural questions cover network
+hubs, dense account groups, and shared merchant histories. Silver tables do not
+contain the graph features needed to answer them. Genie may return a plausible
+volume or attribute proxy instead. The runner compares each response with
+`ground_truth.json` and records `STRUCTURAL GAP CONFIRMED` when the proxy misses
+the graph criterion. It records `UNEXPECTED SIGNAL FOUND` when a base-table
+query reaches the threshold. The preview question records
+`NOT AVAILABLE ON THIS CATALOG; answered in AFTER run`.
 
-`jobs/genie_run_after.py` queries the AFTER space (Silver tables plus the three Gold tables) with a different class of question: portfolio composition, cohort comparisons, community rollups, operational workload, and merchant-side analysis. Five sampler modules (`cat1_portfolio` through `cat5_merchant`) each hold a bank of questions in their `QUESTIONS` list; the runner picks one question per category and asks all five. Every question is asked in plain business language with no SQL hints. Responses — the SQL Genie generated, the rows returned, and any summary text — are captured as an artifact. No grading is performed in this job; that lands in Phase 5. Per-question status is `RESPONDED`, `NO DATA`, or `ERROR`. The closing summary names the five dimensions the AFTER catalog unlocked.
+`jobs/genie_run_after.py` queries the Silver and Gold tables. It covers portfolio
+composition, cohort comparisons, community rollups, operational workload, and
+merchant analysis. Five sampler modules, `cat1_portfolio` through
+`cat5_merchant`, each provide a question bank. The runner selects one question
+from each bank. It stores the generated SQL, returned rows, and summary text.
+Each question receives a status of `RESPONDED`, `NO DATA`, or `ERROR`.
 
 Each runner writes its own JSON artifact to the results volume. There is no compare job.
 
@@ -284,9 +307,17 @@ Terms used throughout this document and in the pipeline code. Each entry defines
 
 **Fraud ring.** A coordinated group of accounts that move money among themselves or transact with shared merchants to obscure the origin of funds or build reputation signal. In this demo, ten rings of 50-200 accounts each are embedded in the 25,000-account population. Ring membership is recorded in `ground_truth.json` and is the ground-truth label every verification check compares against.
 
-**Ring captain.** An account inside a ring that absorbs a disproportionate share of intra-ring inbound transfers. Captains exist to concentrate PageRank inside the ring so ring members surface near the top of risk-score rankings. In this demo, `CAPTAIN_COUNT=5` captains per ring each receive approximately 12 extra intra-ring inbound transfers at `CAPTAIN_TRANSFER_PROB=0.02`, for a total around 155 inbound per captain. That total is deliberately kept below whale inbound so that even the closest tabular proxy for hub detection — sorting by inbound-transfer count — surfaces whales rather than captains, which is what makes hub-detection a structural question that base-table SQL cannot answer.
+**Ring captain.** An account inside a ring that receives a large share of
+intra-ring transfers. Captains concentrate PageRank inside the ring. The demo
+creates five captains per ring. Each captain receives about 155 inbound
+transfers. Whales receive more inbound transfers, so a simple count ranks whales
+above captains. PageRank uses network structure and can surface the captains.
 
-**Whale.** A normal (non-ring) account that receives an elevated volume of peer-to-peer transfers, resembling a payment aggregator or a high-volume personal account. Whales exist to ensure that the closest tabular proxy for hub detection — sorting by inbound-transfer count — returns false positives rather than ring members, which is what makes hub-detection questions structurally out of reach for base-table SQL. In this demo, `WHALE_RATE=0.008` creates 200 whales, each receiving roughly 210 inbound transfers under `WHALE_INBOUND=0.14`. Whales send matching outbound volume to a fixed pool of 30 recurring recipients (`WHALE_RECIPIENT_POOL_SIZE`), keeping them peripheral to the graph topology rather than structurally identical to ring captains.
+**Whale.** A normal account that receives many peer-to-peer transfers, such as
+a payment aggregator or high-volume personal account. The demo creates 200
+whales. Each receives about 210 inbound transfers and sends matching volume to
+30 recurring recipients. This design makes inbound count a weak proxy for
+network centrality.
 
 **Anchor merchant.** A merchant preferentially visited by members of a specific ring, producing shared merchant history across that ring's accounts. Anchor merchants are the mechanism that drives elevated Jaccard similarity between ring members. In this demo, `RING_ANCHOR_CNT=4` anchor merchants are assigned to each ring, and each ring account visits its anchors with probability `RING_ANCHOR_PREF=0.35` on any given transaction.
 

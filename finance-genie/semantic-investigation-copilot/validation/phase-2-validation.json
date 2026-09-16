@@ -48,6 +48,31 @@
       "table_full_text_index"
     ]
   },
+  "remote_revalidation": {
+    "target_type": "dedicated remote Neo4j semantic store",
+    "distinct_from_operational_uri": true,
+    "empty_before_ingest": true,
+    "explicit_remote_write_opt_in": true,
+    "ingestion_status": "passed",
+    "idempotent_reingestion_verified": true,
+    "store_validation_status": "passed",
+    "mcp_validation_status": "passed",
+    "node_counts": {
+      "__neocarta_graph__": 1,
+      "Database": 1,
+      "Schema": 1,
+      "Table": 17,
+      "Column": 172,
+      "Value": 0
+    },
+    "relationship_counts": {
+      "HAS_SCHEMA": 1,
+      "HAS_TABLE": 17,
+      "HAS_COLUMN": 172,
+      "HAS_VALUE": 0,
+      "REFERENCES": 6
+    }
+  },
   "ingestion": {
     "source": "graph-on-databricks.graph-enriched-schema",
     "authentication": "Databricks SDK profile OAuth with optional PAT fallback",
@@ -69,12 +94,21 @@
     "column_full_text_hit": "identity_cluster_id",
     "embedding_calls": 0
   },
+  "embedding_provider": {
+    "provider": "databricks",
+    "endpoint": "databricks-gte-large-en",
+    "endpoint_status": "READY",
+    "smoke_test": "passed",
+    "dimensions": 1024,
+    "probe_vectors": 1,
+    "probe_data_stored": false
+  },
   "quality_gates": {
     "ruff_check": "passed",
     "ruff_format_check": "passed",
     "pytest": {
       "status": "passed",
-      "tests": 6
+      "tests": 9
     }
   }
 }

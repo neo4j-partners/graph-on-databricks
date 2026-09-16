@@ -5,7 +5,7 @@ semantic investigation demo described in
 [`../work-proposals/finance-demo.md`](../work-proposals/finance-demo.md).
 
 The Phase 2 runtime ingests metadata for one Unity Catalog schema into a
-dedicated local Neo4j instance. It does not read or store source row values.
+dedicated Neo4j semantic store. It does not read or store source row values.
 Neocarta then exposes the catalog through a stdio MCP server with catalog and
 full-text retrieval tools.
 
@@ -14,9 +14,12 @@ full-text retrieval tools.
 - `semantic-investigation-copilot/.env` is the one local source of runtime
   configuration. It is git-ignored and loaded explicitly by every runner.
 - `.env.example` is the committed, redacted variable contract.
-- The local Neo4j instance listens only on loopback ports `17474` and `17687`
-  and persists to the `finance-neocarta-data` Docker volume.
-- The Python write path refuses any `NEO4J_URI` whose host is not loopback.
+- The default local Neo4j instance listens only on loopback ports `17474` and
+  `17687` and persists to the `finance-neocarta-data` Docker volume.
+- A dedicated remote Neo4j or Aura instance is also supported, but the Python
+  write path requires the explicit `NEOCARTA_ALLOW_REMOTE_STORE=true` opt-in.
+- Ingestion and validation also refuse any target containing core Finance Genie
+  operational labels such as `Account`, `Customer`, `Phone`, or `Address`.
 - Do not copy values from the Finance Genie operational graph into this store.
   It contains schema metadata only.
 
@@ -30,6 +33,7 @@ The current prototype uses Neocarta `0.8.1` from the local checkout at
 - `uv`
 - Access to the configured Databricks SQL warehouse
 - A working Databricks CLI profile, or a short-lived personal access token
+- Access to the `databricks-gte-large-en` serving endpoint
 
 Python 3.12 and all project dependencies are managed by `uv`.
 
@@ -57,15 +61,24 @@ plus `DATABRICKS_WAREHOUSE_ID` so the runner can derive them. Do not commit the
 resulting `.env`.
 
 Embedding credentials are not required in Phase 2. They are deferred until
-embedding-backed retrieval is enabled in Phase 3.
+embedding-backed retrieval is enabled in Phase 3. The provider and endpoint are
+already selected and smoke-tested through the same Databricks profile:
+
+```dotenv
+EMBEDDING_MODEL=databricks/databricks-gte-large-en
+```
 
 ## Install and ingest
 
 ```bash
 make install
-make neo4j-up
+make validate-embeddings
 make ingest
 ```
+
+Run `make neo4j-up` before ingestion only when `.env` targets the local
+loopback instance. For a dedicated remote store, set
+`NEOCARTA_ALLOW_REMOTE_STORE=true` and do not start the Compose service.
 
 `make ingest` runs `ingest_databricks.py` with `value_sample_limit=0`. It loads
 the configured catalog and schema, writes only metadata, and records the
@@ -75,6 +88,7 @@ Neocarta graph version.
 
 ```bash
 make validate
+make validate-embeddings
 make validate-mcp
 make lint
 make test
@@ -87,6 +101,10 @@ of both `Value` nodes and `HAS_VALUE` relationships.
 `make validate-mcp` launches the real Neocarta stdio server, lists its tools,
 and proves both catalog and full-text retrieval with `gold_accounts` and
 `identity_cluster_id`. It does not call an embedding provider.
+
+`make validate-embeddings` makes one non-persistent request to the configured
+Databricks endpoint and verifies that it returns a non-empty vector. The current
+endpoint returns 1,024 dimensions.
 
 To run the server for an MCP client:
 
@@ -112,7 +130,7 @@ on its current directory:
 
 ## Persistence and clean rebuild
 
-Ordinary shutdown preserves the semantic store:
+For the local Compose store, ordinary shutdown preserves the semantic store:
 
 ```bash
 make neo4j-down
@@ -121,8 +139,8 @@ make validate
 ```
 
 Neocarta schema ingestion is additive. When source metadata changes, remove the
-prototype volume and ingest from a clean store. The following procedure deletes
-only the dedicated local `finance-neocarta-data` volume:
+local prototype volume and ingest from a clean store. The following procedure
+deletes only the dedicated local `finance-neocarta-data` volume:
 
 ```bash
 docker compose --env-file .env down --volumes
@@ -131,6 +149,10 @@ make ingest
 make validate
 make validate-mcp
 ```
+
+For a remote store, do not use the Compose cleanup command. Provision a fresh
+dedicated database or explicitly clear only the Neocarta metadata graph through
+an approved remote maintenance procedure.
 
 ## Versioned artifacts
 

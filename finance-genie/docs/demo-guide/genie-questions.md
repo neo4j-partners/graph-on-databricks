@@ -12,7 +12,9 @@ Copy-paste ready. Run BEFORE questions in the Silver (unenriched) Genie Space; r
 Which merchants are most commonly transacted with by the top 10% of accounts by total dollar amount spent across merchants?
 ```
 
-> Returns a flat popularity list — Brennan, Thomas and Dennis at 30 visits, Perry and Sons and Cox, Jimenez and Rodgers at 28 each. Plausible-looking chains, no triage priority.
+> Returns a flat popularity list. Brennan, Thomas and Dennis has 30 visits.
+> Perry and Sons and Cox, Jimenez and Rodgers each have 28. The result gives no
+> clear triage priority.
 
 ### After
 
@@ -20,7 +22,10 @@ Which merchants are most commonly transacted with by the top 10% of accounts by 
 Which merchants show the highest concentration of ring-candidate transactions relative to the overall book? For the top 10, show each merchant's ring-candidate transaction share versus the ~5% baseline ring-candidate transaction share across the book.
 ```
 
-> Ring-candidate accounts are ~5% of the book. At Brennan, Thomas and Dennis they generate 111 of the merchant's transactions from 70 accounts — roughly 7× over-represented. Alvarez-Barker shows the same pattern at 104 transactions from 68 accounts. The before answer names the same merchants but cannot show the disproportion; the after can.
+> Ring-candidate accounts are about 5% of the book. At Brennan, Thomas and
+> Dennis, they generate 111 transactions from 70 accounts. This rate is about
+> seven times the baseline. Alvarez-Barker shows the same pattern with 104
+> transactions from 68 accounts.
 
 ### Follow-up: Before vs After Ranking Comparison
 
@@ -40,7 +45,9 @@ Rank the top 10 merchants by share of transactions from ring-candidate accounts.
 For ring-candidate communities, what fraction of each community's total transfer volume flows between members inside the community versus to accounts outside? Show the top 5 communities by internal transfer ratio.
 ```
 
-> Top communities show 93–95% of transfer volume staying inside the community — effectively a closed loop. Money enters, cycles between members, and exits through a small number of accounts. That is textbook layering behavior as a single queryable number.
+> Top communities keep 93% to 95% of transfer volume inside the community.
+> Money enters, cycles between members, and exits through a small number of
+> accounts. This ratio gives investigators a clear layering signal.
 
 ### 2. Shared-Merchant Account Pairs
 
@@ -48,7 +55,9 @@ For ring-candidate communities, what fraction of each community's total transfer
 Which pairs of accounts have the highest similarity scores? Show the top 10 pairs with their similarity scores, whether they are in the same community, and their fraud risk tier.
 ```
 
-> Node Similarity finds accounts that route through the same merchants even without ever transacting directly. Every top pair is in the same community and both accounts are high risk — two independent algorithms (Louvain and Node Similarity) land on the same accounts without being told to agree.
+> Node Similarity finds accounts that use the same merchants. Every top pair is
+> in the same community, and both accounts are high risk. Louvain and Node
+> Similarity reach the same accounts from different graph patterns.
 
 ### 3. Investigator Work Queue
 
@@ -56,7 +65,9 @@ Which pairs of accounts have the highest similarity scores? Show the top 10 pair
 Show the top 15 accounts by risk score within ring-candidate communities. Include their community ID, region, total transaction volume, and fraud risk tier.
 ```
 
-> Converts the structural signal into an actionable triage list. Risk score is PageRank eigenvector centrality — accounts at the center of money flow within the ring rank highest. All 15 returned accounts are high risk. This is the queue an investigator works from.
+> Converts the structural signal into a triage list. PageRank gives higher risk
+> scores to accounts at the center of the money flow. All 15 returned accounts
+> are high risk.
 
 ### 4. Book Exposure by Risk Tier
 
@@ -64,7 +75,8 @@ Show the top 15 accounts by risk score within ring-candidate communities. Includ
 What is the total account balance held by high-risk tier accounts, and what share of the total book does that represent? Break it down by region.
 ```
 
-> Puts a dollar figure on the structural signal. US-West leads at $57M in high-risk balances (5.4% of the regional book). Finance audiences always ask "how much money is at risk?" — this answers it by region.
+> Puts a dollar value on the structural signal. US-West leads with $57 million
+> in high-risk balances, or 5.4% of the regional book.
 
 ---
 
@@ -76,7 +88,8 @@ What is the total account balance held by high-risk tier accounts, and what shar
 Which merchants are most commonly visited by the top 20 accounts by total transaction volume?
 ```
 
-> Returns 243 merchants with no co-visit count above 2 — completely dispersed, nothing stands out.
+> Returns 243 merchants with no co-visit count above two. The result does not
+> identify a clear outlier.
 
 ### Validation A After
 
@@ -84,7 +97,8 @@ Which merchants are most commonly visited by the top 20 accounts by total transa
 For James-Conway, Cardenas and Sons, Johnson, Williams and May, and Meyer Ltd, what share of each merchant's customers are members of ring-candidate communities, and how does that compare to the book baseline?
 ```
 
-> Three sit at the ~4% book baseline (utilities, grocery, retail). James-Conway (crypto) is at 76% — ~19× above baseline. The before could not distinguish James-Conway from the noise; the after can.
+> Three merchants match the 4% book baseline. James-Conway reaches 76%, which is
+> about 19 times the baseline. The graph feature identifies the outlier.
 
 ---
 
@@ -108,4 +122,6 @@ Show me accounts in a shared-identity cluster
 
 > Resolves to `gold_accounts.identity_cluster_size > 1`. Returns the same eight accounts, all carrying one `identity_cluster_id` with `identity_cluster_size` = 8. No single phone connects all eight; the shared address is the bridge that collapses the two phone groups into one Weakly Connected Component. That traversal is what a warehouse cannot express in one hop.
 
-> Both questions read from graph-derived columns. Money movement flagged the ring; identity resolution proves the eight accounts are one person wearing eight masks. See [KYC_README.md](../../KYC_README.md) for the full walkthrough, including the knowledge-layer provenance query that names the policy, definition, and source columns behind the classification.
+> Both questions read from graph-derived columns. Money movement flags the ring.
+> Identity resolution links the eight accounts to one shared identity. See the
+> [KYC guide](../kyc-guide.md) for the full walkthrough and provenance query.

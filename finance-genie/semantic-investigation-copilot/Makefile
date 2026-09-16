@@ -1,4 +1,4 @@
-.PHONY: install test lint neo4j-up neo4j-down ingest validate validate-mcp mcp
+.PHONY: install test lint neo4j-up neo4j-down ingest validate validate-embeddings validate-mcp mcp
 
 install:
 	uv sync
@@ -20,6 +20,9 @@ ingest:
 
 validate:
 	uv run python validate_store.py
+
+validate-embeddings:
+	uv run python validate_embeddings.py
 
 validate-mcp:
 	uv run python validate_mcp.py

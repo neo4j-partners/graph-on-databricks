@@ -1,4 +1,4 @@
-"""Configuration helpers for the local Finance Neocarta prototype."""
+"""Configuration helpers for the isolated Finance Neocarta prototype."""
 
 from __future__ import annotations
 
@@ -10,6 +10,12 @@ from dotenv import load_dotenv
 
 DEMO_DIR = Path(__file__).resolve().parent
 ENV_FILE = DEMO_DIR / ".env"
+OPERATIONAL_GRAPH_LABELS = ["Account", "Customer", "Phone", "Address"]
+OPERATIONAL_GRAPH_QUERY = """
+MATCH (node)
+WHERE any(node_label IN labels(node) WHERE node_label IN $operational_labels)
+RETURN count(node) AS operational_node_count
+"""
 
 
 def load_demo_env() -> Path:
@@ -17,6 +23,9 @@ def load_demo_env() -> Path:
     if not ENV_FILE.is_file():
         raise RuntimeError(f"Missing {ENV_FILE}. Copy .env.example and fill in local values.")
     load_dotenv(ENV_FILE, override=True)
+    profile = os.getenv("DATABRICKS_PROFILE", "").strip()
+    if profile:
+        os.environ["DATABRICKS_CONFIG_PROFILE"] = profile
     return ENV_FILE
 
 
@@ -49,11 +58,29 @@ def databricks_http_path() -> str:
     return f"/sql/1.0/warehouses/{require_env('DATABRICKS_WAREHOUSE_ID')}"
 
 
-def assert_local_semantic_store() -> None:
-    """Refuse writes unless the configured semantic store resolves to loopback."""
+def assert_semantic_store_target() -> None:
+    """Require loopback or an explicitly approved dedicated remote store."""
     parsed = urlparse(require_env("NEO4J_URI"))
-    if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+    if parsed.hostname in {"127.0.0.1", "localhost", "::1"}:
+        return
+
+    remote_approved = os.getenv("NEOCARTA_ALLOW_REMOTE_STORE", "").strip().lower()
+    if remote_approved not in {"1", "true", "yes"}:
         raise RuntimeError(
-            "Phase 2 ingestion only writes to a loopback Neo4j URI. "
-            "Use the dedicated local semantic store."
+            "Remote semantic-store writes require NEOCARTA_ALLOW_REMOTE_STORE=true. "
+            "Only approve a dedicated metadata store, never the operational graph."
+        )
+
+
+def assert_no_operational_graph_nodes(driver, database: str) -> None:
+    """Refuse a target containing core Finance Genie operational node labels."""
+    records, _, _ = driver.execute_query(
+        OPERATIONAL_GRAPH_QUERY,
+        operational_labels=OPERATIONAL_GRAPH_LABELS,
+        database_=database,
+    )
+    if records and records[0]["operational_node_count"]:
+        raise RuntimeError(
+            "The semantic-store target contains Finance Genie operational nodes. "
+            "Use a dedicated Neo4j instance or database."
         )

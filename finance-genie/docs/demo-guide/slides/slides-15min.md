@@ -508,7 +508,7 @@ Two columns that don't exist in Silver.
 
 Three merchants are noise: utilities, grocery, and retail all sit at
 the ~4% book baseline. The crypto merchant is the signal: 64 of 84
-customers in ring-candidate communities against a ~4% book rate — 19×
+customers in ring-candidate communities against a ~4% book rate: 19×
 above baseline. Not a verdict, a triage priority. The before answer
 could not distinguish James-Conway from the others; the after answer can.
 -->

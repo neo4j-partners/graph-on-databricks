@@ -10,7 +10,8 @@ from neo4j import GraphDatabase
 from neocarta.connectors.databricks import DatabricksSchemaConnector
 
 from config import (
-    assert_local_semantic_store,
+    assert_no_operational_graph_nodes,
+    assert_semantic_store_target,
     databricks_http_path,
     databricks_server_hostname,
     load_demo_env,
@@ -36,7 +37,7 @@ def databricks_access_token() -> str:
 def main() -> None:
     """Run a metadata-only ingest for one configured Unity Catalog schema."""
     load_demo_env()
-    assert_local_semantic_store()
+    assert_semantic_store_target()
 
     catalog = require_env("DATABRICKS_CATALOG")
     schema = require_env("DATABRICKS_SCHEMA")
@@ -48,6 +49,7 @@ def main() -> None:
     )
     try:
         driver.verify_connectivity()
+        assert_no_operational_graph_nodes(driver, neo4j_database)
         with sql.connect(
             server_hostname=databricks_server_hostname(),
             http_path=databricks_http_path(),

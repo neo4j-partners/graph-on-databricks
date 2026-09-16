@@ -130,7 +130,7 @@ and classifies every shared-identity customer with a `:CLASSIFIED_AS` edge that
 names the policy, definition, and source columns behind the call. The four KYC
 columns land on `gold_accounts` beside `risk_score` and `community_id`, so the
 AFTER Genie space can answer synthetic-identity questions. The notebook closes
-with a presenter walkthrough. `KYC_README.md` is the full operator-and-presenter
+with a presenter walkthrough. `docs/kyc-guide.md` is the full operator and presenter
 guide this notebook implements for the workshop path.
 
 ## Reference Material
@@ -146,7 +146,7 @@ guide this notebook implements for the workshop path.
   tab, an alternative to the Python-client notebook, covering both the fraud
   algorithms (`04_gds_enrichment`) and the WCC identity resolution
   (`06_kyc_walkthrough`)
-- [`../KYC_README.md`](../KYC_README.md): the full KYC operator-and-presenter guide
+- [`../docs/kyc-guide.md`](../docs/kyc-guide.md): the full KYC operator and presenter guide
   that `06_kyc_walkthrough.ipynb` implements, including the planted story ring
   and expected values
 - `diagrams/`: architecture diagrams for the workshop

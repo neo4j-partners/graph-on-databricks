@@ -228,7 +228,7 @@ build on.
 
 <!--
 Frame the gap as a data layer problem, not a query layer
-problem. The answer exists — it just has to be computed by GDS
+problem. GDS must compute the answer
 and materialized before any query tool can reach it. This motivates
 GDS as the silver-to-gold stage: the network is where those answers
 live, and enrichment lands them in the catalog as ordinary columns.
@@ -652,7 +652,7 @@ Two columns that don't exist in Silver.
 
 Three merchants are noise: utilities, grocery, and retail all sit at
 the ~4% book baseline. The crypto merchant is the signal: 64 of 84
-customers in ring-candidate communities against a ~4% book rate — 19×
+customers in ring-candidate communities against a ~4% book rate: 19×
 above baseline. Not a verdict, a triage priority. The before answer
 could not distinguish James-Conway from the others; the after answer can.
 -->

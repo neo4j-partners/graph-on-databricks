@@ -203,7 +203,7 @@ Quick pointers:
 
 ## Further Reading
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md): design rationale, GDS algorithm choices, and integration patterns.
+- [Architecture guide](./docs/architecture.md): design rationale, GDS algorithm choices, and integration patterns.
 - [Production scoping guide](./docs/SCOPING_GUIDE.md): calibration, evaluation, and operational boundaries beyond the teaching dataset.
 - [Full Finance Genie deck](https://neo4j-partners.github.io/graph-on-databricks/slides.html)
 - [15-minute Finance Genie deck](https://neo4j-partners.github.io/graph-on-databricks/slides-15min.html)

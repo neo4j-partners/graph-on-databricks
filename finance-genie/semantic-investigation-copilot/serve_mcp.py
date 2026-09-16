@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from config import assert_local_semantic_store, load_demo_env
+from config import assert_semantic_store_target, load_demo_env
 
 
 def main() -> None:
     """Load the explicit demo environment before importing MCP settings."""
     load_demo_env()
-    assert_local_semantic_store()
+    assert_semantic_store_target()
 
     from neocarta._mcp.server import run
 
