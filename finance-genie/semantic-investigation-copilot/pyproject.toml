@@ -1,0 +1,25 @@
+[project]
+name = "finance-neocarta-prototype"
+version = "0.1.0"
+description = "Local Neocarta prototype for the Finance Genie semantic investigation demo."
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "neocarta[cli,databricks,mcp]",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.11",
+]
+
+[tool.uv.sources]
+neocarta = { path = "../../../../neo4j-labs/neocarta", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

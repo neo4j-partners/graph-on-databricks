@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "primary_concept": "shared_identity",
+  "source_scope": {
+    "databricks_catalog": "graph-on-databricks",
+    "databricks_schema": "graph-enriched-schema",
+    "neo4j_database": "neo4j"
+  },
+  "concepts": [
+    {
+      "id": "shared_identity",
+      "name": "Shared identity",
+      "definition": "Customers connected into one identity cluster through a shared phone number or mailing address.",
+      "interpretation": "An investigation signal, not a determination of fraud.",
+      "databricks": {
+        "table": "gold_accounts",
+        "columns": [
+          "account_id",
+          "identity_cluster_id",
+          "identity_cluster_size",
+          "shared_phone_count",
+          "shared_address_count"
+        ],
+        "predicate": "identity_cluster_size > 1",
+        "join_keys": [
+          "gold_accounts.account_id = accounts.account_id",
+          "gold_accounts.account_id = account_links.src_account_id",
+          "gold_accounts.account_id = account_links.dst_account_id"
+        ]
+      },
+      "neo4j": {
+        "node_labels": [
+          "Customer",
+          "Account",
+          "Phone",
+          "Address",
+          "BusinessTerm",
+          "BusinessRule",
+          "Policy",
+          "DataSource"
+        ],
+        "relationship_types": [
+          "OWNS",
+          "HAS_PHONE",
+          "HAS_ADDRESS",
+          "CLASSIFIED_AS",
+          "DEFINED_BY",
+          "GOVERNED_BY",
+          "DERIVED_FROM"
+        ],
+        "properties": {
+          "Customer": [
+            "customer_id",
+            "identity_cluster_id",
+            "identity_cluster_size",
+            "shared_phone_count",
+            "shared_address_count"
+          ],
+          "Account": [
+            "account_id",
+            "identity_cluster_id",
+            "identity_cluster_size",
+            "shared_phone_count",
+            "shared_address_count"
+          ],
+          "Phone": ["number"],
+          "Address": ["address"],
+          "BusinessTerm": ["name", "description"],
+          "BusinessRule": ["rule_id", "name", "logic", "threshold"],
+          "Policy": ["policy_id", "name", "authority", "description"],
+          "DataSource": ["name", "description"],
+          "CLASSIFIED_AS": [
+            "reason",
+            "evaluatedAt",
+            "cluster_id",
+            "cluster_size"
+          ]
+        },
+        "paths": [
+          "(:Customer)-[:OWNS]->(:Account)",
+          "(:Customer)-[:HAS_PHONE]->(:Phone)<-[:HAS_PHONE]-(:Customer)",
+          "(:Customer)-[:HAS_ADDRESS]->(:Address)<-[:HAS_ADDRESS]-(:Customer)",
+          "(:Customer)-[:CLASSIFIED_AS]->(:BusinessTerm)-[:DEFINED_BY]->(:BusinessRule)-[:DERIVED_FROM]->(:DataSource)",
+          "(:BusinessTerm)-[:GOVERNED_BY]->(:Policy)"
+        ]
+      }
+    },
+    {
+      "id": "kyc_review_candidate",
+      "name": "KYC review candidate",
+      "definition": "An account whose owning customer belongs to a shared-identity cluster containing more than one customer.",
+      "interpretation": "A review candidate, not a confirmed KYC violation.",
+      "databricks": {
+        "table": "gold_accounts",
+        "columns": ["account_id", "identity_cluster_id", "identity_cluster_size"],
+        "predicate": "identity_cluster_size > 1",
+        "join_keys": ["gold_accounts.account_id = accounts.account_id"]
+      },
+      "neo4j": {
+        "node_labels": ["Customer", "Account", "BusinessTerm"],
+        "relationship_types": ["OWNS", "CLASSIFIED_AS"],
+        "properties": {
+          "Customer": ["customer_id", "identity_cluster_id", "identity_cluster_size"],
+          "Account": ["account_id"],
+          "BusinessTerm": ["name", "description"]
+        },
+        "paths": [
+          "(:Customer)-[:OWNS]->(:Account)",
+          "(:Customer)-[:CLASSIFIED_AS]->(:BusinessTerm {name: 'Shared Identity Ring'})"
+        ]
+      }
+    },
+    {
+      "id": "transfer_exposure",
+      "name": "Transfer exposure",
+      "definition": "Directed account-to-account money movement and the accounts exposed through those transfers.",
+      "interpretation": "Transfer connectivity and amount are evidence for investigation, not proof of misconduct.",
+      "databricks": {
+        "table": "account_links",
+        "columns": [
+          "link_id",
+          "src_account_id",
+          "dst_account_id",
+          "amount",
+          "transfer_timestamp"
+        ],
+        "join_keys": [
+          "account_links.src_account_id = accounts.account_id",
+          "account_links.dst_account_id = accounts.account_id"
+        ]
+      },
+      "neo4j": {
+        "node_labels": ["Account"],
+        "relationship_types": ["TRANSFERRED_TO"],
+        "properties": {
+          "Account": ["account_id"],
+          "TRANSFERRED_TO": ["link_id", "amount", "transfer_timestamp"]
+        },
+        "paths": ["(:Account)-[:TRANSFERRED_TO]->(:Account)"]
+      }
+    },
+    {
+      "id": "fraud_ring_candidate",
+      "name": "Fraud-ring candidate",
+      "definition": "An account or community whose transfer topology and graph-derived scores meet the configured ring-candidate thresholds.",
+      "interpretation": "A candidate community, not a fraud determination.",
+      "databricks": {
+        "tables": ["gold_accounts", "gold_fraud_ring_communities"],
+        "columns": [
+          "gold_accounts.account_id",
+          "gold_accounts.community_id",
+          "gold_accounts.risk_score",
+          "gold_accounts.is_ring_community",
+          "gold_fraud_ring_communities.is_ring_candidate"
+        ],
+        "join_keys": [
+          "gold_accounts.community_id = gold_fraud_ring_communities.community_id"
+        ]
+      },
+      "neo4j": {
+        "node_labels": ["Account"],
+        "relationship_types": ["TRANSFERRED_TO", "SIMILAR_TO"],
+        "properties": {
+          "Account": ["account_id", "community_id", "risk_score", "similarity_score"],
+          "TRANSFERRED_TO": ["link_id", "amount", "transfer_timestamp"],
+          "SIMILAR_TO": ["similarity_score"]
+        },
+        "paths": [
+          "(:Account)-[:TRANSFERRED_TO]->(:Account)",
+          "(:Account)-[:SIMILAR_TO]-(:Account)"
+        ],
+        "known_gap": "The operational graph has no fraud-ring BusinessTerm, rule, policy, or classification node. Those mappings remain lakehouse-derived until explicitly curated."
+      }
+    },
+    {
+      "id": "high_risk",
+      "name": "High risk",
+      "definition": "The lakehouse risk tier assigned from ring-community membership, supported by graph centrality and community evidence.",
+      "interpretation": "A derived risk tier, not a fraud verdict.",
+      "databricks": {
+        "table": "gold_accounts",
+        "columns": [
+          "account_id",
+          "fraud_risk_tier",
+          "is_ring_community",
+          "community_id",
+          "risk_score"
+        ],
+        "predicate": "fraud_risk_tier = 'high'"
+      },
+      "neo4j": {
+        "node_labels": ["Account"],
+        "relationship_types": ["TRANSFERRED_TO"],
+        "properties": {
+          "Account": ["account_id", "community_id", "risk_score"]
+        },
+        "paths": ["(:Account)-[:TRANSFERRED_TO]-(:Account)"],
+        "known_gap": "fraud_risk_tier and is_ring_community exist in Databricks Gold but are not stored on operational Account nodes."
+      }
+    }
+  ]
+}

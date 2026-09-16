@@ -1,0 +1,27 @@
+name: finance-neocarta
+
+services:
+  semantic-neo4j:
+    image: neo4j:5.26.23-community
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:17474:7474"
+      - "127.0.0.1:17687:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          cypher-shell -a bolt://localhost:7687 -u neo4j -p "$${NEO4J_AUTH#*/}"
+          "RETURN 1" >/dev/null 2>&1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - semantic-neo4j-data:/data
+
+volumes:
+  semantic-neo4j-data:
+    name: finance-neocarta-data

@@ -1,0 +1,80 @@
+{
+  "phase": 2,
+  "status": "complete",
+  "evidence_date": "2026-09-16",
+  "runtime": {
+    "python": "3.12.12",
+    "neocarta_version": "0.8.1",
+    "neocarta_checkout": "/Users/ryanknight/projects/neo4j-labs/neocarta",
+    "neocarta_commit": "ba6bf7945bf9c60640c664a03ccc26d0013996bf",
+    "neocarta_branch": "fix-vector",
+    "neocarta_checkout_had_preexisting_changes": true,
+    "environment_manager": "uv",
+    "lockfile": "../uv.lock"
+  },
+  "semantic_store": {
+    "image": "neo4j:5.26.23-community",
+    "database": "neo4j",
+    "network_scope": "loopback-only",
+    "bolt_port": 17687,
+    "http_port": 17474,
+    "persistent_volume": "finance-neocarta-data",
+    "restart_persistence_verified": true,
+    "node_counts": {
+      "__neocarta_graph__": 1,
+      "Database": 1,
+      "Schema": 1,
+      "Table": 17,
+      "Column": 172,
+      "Value": 0
+    },
+    "relationship_counts": {
+      "HAS_SCHEMA": 1,
+      "HAS_TABLE": 17,
+      "HAS_COLUMN": 172,
+      "HAS_VALUE": 0,
+      "REFERENCES": 6
+    },
+    "uniqueness_constraints": [
+      "column_id_constraint",
+      "database_id_constraint",
+      "schema_id_constraint",
+      "table_id_constraint",
+      "value_id_constraint"
+    ],
+    "full_text_indexes_online": [
+      "column_full_text_index",
+      "schema_full_text_index",
+      "table_full_text_index"
+    ]
+  },
+  "ingestion": {
+    "source": "graph-on-databricks.graph-enriched-schema",
+    "authentication": "Databricks SDK profile OAuth with optional PAT fallback",
+    "value_sample_limit": 0,
+    "embedding_generation": false,
+    "source_row_values_stored": false
+  },
+  "mcp": {
+    "transport": "stdio",
+    "registered_tools": [
+      "get_context_by_column_full_text_search",
+      "get_context_by_table_full_text_search",
+      "get_full_metadata_schema",
+      "list_schemas",
+      "list_tables_by_schema"
+    ],
+    "catalog_table_count": 17,
+    "table_full_text_hit": "gold_accounts",
+    "column_full_text_hit": "identity_cluster_id",
+    "embedding_calls": 0
+  },
+  "quality_gates": {
+    "ruff_check": "passed",
+    "ruff_format_check": "passed",
+    "pytest": {
+      "status": "passed",
+      "tests": 6
+    }
+  }
+}

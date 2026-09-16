@@ -35,7 +35,7 @@ def main() -> None:
     print("OK    .env loaded")
     print(f"OK    NEO4J_URI      = {uri}")
     print(f"OK    NEO4J_USERNAME = {user}")
-    print(f"OK    NEO4J_PASSWORD = <{len(password)} chars>")
+    print("OK    NEO4J_PASSWORD = [set]")
 
     try:
         with GraphDatabase.driver(uri, auth=(user, password)) as driver:
