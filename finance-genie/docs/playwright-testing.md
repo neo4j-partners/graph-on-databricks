@@ -61,7 +61,7 @@ uv run python -m playwright install --with-deps chromium
 
 ## Best Practices
 
-**Test user-visible behavior, not implementation details.** Interact with visible controls and assert rendered results. Do not probe JavaScript state directly.
+**Test user-visible behavior.** Interact with visible controls and assert rendered results. Keep assertions focused on the rendered page.
 
 **Keep tests isolated.** Each test gets a fresh browser context and does not depend on another test having already run.
 

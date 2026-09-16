@@ -608,7 +608,7 @@ wheels = [
 [[package]]
 name = "finance-neocarta-prototype"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "neocarta", extra = ["cli", "databricks", "mcp"] },
 ]

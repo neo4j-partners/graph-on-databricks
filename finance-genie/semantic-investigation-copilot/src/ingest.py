@@ -1,4 +1,4 @@
-"""Ingest Finance Genie Unity Catalog metadata into the local semantic graph."""
+"""Ingest Finance Genie Unity Catalog metadata into the semantic graph."""
 
 from __future__ import annotations
 

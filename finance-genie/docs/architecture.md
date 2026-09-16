@@ -2,337 +2,161 @@
 
 ![Finance Genie data architecture](images/data-architecture.png)
 
-## What this document covers
+Finance Genie adds graph-derived features to Databricks Gold tables. Neo4j Graph
+Data Science computes the features. Databricks Genie queries them as ordinary
+columns.
 
-This document explains the enrichment pipeline in `enrichment-pipeline/`. It
-describes each stage, its configuration, and its role in the demo.
+## Overview
 
-- **Input:** Silver tables with accounts, merchants, transactions, and transfers.
-- **Graph analysis:** Neo4j GDS calculates centrality, community, and similarity features.
-- **Output:** Databricks writes those features to Gold tables that Genie can query.
-- **Purpose:** The demo shows how graph features add relationship-based questions to Genie.
+- **Input:** Silver tables for accounts, customers, merchants, transactions, and transfers.
+- **Graph analysis:** Neo4j GDS computes centrality, community, and similarity features.
+- **Output:** Gold tables store those features with account and merchant data.
+- **Demo result:** Genie can answer questions about relationship-based segments.
+- **Decision boundary:** Graph features identify investigation candidates. Analysts make fraud decisions.
 
-Two runtime projects sit beside this pipeline:
+Two applications use the same graph data for different workflows:
 
-- [`fraud-signal-workbench/`](../fraud-signal-workbench/README.md) queries the
-  GDS-enriched Aura graph directly, materializes an investigator-selected
-  subgraph into Delta, and sends analysis questions to Genie.
-- [`neo4j-mcp-graph-agent/`](../neo4j-mcp-graph-agent/README.md) provisions the
-  external MCP connection and deploys a graph-only agent endpoint. It retrieves
-  live graph evidence and does not depend on the Gold-table production stage.
+- **Fraud Signal Workbench:** [`fraud-signal-workbench/`](../fraud-signal-workbench/README.md) selects graph evidence and sends analysis questions to Genie.
+- **Graph agent:** [`neo4j-mcp-graph-agent/`](../neo4j-mcp-graph-agent/README.md) retrieves live graph evidence through an MCP connection.
 
-Their project READMEs are the source of truth for runtime deployment. The
-remainder of this document is intentionally scoped to the enrichment pipeline.
+Each application README is the source of truth for deployment. This guide
+covers the enrichment pipeline.
 
-The pipeline has one job: demonstrate what becomes answerable when GDS enriches the Gold layer with structural dimensions that base tables cannot provide. GDS writes features: `risk_score` is PageRank eigenvector centrality, `community_id` is a Louvain community partition, `similarity_score` is Jaccard overlap of shared-merchant sets. Each carries a published mathematical definition. None is a fraud verdict. Genie reads those columns and answers segment questions over structural dimensions: portfolio composition, cohort comparisons, community rollups, operational workload, merchant-side analysis. That goal determines which variables are load-bearing and which are belt-and-suspenders.
+## Data Flow
 
----
+1. Generate a repeatable synthetic banking dataset.
+2. Load the source tables into Unity Catalog Silver tables.
+3. Load accounts, merchants, customers, and relationships into Neo4j.
+4. Run PageRank, Louvain, Node Similarity, and identity resolution.
+5. Pull the graph results back into Databricks Gold tables.
+6. Validate the Gold tables and run the before and after Genie questions.
 
-## Stage 1: Data Generation
+## Stage 1: Generate Data
 
-### Overview
+`enrichment-pipeline/setup/generate_data.py` creates the CSV inputs and
+`ground_truth.json`.
 
-`setup/generate_data.py` produces five CSVs and a `ground_truth.json` file in `enrichment-pipeline/data/`. These become the Silver-layer Delta tables that the rest of the pipeline reads. The generator creates 25,000 accounts, 7,500 merchants, 250,000 account-to-merchant transactions, and 300,000 peer-to-peer transfers. Within those records it embeds ten fraud rings, each connected by elevated transaction density and shared merchant preferences -- the structural signals that GDS algorithms will later surface.
+- **Accounts:** 25,000.
+- **Merchants:** 7,500.
+- **Merchant transactions:** 250,000.
+- **Peer transfers:** 300,000.
+- **Fraud rings:** 10 synthetic rings with 1,000 total members.
+- **Seed:** 42 for repeatable data.
 
-The demo keeps fraud transaction amounts within 3% of normal amounts. This
-removes a simple tabular shortcut. The useful signal lives in the network
-topology. GDS writes `risk_score`, `community_id`, and `similarity_score` to the
-Gold tables. Genie can then answer portfolio, cohort, workload, and merchant
-questions with those columns.
+The generator keeps fraud transaction amounts close to normal transaction
+amounts. This removes a simple volume shortcut. The useful signal comes from
+transfer structure and shared merchant behavior.
 
-`diagnostics/verify_fraud_patterns.py` is an optional diagnostic. It reads the CSVs and checks four structural properties against fixed thresholds, which is useful when re-tuning parameters. It is not a required pipeline stage: the downstream GDS verification in `validation/verify_gds.py` covers the same structural ground, so a stable-parameter run does not need to invoke it.
+### Main Signal Settings
 
----
+| Setting | Default | Purpose |
+| --- | ---: | --- |
+| `WITHIN_RING_PROB` | `0.35` | Creates dense transfers inside each ring for Louvain. |
+| `WHALE_INBOUND` | `0.14` | Creates high-volume normal accounts that weaken inbound count as a proxy for centrality. |
+| `RING_ANCHOR_PREF` | `0.35` | Creates shared merchant behavior for Node Similarity. |
+| `FRAUD_RATE` | `0.04` | Sets the synthetic ring population. |
+| `N_RINGS` | `10` | Sets the number of planted rings. |
+| `WHALE_RATE` | `0.008` | Sets the high-volume normal population. |
 
-### Scale variables
+These values form one calibrated set. Run the validation suite after changing
+any of them.
 
-These control dataset size. They do not affect signal quality directly, but they do set the population context that the signal variables are calibrated against. The defaults have been validated together; changing one without re-verifying the others may require recalibrating the primary tuning knobs.
+## Stage 2: Prepare Databricks
 
-| Variable | Default | What it controls |
-|----------|---------|-----------------|
-| `NUM_ACCOUNTS` | 25,000 | Total account population. Sets the background density against which ring density is measured. |
-| `NUM_MERCHANTS` | 7,500 | Total merchant population. Larger pools reduce Jaccard similarity between any two accounts; `RING_ANCHOR_PREF` compensates. |
-| `NUM_TXN` | 250,000 | Account-to-merchant transactions. Determines how many merchant visits each account accumulates. |
-| `NUM_P2P` | 300,000 | Peer-to-peer transfers. Sets the edge budget that `WITHIN_RING_PROB` and the whale parameters divide. |
-| `FRAUD_RATE` | 0.04 (4%) | Fraction of accounts assigned to fraud rings. At 25,000 accounts, this creates 1,000 ring members across 10 rings. |
-| `N_RINGS` | 10 | Number of distinct fraud rings. Each ring receives an equal share of the fraud population and its own set of anchor merchants. |
-| `WHALE_RATE` | 0.008 (0.8%) | Fraction of normal accounts designated as "whale" accounts. At 25,000 accounts, this creates 200 whales. |
-| `SEED` | 42 | RNG seed. Controls all random draws in the generator, producing a fully reproducible dataset at a fixed seed value. |
+The bootstrap scripts create the Unity Catalog schema, load the Silver tables,
+store secrets, and configure the two Genie Spaces.
 
----
+- **Upload:** `enrichment-pipeline/upload_and_create_tables.sh` creates tables and loads files.
+- **Secrets:** `enrichment-pipeline/setup_secrets.sh` stores Neo4j and Genie values in a Databricks secret scope.
+- **Genie setup:** `enrichment-pipeline/setup/provision_genie_spaces.py` configures the Silver and Gold spaces.
 
-### Primary signal knobs (env-overridable)
+Important environment values include:
 
-Three variables determine whether the GDS algorithms produce clean, separable outputs. They are calibrated together and documented in `worklog/PARAMETER_CALIBRATION.md`. Each controls a specific algorithm's signal, and each has a documented lower bound below which that algorithm's verification check fails.
+| Setting | Purpose |
+| --- | --- |
+| `DATABRICKS_PROFILE` | Selects the Databricks CLI profile. |
+| `DATABRICKS_WAREHOUSE_ID` | Selects the SQL warehouse for setup statements. |
+| `CATALOG` and `SCHEMA` | Select the Unity Catalog location. |
+| `DATABRICKS_VOLUME` | Selects the staging volume. |
+| `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | Connect to Neo4j. |
+| `GENIE_SPACE_ID_BEFORE` | Selects the Silver-only Genie Space. |
+| `GENIE_SPACE_ID_AFTER` | Selects the enriched Genie Space. |
+| `NEO4J_SECRET_SCOPE` | Selects the Databricks secret scope. |
 
-**Louvain community detection: `WITHIN_RING_PROB`, default 0.35**
+## Stage 3: Load Neo4j
 
-The fraction of peer-to-peer transfers that stay within a ring, and the primary driver of the within-ring edge density ratio. At 0.35, roughly 93% of edges originating from a ring member stay inside the ring, producing a within-ring density approximately 3,400 times higher than the background density. Louvain detects the community boundary from that density contrast. Below 0.25 the internal edge ratio drops below 89% and ring boundaries blur enough that some rings merge into large background communities. `WITHIN_RING_PROB` also controls the absolute inbound count received by ring captains, which is why it interacts with the hardcoded captain constants below.
+`enrichment-pipeline/jobs/02_neo4j_ingest.py` reads the Silver tables and builds
+the property graph.
 
-**PageRank centrality: `WHALE_INBOUND`, default 0.14**
+- **Account network:** `Account` nodes connect through `TRANSFERRED_TO` relationships.
+- **Merchant network:** `Account` nodes connect to `Merchant` nodes through `TRANSACTED_WITH` relationships.
+- **Identity network:** `Customer` nodes connect to `Phone` and `Address` nodes through shared identifiers.
+- **Runtime:** A Databricks cluster runs the Neo4j Spark Connector and the GDS Python client.
 
-The fraction of all P2P transfers directed toward whale accounts. At 300,000 total transfers and 200 whales, this gives each whale approximately 210 inbound transfers on average. That number must stay above the inbound count of ring captains so that naive inbound-count sorting finds whales, not ring captains -- establishing that tabular analysis fails and graph analysis is required.
+The ingest clears and rebuilds the demo graph. Batch writes limit memory use on
+Neo4j Aura.
 
-**Node Similarity using Jaccard: `RING_ANCHOR_PREF`, default 0.35**
+## Stage 4: Run Graph Data Science
 
-The probability that a fraud account visits a ring-specific "anchor" merchant on any given transaction, and the primary driver of Jaccard similarity between ring members. At 0.35, the fraud-to-normal Jaccard ratio is approximately 1.98x, clearing the verification threshold of 1.9x. Below 0.25 the ratio drops to roughly 1.50x and the Node Similarity gate fails.
+`enrichment-pipeline/validation/run_gds.py` computes the graph features.
 
----
+- **PageRank:** Writes `risk_score` to accounts based on transfer-network centrality.
+- **Louvain:** Writes `community_id` based on transfer density.
+- **Node Similarity:** Writes `SIMILAR_TO` relationships and `similarity_score` from shared merchant neighborhoods.
+- **Weakly Connected Components:** Writes identity cluster fields from shared phones and addresses.
 
-### Secondary signal constants (hardcoded)
+`enrichment-pipeline/validation/verify_gds.py` checks the expected synthetic
+signals:
 
-These values are calibrated together with the primary knobs and fixed in `setup/generate_data.py`. They are documented here because they shape the signal, but they are not `.env` variables -- changing them requires editing the module and re-running the verification suite.
+- **PageRank ratio:** Fraud accounts average at least three times the normal score.
+- **Community purity:** At least one ring reaches 50% purity.
+- **Similarity ratio:** Fraud pairs reach at least 1.9 times the mixed-pair score.
+- **Coverage:** Every account receives the required graph properties.
+- **Identity fixture:** The planted eight-account identity cluster matches ground truth.
 
-| Constant | Value | Role |
-|----------|-------|------|
-| `WHALE_OUTBOUND` | equal to `WHALE_INBOUND` | Matching outbound volume gives whales symmetric in/out flow, so they resemble payment aggregators rather than pure collection accounts. Outbound transfers go to non-ring accounts, keeping whale senders peripheral and preserving the PageRank separation. |
-| `WHALE_RECIPIENT_POOL_SIZE` | 30 | Each whale's outbound transfers route to a fixed pool of 30 recurring recipients drawn from plain normal accounts, mirroring the consistent-counterparty pattern of a real payment aggregator. Recipients stay low-degree and do not absorb PageRank. |
-| `RING_ANCHOR_CNT` | 4 | Shared anchor merchants per ring. Sets the ceiling on within-ring Jaccard similarity; fewer anchors narrows the shared merchant pool, more anchors raises the ceiling but increases collision risk between rings. |
-| `CAPTAIN_COUNT` | 5 | Captains per ring. Captains absorb a fraction of intra-ring inbound transfers to concentrate PageRank within the ring, ensuring ring members surface near the top of risk-score rankings. |
-| `CAPTAIN_TRANSFER_PROB` | 0.02 | Fraction of within-ring transfers routed to a captain. At 0.02 with 300,000 P2P transfers, each captain receives approximately 12 extra inbound for a total around 155 -- kept below whale inbound (~210) so the whale-hiding property holds. At 0.10 captains would breach the top-200 inbound accounts and break the separation. |
+## Stage 5: Build Gold Tables
 
----
+`enrichment-pipeline/jobs/03_pull_gold_tables.py` reads graph properties through
+the Neo4j Spark Connector and writes three Gold tables.
 
-### Tabular signal constants (hardcoded)
+- **`gold_accounts`:** Adds graph scores, community fields, identity fields, and derived tiers to each account.
+- **`gold_fraud_ring_communities`:** Summarizes candidate communities for portfolio and workload questions.
+- **`gold_account_similarity_pairs`:** Stores high-similarity account pairs for shared-behavior questions.
 
-Six lognormal-distribution constants keep the fraud/normal tabular signal deliberately weak -- the gap between fraud and normal transaction medians is less than 3%. This is what makes structural-discovery questions unanswerable from row-level SQL on the Silver tables and what makes the BEFORE Genie run's gap authentic. The enrichment step changes which questions the analyst can usefully bring to Genie; the transaction distributions are fixed to ensure that base-table analysis alone cannot shortcut that gap. The values are fixed in `setup/generate_data.py` and do not need ongoing adjustment.
+The demo classifies a community as a ring candidate when its size is between 50
+and 200 and its average risk score is at least 1.0. These values support the
+synthetic fixture. Production teams must calibrate them with representative data.
 
-| Constant | Value | What it controls |
-|----------|-------|-----------------|
-| `FRAUD_LOGNORM_MU` | 4.1 | Log-mean of transaction amounts for fraud accounts (~$60 median). |
-| `FRAUD_LOGNORM_SIGMA` | 1.2 | Log-std of transaction amounts for fraud accounts. |
-| `NORMAL_LOGNORM_MU` | 4.0 | Log-mean of transaction amounts for normal accounts (~$55 median). |
-| `NORMAL_LOGNORM_SIGMA` | 1.2 | Log-std of transaction amounts for normal accounts. |
-| `P2P_LOGNORM_MU` | 5.0 | Log-mean of P2P transfer amounts (~$148 median). |
-| `P2P_LOGNORM_SIGMA` | 1.5 | Log-std of P2P transfer amounts. |
+The Gold validation job checks community counts, coverage, sizes, risk tiers,
+top accounts, similarity pairs, and identity outputs against `ground_truth.json`.
 
----
+## Stage 6: Compare Genie Results
 
-## Stage 2: Lakehouse Bootstrap
+The before and after jobs ask different question classes.
 
-### Overview
+- **Before:** `jobs/01_genie_run_before.py` asks structural questions against Silver tables. It records when volume or attribute proxies miss the graph criterion.
+- **After:** `jobs/05_genie_run_after.py` asks portfolio, cohort, community, workload, and merchant questions against Gold tables.
+- **Artifacts:** Both jobs store generated SQL, rows, summaries, and status values in the configured results volume.
 
-Three scripts run once to configure the Databricks workspace for the pipeline:
+Genie can generate different valid SQL for the same question. The graph features
+remain stable for a fixed graph projection. Use explicit top counts when the
+demo needs a broad sample.
 
-`upload_and_create_tables.sh` creates the Unity Catalog schema and volume, applies `sql/schema.sql` to create the five Silver Delta tables, and uploads the generated CSVs plus `ground_truth.json` into the volume. Column-level comments on every table are the primary metadata Genie uses to understand table semantics; these comments are preserved across data reloads because the script uses `INSERT OVERWRITE` rather than `CREATE OR REPLACE TABLE`.
+## Validation Layers
 
-`setup_secrets.sh` writes Neo4j credentials and both Genie Space IDs into a Databricks secret scope named `neo4j-graph-engineering`. This keeps credentials out of job definitions and out of `.env` files committed to source control.
+- **Source checks:** Confirm file counts, schema, and planted patterns.
+- **Graph checks:** Confirm algorithm separation, coverage, and identity clusters.
+- **Gold checks:** Confirm table contracts and ground-truth alignment.
+- **Genie checks:** Capture query behavior before and after enrichment.
+- **Production checks:** Measure precision, recall, review volume, runtime, and drift on representative data.
 
-`setup/provision_genie_spaces.py` configures both Genie Spaces to a deterministic state: table sets, sample questions, and instruction text. The script is idempotent -- it can be re-run after any space drift.
+See the [production scoping guide](SCOPING_GUIDE.md) for production evaluation
+requirements.
 
----
+## Design Principles
 
-### Bootstrap variables
-
-These live in `.env` and are infrastructure coordinates rather than signal parameters.
-
-| Variable | What it controls |
-|----------|-----------------|
-| `DATABRICKS_PROFILE` | CLI profile used for all Databricks SDK calls in the bootstrap scripts. |
-| `DATABRICKS_WAREHOUSE_ID` | SQL Warehouse used to execute DDL in `upload_and_create_tables.sh`. |
-| `CATALOG` | Unity Catalog catalog name for all tables and volumes. |
-| `SCHEMA` | Unity Catalog schema name. |
-| `DATABRICKS_VOLUME` | Volume path where CSVs and `ground_truth.json` are staged. |
-| `NEO4J_URI` | Neo4j Aura connection string written to the secret scope. |
-| `NEO4J_USERNAME` | Neo4j username written to the secret scope. |
-| `NEO4J_PASSWORD` | Neo4j password written to the secret scope. |
-| `GENIE_SPACE_ID_BEFORE` | ID of the Genie Space configured with the four base Silver tables only. |
-| `GENIE_SPACE_ID_AFTER` | ID of the Genie Space configured with the base tables plus three Gold tables. |
-| `NEO4J_SECRET_SCOPE` | Name of the Databricks secret scope. Defaults to `neo4j-graph-engineering`. |
-
----
-
-## Stage 3: Neo4j Ingest
-
-### Overview
-
-`jobs/neo4j_ingest.py` runs as a Databricks Python job on the cluster. It reads the five Silver Delta tables and loads them into Neo4j as a property graph: `:Account` nodes, `:Merchant` nodes, `TRANSACTED_WITH` relationships (account to merchant), and `TRANSFERRED_TO` relationships (account to account). It clears the graph before each run using batched `DETACH DELETE` queries to stay within Neo4j Aura memory limits.
-
-The Neo4j Spark Connector and the `graphdatascience` library must be installed on the cluster before this job can run. `validation/validate_cluster.py` checks for both before the ingest job is submitted.
-
----
-
-### Ingest variables
-
-| Variable | What it controls |
-|----------|-----------------|
-| `CATALOG` | Source catalog for the Silver tables. Forwarded to the job by the CLI runner. |
-| `SCHEMA` | Source schema for the Silver tables. |
-| `NEO4J_SECRET_SCOPE` | Secret scope from which the job reads Neo4j credentials at runtime. |
-| `DATABRICKS_CLUSTER_ID` | Cluster ID the CLI runner submits the job to. |
-| `DATABRICKS_COMPUTE_MODE` | Set to `cluster` to use a named cluster rather than serverless compute. Required because the Neo4j Spark Connector JAR is not available in serverless. |
-
-The Spark Connector batch size is hardcoded at 10,000 rows per write operation in `jobs/neo4j_secrets.py`. This value manages Neo4j Aura memory during writes and does not need to be configurable for the demo.
-
----
-
-## Stage 4: GDS Execution
-
-### Overview
-
-`validation/run_gds.py` runs locally against the Neo4j Aura instance. It executes three GDS algorithms in sequence and writes the results back as node properties. `validation/verify_gds.py` runs afterward as a separate script and checks the results against fixed thresholds.
-
-**PageRank** runs on a graph projection of `TRANSFERRED_TO` edges treated as undirected. It writes `risk_score` to every `:Account` node. Ring captains, which have elevated inbound transfer counts from other ring members, accumulate higher scores than background accounts.
-
-**Louvain** runs on the same projection and writes `community_id` to every `:Account` node. Because within-ring edge density is approximately 3,400 times higher than background density, Louvain assigns most ring members to the same community.
-
-**Node Similarity** runs on a bipartite projection of `:Account` nodes connected through shared `:Merchant` nodes via `TRANSACTED_WITH` edges. It writes `:SIMILAR_TO` relationships between account pairs with high Jaccard overlap in merchant visit history. The `degreeCutoff` parameter (hardcoded at 5) excludes accounts with fewer than five unique merchant visits from the projection; accounts below this cutoff receive `similarity_score=0` and are later tiered as `medium` rather than `high` in the Gold tables.
-
-`validation/verify_gds.py` checks the results against fixed thresholds:
-
-- PageRank fraud/normal average ratio must be at least 3.0x
-- Louvain community purity for at least one ring must reach 50%
-- Node Similarity fraud/normal Jaccard ratio must be at least 1.9x
-- All 25,000 accounts must have all three properties populated
-
-It exits with status 1 if any check fails.
-
----
-
-### GDS variables
-
-The GDS algorithm parameters (iterations, damping factor, topK) are hardcoded in the script because they are calibrated to the dataset and do not benefit from being tunable at runtime. The only environment variables this stage needs are:
-
-| Variable | What it controls |
-|----------|-----------------|
-| `NEO4J_URI` | Direct connection to Neo4j Aura. Read from `.env` since the script runs locally, not on the cluster. |
-| `NEO4J_USERNAME` | Neo4j username. |
-| `NEO4J_PASSWORD` | Neo4j password. |
-
----
-
-## Stage 5: Gold Table Production
-
-### Overview
-
-`jobs/pull_gold_tables.py` runs as a Databricks job. It reads the GDS-enriched node properties from Neo4j via the Spark Connector and writes three Gold Delta tables that Genie can query directly.
-
-`gold_accounts` adds `risk_score`, `community_id`, `similarity_score`, and four derived columns to the base account dimension: `community_size`, `community_avg_risk_score`, `community_risk_rank`, and `inbound_transfer_events`. It also computes `is_ring_community` and `fraud_risk_tier` (high when in a ring community, otherwise low) from those columns. The Genie Space for the "after" demo queries this table.
-
-`gold_fraud_ring_communities` aggregates `gold_accounts` by community to produce one row per candidate ring: member count, average and maximum risk score, average similarity score, high-risk member count, and the top-ranking account in the community.
-
-`gold_account_similarity_pairs` reads `:SIMILAR_TO` edges from Neo4j and surfaces them as a flat table of (account_a, account_b, similarity_score, same_community) pairs.
-
-`jobs/validate_gold_tables.py` runs immediately after as a separate job. It reads `ground_truth.json` from the UC Volume and checks six correctness properties against the gold tables: ring candidate count, community dominance by ring, community size bounds, high-tier coverage, top account membership, and same-ring pair fractions.
-
----
-
-### Gold table variables
-
-The ring candidate thresholds live in `jobs/gold_constants.py` and are shared between `pull_gold_tables.py` (where they define what counts as a ring) and `validate_gold_tables.py` (where they define what counts as a passing gate). They are not `.env` variables; changing them requires editing the module.
-
-| Constant | Default | What it controls |
-|----------|---------|-----------------|
-| `RING_SIZE_LOW` | 50 | Minimum community member count for a community to be classified as a ring candidate. |
-| `RING_SIZE_HIGH` | 200 | Maximum member count. Communities larger than 200 are background communities, not rings. |
-| `COMMUNITY_AVG_RISK_MIN` | 1.0 | Minimum average `risk_score` for a community to be classified as a ring candidate. Ensures the community is elevated in PageRank, not just cohesive. |
-
-`fraud_risk_tier` is binary: accounts in a ring-candidate community receive `TIER_HIGH` ("high"), everything else receives `TIER_LOW` ("low"). The same module also holds the GDS verification thresholds (`GDS_PR_RATIO_MIN`, `GDS_COMMUNITY_PURITY_MIN`, `GDS_SIM_RATIO_MIN`, `GDS_RING_EXCLUSION_MAX`) used by `validation/verify_gds.py`.
-
-The validation job also uses two `.env` variables:
-
-| Variable | What it controls |
-|----------|-----------------|
-| `GROUND_TRUTH_PATH` | UC Volume path to `ground_truth.json`. Used by the validation job to check that the Gold tables match the ground truth embedded at generation time. |
-| `RESULTS_VOLUME_DIR` | UC Volume directory where validation artifacts (JSON result files) are written. |
-
----
-
-## Stage 6: Genie Validation
-
-### Overview
-
-Two jobs ask different classes of question against the two Genie Spaces and write independent JSON artifacts to the UC Volume.
-
-`jobs/genie_run_before.py` queries the Silver-only space with three structural
-questions and one preview question. The structural questions cover network
-hubs, dense account groups, and shared merchant histories. Silver tables do not
-contain the graph features needed to answer them. Genie may return a plausible
-volume or attribute proxy instead. The runner compares each response with
-`ground_truth.json` and records `STRUCTURAL GAP CONFIRMED` when the proxy misses
-the graph criterion. It records `UNEXPECTED SIGNAL FOUND` when a base-table
-query reaches the threshold. The preview question records
-`NOT AVAILABLE ON THIS CATALOG; answered in AFTER run`.
-
-`jobs/genie_run_after.py` queries the Silver and Gold tables. It covers portfolio
-composition, cohort comparisons, community rollups, operational workload, and
-merchant analysis. Five sampler modules, `cat1_portfolio` through
-`cat5_merchant`, each provide a question bank. The runner selects one question
-from each bank. It stores the generated SQL, returned rows, and summary text.
-Each question receives a status of `RESPONDED`, `NO DATA`, or `ERROR`.
-
-Each runner writes its own JSON artifact to the results volume. There is no compare job.
-
-For each structural question, the BEFORE runner measures one metric against `ground_truth.json`:
-
-- Hub detection: precision of the top-20 returned accounts against ground-truth ring members
-- Community structure: maximum ring coverage fraction within any returned community group
-- Merchant overlap: fraction of returned account pairs that belong to the same ground-truth ring
-
-The AFTER runner records no metrics. Evaluation (response-shape checks and LLM-as-judge scoring) is Phase 5.
-
----
-
-### Genie validation variables
-
-| Variable | Default | What it controls |
-|----------|---------|-----------------|
-| `GENIE_SPACE_ID_BEFORE` | (required) | Space ID for the pre-GDS Genie Space. |
-| `GENIE_SPACE_ID_AFTER` | (required) | Space ID for the post-GDS Genie Space. |
-| `GENIE_TEST_RETRIES` | 2 | Number of times to retry a question if Genie returns an error or empty result before marking it as failed. Applies to both runners. |
-| `GENIE_TEST_TIMEOUT_SECONDS` | 120 | Per-attempt timeout. Genie query planning can be slow; 120 seconds covers typical warehouse startup latency. Applies to both runners. |
-| `GROUND_TRUTH_PATH` | (required) | UC Volume path to `ground_truth.json`. Used by `genie_run_before.py` for metric computation against ground-truth ring labels. Not used by `genie_run_after.py`. |
-| `RESULTS_VOLUME_DIR` | (required) | UC Volume directory where Genie run artifacts are written by both runners. |
-| `SAMPLERS` | (all five) | Comma-separated category module names passed to `genie_run_after.py` (e.g. `cat1_portfolio,cat4_operational`). Defaults to all five categories. Useful for running a single-category demo when time is short. |
-
----
-
-## What each GDS algorithm guarantees
-
-Each of the three GDS algorithms carries a published mathematical guarantee. The output is a feature. A downstream consumer reads that feature and makes the call the algorithm does not.
-
-**PageRank guarantees eigenvector centrality.** The score `risk_score` converges to the principal eigenvector of the transfer network's transition matrix under the configured damping factor. Ring captains and whales score higher than background accounts because more probability mass flows toward them. A fraud investigator or supervised classifier consumes the ranked list and adjudicates which high-score accounts warrant review.
-
-**Louvain guarantees a modularity-optimal community partition.** The label `community_id` assigns every account to the community that maximizes the graph's modularity score given the projection. Rings surface as communities because their within-ring edge density is roughly three orders of magnitude above background. A Genie analyst reading `gold_fraud_ring_communities` queries the candidate communities, and a human or downstream model decides which are real rings.
-
-**Node Similarity guarantees Jaccard overlap.** The edges in `:SIMILAR_TO` and the column `similarity_score` carry exact Jaccard similarity of merchant-visit sets above the configured degree cutoff. Ring members cluster because anchor-merchant preferences drive overlap. A dashboard or analyst consumes the ranked pairs and investigates which high-similarity pairs represent collusion.
-
-Each feature is reproducible given a fixed projection. Each is a named mathematical object with a published definition. The Databricks-hosted workflow that reads the gold columns is where precision, recall, and business judgment get applied.
-
----
-
-## Glossary
-
-Terms used throughout this document and in the pipeline code. Each entry defines the term generally and notes how it shows up in this specific demo.
-
-**Fraud ring.** A coordinated group of accounts that move money among themselves or transact with shared merchants to obscure the origin of funds or build reputation signal. In this demo, ten rings of 50-200 accounts each are embedded in the 25,000-account population. Ring membership is recorded in `ground_truth.json` and is the ground-truth label every verification check compares against.
-
-**Ring captain.** An account inside a ring that receives a large share of
-intra-ring transfers. Captains concentrate PageRank inside the ring. The demo
-creates five captains per ring. Each captain receives about 155 inbound
-transfers. Whales receive more inbound transfers, so a simple count ranks whales
-above captains. PageRank uses network structure and can surface the captains.
-
-**Whale.** A normal account that receives many peer-to-peer transfers, such as
-a payment aggregator or high-volume personal account. The demo creates 200
-whales. Each receives about 210 inbound transfers and sends matching volume to
-30 recurring recipients. This design makes inbound count a weak proxy for
-network centrality.
-
-**Anchor merchant.** A merchant preferentially visited by members of a specific ring, producing shared merchant history across that ring's accounts. Anchor merchants are the mechanism that drives elevated Jaccard similarity between ring members. In this demo, `RING_ANCHOR_CNT=4` anchor merchants are assigned to each ring, and each ring account visits its anchors with probability `RING_ANCHOR_PREF=0.35` on any given transaction.
-
-**Background density.** The rate at which peer-to-peer edges exist between arbitrary pairs of accounts, measured across the full population. In this demo the background density is roughly three orders of magnitude below within-ring density. The ratio between the two is what Louvain uses to draw community boundaries.
-
-**Within-ring density.** The rate at which peer-to-peer edges exist between accounts that are both members of the same ring. At the demo's default parameters, within-ring density is approximately 3,400 times the background density, which is what makes rings detectable as communities rather than as noise.
-
-**Jaccard ratio.** The ratio of fraud-to-fraud Jaccard similarity (averaged over ring-member pairs) to fraud-to-normal Jaccard similarity (averaged over mixed pairs), measured on each account's shared-merchant set. In this demo the ratio sits near 1.98 at default parameters, and `validation/verify_gds.py` requires at least 1.9. Below that threshold, Node Similarity cannot cleanly separate rings from background.
-
-**PageRank separation.** The ratio of average PageRank score among ring members to average PageRank score among normals. This demo targets at least 3.0x, enforced by `validation/verify_gds.py` as `GDS_PR_RATIO_MIN`. It is the numeric form of the claim that ring members are structurally more central in the transfer network than random accounts.
-
-**Community dominance.** The fraction of a detected Louvain community that belongs to a single ground-truth ring. `jobs/validate_gold_tables.py` requires each ring-candidate community to be dominated at 80% or higher by one real ring. Dominance normalizes by community size and answers the question "is this community mostly one ring?".
-
-**Ring coverage.** The fraction of a ground-truth ring captured by a single Louvain community. Complementary to dominance: where dominance asks "is this community mostly one ring?", coverage asks "is this ring mostly in one community?". The Genie `community_structure` question measures maximum ring coverage across returned communities.
-
-**Confuser cohort.** A population of accounts deliberately injected into the synthetic dataset that looks structurally similar to a fraud ring but is not one. Examples include family units, commuter corridors, small-business payroll clusters, and university cohorts, each of which produces elevated within-group transfer rates and shared-merchant Jaccard similarity for benign reasons. Confuser cohorts force GDS and downstream filtering to rank real rings above lookalikes, converting "GDS found all rings perfectly" into the more production-realistic "GDS produced a ranked candidate list where real rings sit at the top and benign lookalikes sit below." Not currently present in this demo's generator; proposed as Phase 3 in `REFINE_DEMO.md`.
-
-**Ground truth.** The file `ground_truth.json` produced by the data generator, recording which accounts belong to which ring, which merchants are anchors for which rings, and which accounts are captains or whales. Every verification check joins against this file, keyed on `account_id` rather than `community_id` (which drifts across GDS runs), to compute precision and coverage metrics. Ground truth exists only because the data is synthetic, which is both the strength of the demo (verifiable metrics against a known-correct answer) and its limitation (not representative of production conditions where ground truth is partial, delayed, or absent).
+- **Keep discovery in the graph:** GDS computes properties that depend on network structure.
+- **Keep analysis in Genie:** Genie groups, filters, ranks, and compares the stored features.
+- **Store evidence:** Preserve graph configuration, Gold values, generated SQL, and validation artifacts.
+- **Separate signals from decisions:** Treat scores and communities as investigation inputs.
+- **Recalibrate for production:** Reevaluate data scale, thresholds, capacity, and review policy for each deployment.

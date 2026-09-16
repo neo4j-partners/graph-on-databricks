@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
-DEMO_DIR = Path(__file__).resolve().parent
+DEMO_DIR = Path(__file__).resolve().parents[1]
 ENV_FILE = DEMO_DIR / ".env"
 OPERATIONAL_GRAPH_LABELS = ["Account", "Customer", "Phone", "Address"]
 OPERATIONAL_GRAPH_QUERY = """

@@ -13,8 +13,8 @@ Which merchants are most commonly transacted with by the top 10% of accounts by 
 ```
 
 > Returns a flat popularity list. Brennan, Thomas and Dennis has 30 visits.
-> Perry and Sons and Cox, Jimenez and Rodgers each have 28. The result gives no
-> clear triage priority.
+> Perry and Sons and Cox, Jimenez and Rodgers each have 28. Many merchants
+> receive equal triage priority.
 
 ### After
 
@@ -88,8 +88,8 @@ What is the total account balance held by high-risk tier accounts, and what shar
 Which merchants are most commonly visited by the top 20 accounts by total transaction volume?
 ```
 
-> Returns 243 merchants with no co-visit count above two. The result does not
-> identify a clear outlier.
+> Returns 243 merchants. Every co-visit count is two or lower, so the list has
+> no clear outlier.
 
 ### Validation A After
 

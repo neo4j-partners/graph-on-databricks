@@ -1,4 +1,4 @@
-"""Validate the local Neocarta semantic store after metadata ingestion."""
+"""Validate the Neocarta semantic store after metadata ingestion."""
 
 from __future__ import annotations
 

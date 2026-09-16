@@ -32,7 +32,7 @@ async def validate() -> dict[str, Any]:
     schema_name = require_env("DATABRICKS_SCHEMA")
     server = StdioServerParameters(
         command=sys.executable,
-        args=[str(DEMO_DIR / "serve_mcp.py")],
+        args=["-m", "mcp_server"],
         cwd=DEMO_DIR,
         env=dict(os.environ),
     )

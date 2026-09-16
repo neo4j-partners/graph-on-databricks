@@ -453,7 +453,7 @@ left join, average by region. No CTEs, no counterparty ranking.
 The answer: four and a half to five and a half percent per region.
 Roughly a tenth the size of the proxy minority. US-West highest,
 APAC lowest. The structural minority the volume-proxy could not
-see, because concentration does not imply coordination.
+see. Concentration and coordination measure different patterns.
 
 Most accounts concentrate on a handful of counterparties for
 legitimate reasons: payroll, family transfers, regular suppliers.

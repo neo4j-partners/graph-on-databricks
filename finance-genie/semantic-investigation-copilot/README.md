@@ -80,9 +80,9 @@ Run `make neo4j-up` before ingestion only when `.env` targets the local
 loopback instance. For a dedicated remote store, set
 `NEOCARTA_ALLOW_REMOTE_STORE=true` and do not start the Compose service.
 
-`make ingest` runs `ingest_databricks.py` with `value_sample_limit=0`. It loads
-the configured catalog and schema, writes only metadata, and records the
-Neocarta graph version.
+`make ingest` runs the installed `finance-semantic-ingest` command with
+`value_sample_limit=0`. It loads the configured catalog and schema, writes only
+metadata, and records the Neocarta graph version.
 
 ## Validate
 
@@ -122,8 +122,7 @@ on its current directory:
     "--directory",
     "/Users/ryanknight/projects/databricks/graph-on-databricks/finance-genie/semantic-investigation-copilot",
     "run",
-    "python",
-    "serve_mcp.py"
+    "finance-semantic-mcp"
   ]
 }
 ```
@@ -156,6 +155,7 @@ an approved remote maintenance procedure.
 
 ## Versioned artifacts
 
+- `src/` contains the installable Python command modules.
 - `mappings/semantic-mappings.json` contains the five verified business concept
   mappings.
 - `mappings/graph-asset-representation.json` records the selected operational

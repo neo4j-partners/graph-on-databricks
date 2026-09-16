@@ -1,11 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "finance-neocarta-prototype"
 version = "0.1.0"
 description = "Local Neocarta prototype for the Finance Genie semantic investigation demo."
+readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "neocarta[cli,databricks,mcp]",
 ]
+
+[project.scripts]
+finance-semantic-ingest = "ingest:main"
+finance-semantic-mcp = "mcp_server:main"
+finance-semantic-validate-embeddings = "validate_embeddings:main"
+finance-semantic-validate-mcp = "validate_mcp:main"
+finance-semantic-validate-store = "validate_store:main"
 
 [dependency-groups]
 dev = [
@@ -16,8 +28,18 @@ dev = [
 [tool.uv.sources]
 neocarta = { path = "../../../../neo4j-labs/neocarta", editable = true }
 
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = [
+    "config",
+    "ingest",
+    "mcp_server",
+    "validate_embeddings",
+    "validate_mcp",
+    "validate_store",
+]
+
 [tool.pytest.ini_options]
-pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.ruff]

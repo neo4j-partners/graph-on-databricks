@@ -8,6 +8,7 @@ test:
 
 lint:
 	uv run ruff check .
+	uv run ruff format --check .
 
 neo4j-up:
 	docker compose --env-file .env up -d --wait
@@ -16,16 +17,16 @@ neo4j-down:
 	docker compose --env-file .env down
 
 ingest:
-	uv run python ingest_databricks.py
+	uv run finance-semantic-ingest
 
 validate:
-	uv run python validate_store.py
+	uv run finance-semantic-validate-store
 
 validate-embeddings:
-	uv run python validate_embeddings.py
+	uv run finance-semantic-validate-embeddings
 
 validate-mcp:
-	uv run python validate_mcp.py
+	uv run finance-semantic-validate-mcp
 
 mcp:
-	uv run python serve_mcp.py
+	uv run finance-semantic-mcp

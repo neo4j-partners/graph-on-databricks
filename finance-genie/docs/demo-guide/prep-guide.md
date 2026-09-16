@@ -1,7 +1,7 @@
 # Finance Genie Presenter Guide
 
 Use this guide to prepare and deliver the Finance Genie demo. The demo is a
-teaching example. It is not a production fraud benchmark.
+synthetic teaching example. Production evaluation requires representative data.
 
 ## Overview
 
@@ -21,7 +21,7 @@ Gold answer second. Explain the architecture after the audience sees the gap.
 3. **Show the Gold answer:** Genie uses graph-derived community columns to return a focused merchant list.
 4. **Explain the cause:** Neo4j GDS created structural features before Genie ran the Gold query.
 5. **Show the pipeline:** Silver data loads into Neo4j, GDS computes features, and Databricks writes them to Gold.
-6. **Close with the boundary:** The result is an investigation queue, not a fraud verdict.
+6. **Close with the boundary:** The result is an investigation queue. Analysts make fraud decisions.
 
 Use the [current 15-minute slides](slides/slides-15min.md) for this sequence.
 Use the [full deck](slides/slides.md) when the session allows more detail.
@@ -55,8 +55,8 @@ stable.
 > Which merchants are most commonly transacted with by the top 10% of accounts
 > by total dollar amount spent across merchants?
 
-The result is a broad popularity list. It does not provide a clear investigation
-priority.
+The result is a broad popularity list with equal investigation priority across
+many merchants.
 
 ### After Graph Enrichment
 
@@ -84,7 +84,7 @@ the resulting segments and scores.
 
 - **Start with value:** Show the before and after answers before the architecture.
 - **Use plain terms:** Say central account, connected group, and shared behavior before naming each algorithm.
-- **Keep the claim narrow:** Say the graph surfaces candidates. Do not say it proves fraud.
+- **Keep the claim narrow:** Say the graph surfaces candidates for analyst review.
 - **Name the synthetic design:** State that the dataset is tuned for a short, repeatable demo.
 - **Show evidence:** Use the generated tables, graph paths, and validation results.
 - **Control result breadth:** Ask for an explicit top count when a wider sample matters.
@@ -100,8 +100,8 @@ representative data.
 ### Was the dataset designed for GDS?
 
 Yes. The synthetic data creates visible centrality, community, and similarity
-patterns. The demo proves the integration pattern and explains the features. It
-does not claim production precision.
+patterns. The demo proves the integration pattern and explains the features.
+The production scoping guide defines the precision evaluation process.
 
 ### Does GDS find fraud?
 
