@@ -1,0 +1,456 @@
+# =============================================================================
+# SupplierRisk — OWL 2 ontology for OntoBricks import
+# =============================================================================
+#
+# Import path (OntoBricks UI):
+#   Ontology -> Import -> OWL tab -> mode "Replace" -> From Local File
+#   (this file). "Append" merges into an existing domain and reports conflicts.
+#
+# What the OntoBricks OWL importer reads out of this file:
+#   classes            owl:Class + rdfs:label/comment/subClassOf + ontobricks:icon
+#   attributes         owl:DatatypeProperty via rdfs:domain, or via an
+#                      owl:Restriction on the class (used here for the columns
+#                      that several tables share: id, name, amount, currency,
+#                      status)
+#   relationships      owl:ObjectProperty + rdfs:domain/range
+#   constraints        property characteristics (functional, transitive),
+#                      cardinality restrictions, someValuesFrom
+#   axioms             owl:inverseOf, owl:disjointWith, owl:propertyChainAxiom
+#   reasoning rules    ontobricks:SWRLRule (label, comment, antecedent,
+#                      consequent) -> Reasoning tab, executable
+#   UC binding         ontobricks:dataset -> pre-links each class to its Unity
+#                      Catalog table so Mapping / auto-assign starts from the
+#                      right table instead of guessing
+#
+# ---- EDIT BEFORE IMPORT -----------------------------------------------------
+# The ontobricks:dataset annotations below match upload.py's defaults: catalog
+# "graph-on-databricks" and schema "supplier_risk". If your workspace differs,
+# replace both names in the ontobricks:dataset lines, e.g.
+#     python3 - <<'EOF'
+#     p = "supplier-risk-ontology.ttl"; s = open(p).read()
+#     s = s.replace("graph-on-databricks.supplier_risk", "YOURCAT.YOURSCHEMA")
+#     s = s.replace('\\"graph-on-databricks\\"', '\\"YOURCAT\\"').replace('\\"supplier_risk\\"', '\\"YOURSCHEMA\\"')
+#     open(p, "w").write(s)
+#     EOF
+# ---- NOT CARRIED BY THIS FILE ----------------------------------------------
+#   * owl:NamedIndividual — the importer extracts classes/properties/rules
+#     only, so the five governed cutoffs (THR-01..THR-05) are modeled as the
+#     Threshold class and carried as literals inside the SWRL rules and the
+#     class comments. Load data/thresholds.csv as a table if you want the
+#     instances in the graph.
+#   * SHACL shapes — a file containing sh:NodeShape is routed to Data Quality
+#     instead of the ontology, so shapes must be a separate import.
+#   * Graph-computed classifications (CriticalSupplier, OwnershipRisk,
+#     RiskyCustomer) — declared as classes with their governing rule in the
+#     comment, but no executable rule: betweenness, weighted PageRank and kNN
+#     are not expressible in SWRL. Those stay Reasoning-tab / GDS work.
+# =============================================================================
+
+@prefix :           <https://databricks-ontology.com/supplierrisk/> .
+@prefix owl:        <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:        <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:       <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:        <http://www.w3.org/2001/XMLSchema#> .
+@prefix ontobricks: <http://ontobricks.com/schema#> .
+
+# Slash-terminated namespace on purpose. OntoBricks' R2RML parser reads the
+# class name out of a subject template with the regex /([^/]+)/\{[^}]+\}$, so a
+# hash namespace makes it read "supplierrisk#Customer" instead of "Customer"
+# and the mapping import loses the class binding. DEFAULT_BASE_URI in OntoBricks
+# is slash-terminated for the same reason.
+<https://databricks-ontology.com/supplierrisk/>
+    rdf:type      owl:Ontology ;
+    rdfs:label    "SupplierRisk" ;
+    rdfs:comment  "Supplier and credit risk in a beverage producer's supply chain. Operational entities are stored facts in Unity Catalog; the risk terms are classifications decided by a governed rule and a threshold, not columns." .
+
+# =============================================================================
+# 1. Shared datatype properties
+# -----------------------------------------------------------------------------
+# Declared without rdfs:domain on purpose: several tables carry these columns,
+# and multiple rdfs:domain values mean intersection in OWL (a Customer with an
+# id would be inferred to also be a Supplier). They attach to each class through
+# owl:Restriction in section 2 instead, which also gives the Constraints tab its
+# cardinality entries.
+# =============================================================================
+
+:id         rdf:type owl:DatatypeProperty , owl:FunctionalProperty ;
+            rdfs:label "id" ; rdfs:range xsd:string ;
+            rdfs:comment "Primary key of the source row." .
+
+:name       rdf:type owl:DatatypeProperty ;
+            rdfs:label "name" ; rdfs:range xsd:string .
+
+:amount     rdf:type owl:DatatypeProperty ;
+            rdfs:label "amount" ; rdfs:range xsd:double ;
+            rdfs:comment "Monetary amount in EUR." .
+
+:currency   rdf:type owl:DatatypeProperty ;
+            rdfs:label "currency" ; rdfs:range xsd:string ;
+            rdfs:comment "ISO 4217 code. Every amount in this dataset is EUR." .
+
+:status     rdf:type owl:DatatypeProperty ;
+            rdfs:label "status" ; rdfs:range xsd:string ;
+            rdfs:comment "Lifecycle state; the vocabulary depends on the owning class." .
+
+# =============================================================================
+# 2. Core entity classes (stored facts, one Unity Catalog table each)
+# =============================================================================
+
+:Customer
+    rdf:type            owl:Class ;
+    rdfs:label          "Customer" ;
+    rdfs:comment        "An account the business sells to. Invoices and compliance findings hang off it as one-to-many branches." ;
+    ontobricks:icon     "🧾" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"customers\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.customers\", \"key_column\": \"id\", \"description\": \"One row per customer.\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :id   ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :name ; owl:minCardinality 1 ] .
+
+:segment    rdf:type owl:DatatypeProperty ; rdfs:label "segment" ;
+            rdfs:domain :Customer ; rdfs:range xsd:string ;
+            rdfs:comment "Commercial tier: platinum, gold, or silver." .
+
+:creditLimit
+            rdf:type owl:DatatypeProperty ; rdfs:label "creditLimit" ;
+            rdfs:domain :Customer ; rdfs:range xsd:double ;
+            rdfs:comment "Total committed credit facility in EUR. Open invoices are the drawn portion of it, never an addition (RULE-08)." .
+
+:defaultedPeriod
+            rdf:type owl:DatatypeProperty ; rdfs:label "defaultedPeriod" ;
+            rdfs:domain :Customer ; rdfs:range xsd:string ;
+            rdfs:comment "Quarter in which the customer recorded a default, format YYYY-Qn. Absent if it never defaulted." .
+
+:Supplier
+    rdf:type            owl:Class ;
+    rdfs:label          "Supplier" ;
+    rdfs:comment        "A vendor the business buys from. Has no business unit column: a supplier serves many units, so scope supplier questions through :serves." ;
+    ontobricks:icon     "🏭" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"suppliers\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.suppliers\", \"key_column\": \"id\", \"description\": \"One row per supplier.\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :id   ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :name ; owl:minCardinality 1 ] .
+
+:category   rdf:type owl:DatatypeProperty ; rdfs:label "category" ;
+            rdfs:domain :Supplier ; rdfs:range xsd:string ;
+            rdfs:comment "Procurement category: ingredients, packaging, logistics, equipment, or services." .
+
+:subcategory
+            rdf:type owl:DatatypeProperty ; rdfs:label "subcategory" ;
+            rdfs:domain :Supplier ; rdfs:range xsd:string ;
+            rdfs:comment "Specialty within the category. This is the commodity a supply path carries." .
+
+:riskScore  rdf:type owl:DatatypeProperty ; rdfs:label "riskScore" ;
+            rdfs:domain :Supplier ; rdfs:range xsd:integer ;
+            rdfs:comment "Procurement risk score, 0-100, higher is riskier." .
+
+:BusinessUnit
+    rdf:type            owl:Class ;
+    rdfs:label          "BusinessUnit" ;
+    rdfs:comment        "An internal division. Customers roll up into it, suppliers feed it, revenue is booked to it." ;
+    ontobricks:icon     "🏢" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"business_units\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.business_units\", \"key_column\": \"id\", \"description\": \"One row per business unit.\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :id   ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :name ; owl:minCardinality 1 ] .
+
+:region     rdf:type owl:DatatypeProperty ; rdfs:label "region" ;
+            rdfs:domain :BusinessUnit ; rdfs:range xsd:string ;
+            rdfs:comment "Region code: AMER, EMEA, or APAC." .
+
+:Invoice
+    rdf:type            owl:Class ;
+    rdfs:label          "Invoice" ;
+    rdfs:comment        "A bill issued to a customer. Many per customer." ;
+    ontobricks:icon     "📄" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"invoices\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.invoices\", \"key_column\": \"id\", \"description\": \"One row per invoice, many per customer.\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :id       ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :amount   ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :currency ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :status   ; owl:cardinality 1 ] .
+
+:issueDate  rdf:type owl:DatatypeProperty ; rdfs:label "issueDate" ;
+            rdfs:domain :Invoice ; rdfs:range xsd:date .
+
+:dueDate    rdf:type owl:DatatypeProperty ; rdfs:label "dueDate" ;
+            rdfs:domain :Invoice ; rdfs:range xsd:date .
+
+:paidDate   rdf:type owl:DatatypeProperty ; rdfs:label "paidDate" ;
+            rdfs:domain :Invoice ; rdfs:range xsd:date ;
+            rdfs:comment "Absent while the invoice is open or overdue." .
+
+:daysLate   rdf:type owl:DatatypeProperty ; rdfs:label "daysLate" ;
+            rdfs:domain :Invoice ; rdfs:range xsd:integer ;
+            rdfs:comment "Days between dueDate and payment. Compared against the Late Payment Threshold (60)." .
+
+:RevenueEntry
+    rdf:type            owl:Class ;
+    rdfs:label          "RevenueEntry" ;
+    rdfs:comment        "Recognized revenue booked to a business unit for an accounting month." ;
+    ontobricks:icon     "💰" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"revenue_entries\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.revenue_entries\", \"key_column\": \"id\", \"description\": \"One row per business unit per accounting period.\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :id       ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :amount   ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :currency ; owl:cardinality 1 ] .
+
+:period     rdf:type owl:DatatypeProperty ; rdfs:label "period" ;
+            rdfs:domain :RevenueEntry ; rdfs:range xsd:date ;
+            rdfs:comment "Accounting month, stored as a DATE on the first of the month. Derive quarters with YEAR and QUARTER." .
+
+:reconciled rdf:type owl:DatatypeProperty ; rdfs:label "reconciled" ;
+            rdfs:domain :RevenueEntry ; rdfs:range xsd:boolean .
+
+:ComplianceFinding
+    rdf:type            owl:Class ;
+    rdfs:label          "ComplianceFinding" ;
+    rdfs:comment        "A compliance issue raised against a customer. Many per customer." ;
+    ontobricks:icon     "⚖️" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"compliance_findings\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.compliance_findings\", \"key_column\": \"id\", \"description\": \"One row per compliance finding, many per customer.\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :id     ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :status ; owl:cardinality 1 ] .
+
+:findingType
+            rdf:type owl:DatatypeProperty ; rdfs:label "findingType" ;
+            rdfs:domain :ComplianceFinding ; rdfs:range xsd:string ;
+            rdfs:comment "Finding category: KYC, AML, or sanctions. Source column is `type`." .
+
+:openedDate rdf:type owl:DatatypeProperty ; rdfs:label "openedDate" ;
+            rdfs:domain :ComplianceFinding ; rdfs:range xsd:date .
+
+# -----------------------------------------------------------------------------
+# Reified link classes. Both chains have to be walkable tier by tier, so each
+# edge table is its own class rather than a flattened attribute: SupplyRelationship
+# because Critical Supplier is decided by how much of the multi-tier network runs
+# through a supplier, OwnershipStake because it carries the percentage that
+# decides how much risk actually reaches a parent.
+# -----------------------------------------------------------------------------
+
+:SupplyRelationship
+    rdf:type            owl:Class ;
+    rdfs:label          "SupplyRelationship" ;
+    rdfs:comment        "One supplier-to-supplier supply link in the multi-tier network. Direction runs the way material flows (ENT-07)." ;
+    ontobricks:icon     "🔗" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"supply_relationships\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.supply_relationships\", \"description\": \"One row per supplier-to-supplier supply link (fromSupplierId -> toSupplierId).\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :supplyFrom ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :supplyTo   ; owl:cardinality 1 ] .
+
+:OwnershipStake
+    rdf:type            owl:Class ;
+    rdfs:label          "OwnershipStake" ;
+    rdfs:comment        "One ownership stake between customers, with the fraction held. A customer can have more than one owner, so this is not a single parent column." ;
+    ontobricks:icon     "🪙" ;
+    ontobricks:dataset  "{\"catalog\": \"graph-on-databricks\", \"schema\": \"supplier_risk\", \"asset\": \"owned_by\", \"type\": \"TABLE\", \"fullName\": \"graph-on-databricks.supplier_risk.owned_by\", \"description\": \"One row per ownership stake: customer_id is owned by parent_customer_id, ownershipPct is the fraction held.\"}" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :stakeOf       ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :stakeHeldBy   ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :ownershipPct  ; owl:cardinality 1 ] .
+
+:ownershipPct
+            rdf:type owl:DatatypeProperty ; rdfs:label "ownershipPct" ;
+            rdfs:domain :OwnershipStake ; rdfs:range xsd:double ;
+            rdfs:comment "Fraction of the owned customer held by the parent, 0 to 1. This is the weight risk propagates by." .
+
+# -----------------------------------------------------------------------------
+# Governance
+# -----------------------------------------------------------------------------
+
+:Threshold
+    rdf:type            owl:Class ;
+    rdfs:label          "Threshold" ;
+    rdfs:comment        "A governed cutoff a classification rule compares against. THR-01 Supplier Risk 70; THR-02 Late Payment 60 days; THR-03 Supply Concentration 878.32 (95th percentile of supply betweenness); THR-04 Ownership Contagion 0.17168; THR-05 Customer Similarity 0.5. Values live in data/thresholds.csv — load it as a table to get the instances." ;
+    ontobricks:icon     "📐" ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :id            ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :name          ; owl:cardinality 1 ] ;
+    rdfs:subClassOf     [ rdf:type owl:Restriction ; owl:onProperty :thresholdValue ; owl:cardinality 1 ] .
+
+:thresholdValue
+            rdf:type owl:DatatypeProperty ; rdfs:label "thresholdValue" ;
+            rdfs:domain :Threshold ; rdfs:range xsd:double .
+
+:thresholdBasis
+            rdf:type owl:DatatypeProperty ; rdfs:label "thresholdBasis" ;
+            rdfs:domain :Threshold ; rdfs:range xsd:string ;
+            rdfs:comment "How the cutoff was set, where it is not a round policy number." .
+
+# =============================================================================
+# 3. Object properties
+# =============================================================================
+
+# --- mapped straight from a foreign key -------------------------------------
+
+:belongsTo  rdf:type owl:ObjectProperty ; rdfs:label "belongsTo" ;
+            rdfs:domain :Customer ; rdfs:range :BusinessUnit ;
+            rdfs:comment "Which division carries the account (customers.businessUnitId)." .
+
+:serves     rdf:type owl:ObjectProperty ; rdfs:label "serves" ;
+            rdfs:domain :Supplier ; rdfs:range :BusinessUnit ;
+            rdfs:comment "A supplier feeds a division directly (supplier_business_units bridge). Many-to-many." .
+
+:billedTo   rdf:type owl:ObjectProperty ; rdfs:label "billedTo" ;
+            rdfs:domain :Invoice ; rdfs:range :Customer ;
+            rdfs:comment "invoices.customerId." .
+
+:raisedAgainst
+            rdf:type owl:ObjectProperty ; rdfs:label "raisedAgainst" ;
+            rdfs:domain :ComplianceFinding ; rdfs:range :Customer ;
+            rdfs:comment "compliance_findings.customerId." .
+
+:bookedTo   rdf:type owl:ObjectProperty ; rdfs:label "bookedTo" ;
+            rdfs:domain :RevenueEntry ; rdfs:range :BusinessUnit ;
+            rdfs:comment "revenue_entries.businessUnitId." .
+
+:supplyFrom rdf:type owl:ObjectProperty ; rdfs:label "supplyFrom" ;
+            rdfs:domain :SupplyRelationship ; rdfs:range :Supplier ;
+            rdfs:comment "supply_relationships.fromSupplierId — the supplying side." .
+
+:supplyTo   rdf:type owl:ObjectProperty ; rdfs:label "supplyTo" ;
+            rdfs:domain :SupplyRelationship ; rdfs:range :Supplier ;
+            rdfs:comment "supply_relationships.toSupplierId — the receiving side." .
+
+:stakeOf    rdf:type owl:ObjectProperty ; rdfs:label "stakeOf" ;
+            rdfs:domain :OwnershipStake ; rdfs:range :Customer ;
+            rdfs:comment "owned_by.customer_id — the customer that is owned." .
+
+:stakeHeldBy
+            rdf:type owl:ObjectProperty ; rdfs:label "stakeHeldBy" ;
+            rdfs:domain :OwnershipStake ; rdfs:range :Customer ;
+            rdfs:comment "owned_by.parent_customer_id — the owning customer." .
+
+:governedBy rdf:type owl:ObjectProperty ; rdfs:label "governedBy" ;
+            rdfs:range :Threshold ;
+            rdfs:comment "Links a classified term to the cutoff that decides it. Attached per class by restriction, so it stays domain-free." .
+
+# --- traversal properties (inverses and chains) -----------------------------
+
+:hasInvoice rdf:type owl:ObjectProperty ; rdfs:label "hasInvoice" ;
+            rdfs:domain :Customer ; rdfs:range :Invoice ;
+            owl:inverseOf :billedTo .
+
+:hasFinding rdf:type owl:ObjectProperty ; rdfs:label "hasFinding" ;
+            rdfs:domain :Customer ; rdfs:range :ComplianceFinding ;
+            owl:inverseOf :raisedAgainst .
+
+:recognizes rdf:type owl:ObjectProperty ; rdfs:label "recognizes" ;
+            rdfs:domain :BusinessUnit ; rdfs:range :RevenueEntry ;
+            owl:inverseOf :bookedTo .
+
+:hasSupplyLink
+            rdf:type owl:ObjectProperty ; rdfs:label "hasSupplyLink" ;
+            rdfs:domain :Supplier ; rdfs:range :SupplyRelationship ;
+            owl:inverseOf :supplyFrom ;
+            rdfs:comment "The outgoing supply links of a supplier." .
+
+:hasOwnershipStake
+            rdf:type owl:ObjectProperty ; rdfs:label "hasOwnershipStake" ;
+            rdfs:domain :Customer ; rdfs:range :OwnershipStake ;
+            owl:inverseOf :stakeOf ;
+            rdfs:comment "The stakes held in this customer." .
+
+:supplies   rdf:type owl:ObjectProperty , owl:TransitiveProperty ;
+            rdfs:label "supplies" ;
+            rdfs:domain :Supplier ; rdfs:range :Supplier ;
+            owl:propertyChainAxiom ( :hasSupplyLink :supplyTo ) ;
+            rdfs:comment "Supplier feeds supplier. Transitive, so a chain of any length is walkable — this is the network Critical Supplier is measured over. Derived from SupplyRelationship, never flattened onto Supplier." .
+
+:ownedBy    rdf:type owl:ObjectProperty , owl:TransitiveProperty ;
+            rdfs:label "ownedBy" ;
+            rdfs:domain :Customer ; rdfs:range :Customer ;
+            owl:propertyChainAxiom ( :hasOwnershipStake :stakeHeldBy ) ;
+            rdfs:comment "Customer owned by customer. Transitive, so a controlling chain several levels long is walkable — the path Ownership Risk propagates along, weighted by ownershipPct." .
+
+# =============================================================================
+# 4. Classified business terms
+# -----------------------------------------------------------------------------
+# Subclasses of the entity they classify, never a boolean column on it. The two
+# column-findable ones get executable SWRL rules in section 5; the three
+# graph-computed ones carry their rule in the comment and are asserted by the
+# Reasoning / GDS step.
+# =============================================================================
+
+:DefaultedCustomer
+    rdf:type        owl:Class ;
+    rdfs:label      "DefaultedCustomer" ;
+    rdfs:subClassOf :Customer ;
+    rdfs:comment    "TERM-02 / RULE-02: a customer with a recorded default in the snapshot (defaultedPeriod is set). Column-findable. This is the source of the failure that Ownership Risk propagates." ;
+    ontobricks:icon "🔴" .
+
+:LateInvoice
+    rdf:type        owl:Class ;
+    rdfs:label      "LateInvoice" ;
+    rdfs:subClassOf :Invoice ;
+    rdfs:comment    "An invoice paid more than the Late Payment Threshold (60 days) after its due date. Intermediate step towards DelinquentCustomer, which additionally needs the last-three-invoices window." ;
+    ontobricks:icon "⏰" ;
+    rdfs:subClassOf [ rdf:type owl:Restriction ; owl:onProperty :governedBy ; owl:someValuesFrom :Threshold ] .
+
+:HighRiskSupplier
+    rdf:type        owl:Class ;
+    rdfs:label      "HighRiskSupplier" ;
+    rdfs:subClassOf :Supplier ;
+    rdfs:comment    "TERM-04 / RULE-04: riskScore >= the Supplier Risk Threshold (70). Column-findable, and the contrast case for CriticalSupplier: a supplier can be high-risk without being critical, and critical without being high-risk." ;
+    ontobricks:icon "⚠️" ;
+    rdfs:subClassOf [ rdf:type owl:Restriction ; owl:onProperty :governedBy ; owl:someValuesFrom :Threshold ] .
+
+:DelinquentCustomer
+    rdf:type        owl:Class ;
+    rdfs:label      "DelinquentCustomer" ;
+    rdfs:subClassOf :Customer ;
+    rdfs:comment    "TERM-03 / RULE-03: more than 60 days late on each of its last three invoices. Column-findable but not SWRL-expressible — it needs an ordered window over the invoice branch, so run it as an aggregate rule or SQL, not a SWRL rule." ;
+    ontobricks:icon "🟠" ;
+    rdfs:subClassOf [ rdf:type owl:Restriction ; owl:onProperty :governedBy ; owl:someValuesFrom :Threshold ] .
+
+:CriticalSupplier
+    rdf:type        owl:Class ;
+    rdfs:label      "CriticalSupplier" ;
+    rdfs:subClassOf :Supplier ;
+    rdfs:comment    "TERM-05 / RULE-05: a supplier that a disproportionate share of the multi-tier supply paths carrying a commodity into a business unit run through, leaving few alternatives around it. Measured as supply betweenness over :supplies walked transitively, at or above the Supply Concentration Threshold (878.32, the 95th percentile). Not readable from any column, and a Critical Supplier need not sell to the affected unit directly." ;
+    ontobricks:icon "🎯" ;
+    rdfs:subClassOf [ rdf:type owl:Restriction ; owl:onProperty :governedBy ; owl:someValuesFrom :Threshold ] .
+
+:OwnershipRisk
+    rdf:type        owl:Class ;
+    rdfs:label      "OwnershipRisk" ;
+    rdfs:subClassOf :Customer ;
+    rdfs:comment    "TERM-06 / RULE-06: a clean-record customer with its own invoices that absorbs more propagated failure through its ownership stakes than any other trading customer. Stake-weighted propagation over :ownedBy from every DefaultedCustomer, at or above the Ownership Contagion Threshold (0.17168). Proximity to a default does not qualify an account on its own — the size of the stake decides how much reaches it." ;
+    ontobricks:icon "🕸️" ;
+    rdfs:subClassOf [ rdf:type owl:Restriction ; owl:onProperty :governedBy ; owl:someValuesFrom :Threshold ] ;
+    owl:disjointWith :DefaultedCustomer .
+
+:RiskyCustomer
+    rdf:type        owl:Class ;
+    rdfs:label      "RiskyCustomer" ;
+    rdfs:subClassOf :Customer ;
+    rdfs:comment    "TERM-07 / RULE-09: an active customer, neither defaulted nor already delinquent, where at least the Customer Similarity Threshold (0.5) share of its 10 nearest neighbours by payment behaviour are DelinquentCustomers. kNN over standardized avgDaysLate and overdueShare — an early warning, not a rule on the customer's own record. Note the two behaviour features are withheld from the Unity Catalog customers table by design, so this term is scored on the graph side." ;
+    ontobricks:icon "🟡" ;
+    rdfs:subClassOf [ rdf:type owl:Restriction ; owl:onProperty :governedBy ; owl:someValuesFrom :Threshold ] ;
+    owl:disjointWith :DelinquentCustomer .
+
+# The remaining two exclusions from RULE-06 and RULE-09, stated from the other
+# side so each subject carries a single owl:disjointWith (the importer lists an
+# axiom once per subject-object pair, so two objects on one subject read as a
+# duplicate row).
+:DefaultedCustomer  owl:disjointWith :RiskyCustomer .
+:DelinquentCustomer owl:disjointWith :OwnershipRisk .
+
+# =============================================================================
+# 5. Executable reasoning rules
+# -----------------------------------------------------------------------------
+# OntoBricks SWRL rules. Only the two single-row, column-findable terms are
+# expressible here; everything needing a window, an aggregate or a graph
+# algorithm is called out in the class comments above.
+# =============================================================================
+
+:RuleHighRiskSupplier
+    rdf:type                 ontobricks:SWRLRule ;
+    rdfs:label               "High-Risk Supplier Rule" ;
+    rdfs:comment             "RULE-04 / THR-01: procurement risk score at or above the Supplier Risk Threshold (70)." ;
+    ontobricks:antecedent    "Supplier(?s) ^ riskScore(?s, ?r) ^ swrlb:greaterThanOrEqual(?r, 70)" ;
+    ontobricks:consequent    "HighRiskSupplier(?s)" .
+
+:RuleDefaultedCustomer
+    rdf:type                 ontobricks:SWRLRule ;
+    rdfs:label               "Defaulted Customer Rule" ;
+    rdfs:comment             "RULE-02: a default period is recorded on the customer. Assumes the mapping emits no defaultedPeriod triple for customers that never defaulted." ;
+    ontobricks:antecedent    "Customer(?c) ^ defaultedPeriod(?c, ?p)" ;
+    ontobricks:consequent    "DefaultedCustomer(?c)" .
+
+:RuleLateInvoice
+    rdf:type                 ontobricks:SWRLRule ;
+    rdfs:label               "Late Invoice Rule" ;
+    rdfs:comment             "THR-02: more than 60 days late. The per-invoice half of RULE-03; the last-three-invoices window is not SWRL-expressible." ;
+    ontobricks:antecedent    "Invoice(?i) ^ daysLate(?i, ?d) ^ swrlb:greaterThan(?d, 60)" ;
+    ontobricks:consequent    "LateInvoice(?i)" .

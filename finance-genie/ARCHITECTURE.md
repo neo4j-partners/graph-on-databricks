@@ -6,6 +6,18 @@
 
 This document describes the enrichment pipeline in `finance-genie/enrichment-pipeline/`. It covers each major stage, the configuration variables that control each stage, what those variables do and why they exist, and an honest assessment of what could be removed without losing the before/after GDS enrichment contrast at the center of the demo.
 
+Two runtime projects sit beside this pipeline:
+
+- [`fraud-signal-workbench/`](./fraud-signal-workbench/README.md) queries the
+  GDS-enriched Aura graph directly, materializes an investigator-selected
+  subgraph into Delta, and sends analysis questions to Genie.
+- [`neo4j-mcp-graph-agent/`](./neo4j-mcp-graph-agent/README.md) provisions the
+  external MCP connection and deploys a graph-only agent endpoint. It retrieves
+  live graph evidence and does not depend on the Gold-table production stage.
+
+Their project READMEs are the source of truth for runtime deployment. The
+remainder of this document is intentionally scoped to the enrichment pipeline.
+
 The pipeline has one job: demonstrate what becomes answerable when GDS enriches the Gold layer with structural dimensions that base tables cannot provide. GDS writes features: `risk_score` is PageRank eigenvector centrality, `community_id` is a Louvain community partition, `similarity_score` is Jaccard overlap of shared-merchant sets. Each carries a published mathematical definition. None is a fraud verdict. Genie reads those columns and answers segment questions over structural dimensions: portfolio composition, cohort comparisons, community rollups, operational workload, merchant-side analysis. That goal determines which variables are load-bearing and which are belt-and-suspenders.
 
 ---

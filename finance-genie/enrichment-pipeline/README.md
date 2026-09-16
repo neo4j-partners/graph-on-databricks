@@ -9,26 +9,26 @@ tables, and validates output against ground truth.
 The notebooks under `workshop/` do the same work interactively in a live kernel.
 The scripts here wrap that logic as Databricks Python tasks that run unattended
 via the CLI. For the architecture overview and the shared `.env` + secret setup,
-see the top-level [README](../README.md#common-setup).
+see the top-level [README](../README.md#canonical-setup).
 
 ## Quick Start (from scratch)
 
-After the root [Common Setup](../README.md#common-setup) (`.env`, secrets, and
-base tables) and the [Prerequisites](#prerequisites) below (cluster libraries,
-CLI auth), run the whole pipeline with one command. The orchestrator re-runs the
-shared upload and secret steps idempotently, then does the graph work. The
-synthetic dataset is already committed in `finance-genie/data/`, so data
-generation is not part of the happy path:
+The supported entry point is the root [canonical setup](../README.md#canonical-setup).
+After filling in `finance-genie/.env` and completing the prerequisites below,
+run:
 
 ```bash
-cd enrichment-pipeline
-./run_existing_data_pipeline.py        # full 16-step orchestrator
+cd finance-genie
+make demo
 ```
 
-This validates the committed data, uploads tables, provisions Genie Spaces, runs
-the BEFORE baseline, ingests into Neo4j, runs GDS, pulls the three Gold tables,
-validates them against ground truth, and runs the AFTER Genie observation. Each
-step prints an explicit header and heartbeat output.
+`make demo` calls this project's full orchestrator. It validates the committed
+data, uploads tables, creates or reconciles the canonical Genie Spaces, writes
+their IDs to the local `.env` and Databricks secret scope, runs the BEFORE
+baseline, ingests Neo4j, runs GDS, pulls the three Gold tables, validates them,
+and runs the AFTER Genie observation. Each step prints an explicit header and
+heartbeat output. It does not deploy the optional MCP agent, Fraud Signal
+Workbench, or Virtual Graph demo.
 
 When it finishes you have: the five Silver base tables, an enriched Neo4j graph,
 the three Gold tables (`gold_accounts`, `gold_account_similarity_pairs`,
@@ -52,16 +52,8 @@ uv run diagnostics/verify_fraud_patterns.py
 
 ## Prerequisites
 
-- **Local `.env` symlink to the parent.** The CLI job runner (`uv run python -m
-  cli submit ...`) reads `.env` from the current directory, so it does not pick
-  up the shared `finance-genie/.env` on its own. Link the local file to the
-  parent so the CLI and the pipeline scripts share one source of truth (and one
-  `DATABRICKS_PROFILE`):
-
-  ```bash
-  cd enrichment-pipeline
-  ln -sf ../.env .env
-  ```
+- **Shared root `.env`.** The pipeline CLI reads `finance-genie/.env` directly;
+  no per-directory `.env` file or symlink is required.
 
 - **Databricks CLI** authenticated against your workspace. The shell scripts call
   the CLI directly, so an expired or missing token causes a
@@ -92,11 +84,11 @@ uv run validation/validate_cluster.py
 
 ### Run with existing data, full pipeline
 
-The Quick Start uses `run_existing_data_pipeline.py`. Override the per-step
-timeout when needed:
+`make demo` runs `run_existing_data_pipeline.py`. Override the per-step timeout
+when needed:
 
 ```bash
-PIPELINE_STEP_TIMEOUT_SECONDS=10800 ./run_existing_data_pipeline.py
+PIPELINE_STEP_TIMEOUT_SECONDS=10800 make demo
 ```
 
 ### Resume or subset the orchestrator
@@ -142,7 +134,7 @@ uv run python -m cli submit 05_genie_run_after.py SAMPLERS=cat1_portfolio,cat4_o
 
 ### Optional: pull Gold tables
 
-`03_pull_gold_tables.py` is optional for the deployed `graph-fraud-analyst` app,
+`03_pull_gold_tables.py` is optional for the deployed Fraud Signal Workbench,
 which reads ring, risky-account, and central-account data live from Neo4j via
 Cypher. The Gold tables exist for two narrower cases: the Genie quickstart, so
 Genie has tables to query before any Load action runs; and a fallback path if
@@ -247,7 +239,7 @@ to recompute.
 | `similarity_score` | max JACCARD over `:SIMILAR_TO` edges from Node Similarity |
 
 It also creates `:SIMILAR_TO` relationships and the `account_community_id` /
-`account_risk_score` lookup indexes. The deployed `graph-fraud-analyst` app
+`account_risk_score` lookup indexes. The deployed Fraud Signal Workbench
 requires these properties to be populated.
 
 ### Verify GDS (`validation/verify_gds.py`)

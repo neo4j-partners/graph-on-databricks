@@ -1,0 +1,502 @@
+# =============================================================================
+# SupplierRisk — R2RML mapping from Unity Catalog to the SupplierRisk ontology
+# =============================================================================
+#
+# Import path (OntoBricks UI):
+#   Mapping -> Import -> R2RML "From Local File" (this file).
+#   Import AFTER supplier-risk-ontology.ttl. The importer rewrites the class
+#   and property IRIs below onto the loaded ontology's own IRIs by local name,
+#   so a mapping for a class the domain does not have yet lands but never
+#   shows as applied.
+#
+# The import replaces the whole assignment (entities and relationships), it
+# does not merge. Anything auto-assign proposed before this file is imported
+# is discarded, which is the point: these mappings are hand-written and
+# deterministic, not agent-proposed.
+#
+# ---- EDIT BEFORE IMPORT -----------------------------------------------------
+# Targets catalog `graph-on-databricks`, schema supplier_risk, which is where
+# the nine source tables actually live (verified against Unity Catalog: every
+# column named below exists). The catalog name is hyphenated, so it carries
+# backticks inside every FROM clause. Mapping._FQN_TABLE_RE accepts a
+# backticked, hyphenated part, so the permission sweep still resolves each
+# table. To retarget:
+#     python3 - <<'EOF'
+#     p = "supplier-risk-r2rml.ttl"; s = open(p).read()
+#     open(p, "w").write(
+#         s.replace("`graph-on-databricks`.supplier_risk.", "<catalog>.<schema>."))
+#     EOF
+#
+# ---- CONVENTIONS THE IMPORTER DEPENDS ON ------------------------------------
+#   subject template   "{base}{ClassName}/{"idcol"}" — the class name is read
+#                      back out of the template with the regex /([^/]+)/\{...\}
+#                      at the end of the string, so the ClassName segment must
+#                      be the last path segment before the {id}. This is why
+#                      the ontology namespace is slash-terminated: a hash
+#                      namespace makes it read "supplierrisk#Customer".
+#   column names       double-quoted inside the template and in rr:column.
+#   rr:sqlQuery        every logical table is a SELECT, never rr:tableName.
+#                      R2RMLParser only carries a source string into the mapping
+#                      record when the logical table is a sqlQuery, and both
+#                      DigitalTwin's entity loop and its relationship loop skip
+#                      any mapping whose sql_query is empty. Import with
+#                      rr:tableName and the catalog/schema/table fields fill in,
+#                      the mapping still reads as unassigned, and the graph
+#                      builds with no nodes and no edges. Table names stay
+#                      fully qualified inside the FROM clause.
+#   SELECT column list explicit, never SELECT *. Diagnostics resolve every
+#                      id, label, and attribute column against the SELECT
+#                      output, and _extract_select_columns cannot see through a
+#                      star. A column added to the source table is invisible
+#                      here until it is added to the SELECT, which is the
+#                      intended behaviour: the mapping is the contract.
+#   rdfs:label         any predicate whose IRI ends in "label" is taken as the
+#                      display-label column, not as an attribute. Entities with
+#                      no name column use their id, so the graph view never
+#                      shows a bare URI (and the missing-label data-quality
+#                      check stays meaningful).
+#   relationship POM   objectMap with rr:template. An attribute POM uses
+#                      rr:column. That is the only thing distinguishing the two.
+#   rr:datatype        recorded for documentation only. The importer ignores it
+#                      and the triple store keeps objects as strings; the SHACL
+#                      numeric checks TRY_CAST, so nothing depends on it.
+#
+# A NULL column emits no triple, which several rules rely on:
+# RuleDefaultedCustomer fires on the presence of a defaultedPeriod triple, and
+# the shapes file only requires paidDate-style optional columns where the
+# business says they must be there.
+#
+# Columns deliberately not mapped: customers.profitabilityTrend, churnRisk,
+# upsellScore, avgDaysLate, overdueShare. They are withheld from the Unity
+# Catalog customers table by design (they are the kNN features RiskyCustomer is
+# scored on), so mapping them would fail at materialization time.
+# =============================================================================
+
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix :     <https://databricks-ontology.com/supplierrisk/> .
+@prefix map:  <https://databricks-ontology.com/supplierrisk/mapping/> .
+
+# =============================================================================
+# Customer  <-  `graph-on-databricks`.supplier_risk.customers
+# =============================================================================
+
+map:CustomerMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT id,
+                   name,
+                   segment,
+                   creditLimit,
+                   defaultedPeriod,
+                   businessUnitId
+            FROM `graph-on-databricks`.supplier_risk.customers
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/Customer/{\"id\"}" ;
+        rr:class     :Customer ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"name\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :id ;
+        rr:objectMap  [ rr:column "\"id\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :name ;
+        rr:objectMap  [ rr:column "\"name\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :segment ;
+        rr:objectMap  [ rr:column "\"segment\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :creditLimit ;
+        rr:objectMap  [ rr:column "\"creditLimit\"" ; rr:datatype xsd:double ] ;
+    ] ;
+    # Absent for every customer that never defaulted, which is what
+    # RuleDefaultedCustomer keys on.
+    rr:predicateObjectMap [
+        rr:predicate  :defaultedPeriod ;
+        rr:objectMap  [ rr:column "\"defaultedPeriod\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :belongsTo ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/BusinessUnit/{\"businessUnitId\"}" ;
+        ] ;
+    ] .
+
+# =============================================================================
+# Supplier  <-  `graph-on-databricks`.supplier_risk.suppliers
+# -----------------------------------------------------------------------------
+# No business unit column on purpose: a supplier serves many units. That edge
+# comes from the supplier_business_units bridge below.
+# =============================================================================
+
+map:SupplierMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT id,
+                   name,
+                   category,
+                   subcategory,
+                   riskScore
+            FROM `graph-on-databricks`.supplier_risk.suppliers
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/Supplier/{\"id\"}" ;
+        rr:class     :Supplier ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"name\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :id ;
+        rr:objectMap  [ rr:column "\"id\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :name ;
+        rr:objectMap  [ rr:column "\"name\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :category ;
+        rr:objectMap  [ rr:column "\"category\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :subcategory ;
+        rr:objectMap  [ rr:column "\"subcategory\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :riskScore ;
+        rr:objectMap  [ rr:column "\"riskScore\"" ; rr:datatype xsd:integer ] ;
+    ] .
+
+# =============================================================================
+# BusinessUnit  <-  `graph-on-databricks`.supplier_risk.business_units
+# =============================================================================
+
+map:BusinessUnitMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT id,
+                   name,
+                   region
+            FROM `graph-on-databricks`.supplier_risk.business_units
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/BusinessUnit/{\"id\"}" ;
+        rr:class     :BusinessUnit ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"name\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :id ;
+        rr:objectMap  [ rr:column "\"id\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :name ;
+        rr:objectMap  [ rr:column "\"name\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :region ;
+        rr:objectMap  [ rr:column "\"region\"" ; rr:datatype xsd:string ] ;
+    ] .
+
+# =============================================================================
+# Invoice  <-  `graph-on-databricks`.supplier_risk.invoices
+# -----------------------------------------------------------------------------
+# No name column, so the id doubles as the display label. paidDate is absent
+# while an invoice is open or overdue.
+# =============================================================================
+
+map:InvoiceMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT id,
+                   amount,
+                   currency,
+                   issueDate,
+                   dueDate,
+                   paidDate,
+                   daysLate,
+                   status,
+                   customerId
+            FROM `graph-on-databricks`.supplier_risk.invoices
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/Invoice/{\"id\"}" ;
+        rr:class     :Invoice ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"id\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :id ;
+        rr:objectMap  [ rr:column "\"id\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :amount ;
+        rr:objectMap  [ rr:column "\"amount\"" ; rr:datatype xsd:double ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :currency ;
+        rr:objectMap  [ rr:column "\"currency\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :issueDate ;
+        rr:objectMap  [ rr:column "\"issueDate\"" ; rr:datatype xsd:date ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :dueDate ;
+        rr:objectMap  [ rr:column "\"dueDate\"" ; rr:datatype xsd:date ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :paidDate ;
+        rr:objectMap  [ rr:column "\"paidDate\"" ; rr:datatype xsd:date ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :daysLate ;
+        rr:objectMap  [ rr:column "\"daysLate\"" ; rr:datatype xsd:integer ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :status ;
+        rr:objectMap  [ rr:column "\"status\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :billedTo ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/Customer/{\"customerId\"}" ;
+        ] ;
+    ] .
+
+# =============================================================================
+# RevenueEntry  <-  `graph-on-databricks`.supplier_risk.revenue_entries
+# =============================================================================
+
+map:RevenueEntryMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT id,
+                   amount,
+                   currency,
+                   period,
+                   reconciled,
+                   businessUnitId
+            FROM `graph-on-databricks`.supplier_risk.revenue_entries
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/RevenueEntry/{\"id\"}" ;
+        rr:class     :RevenueEntry ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"id\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :id ;
+        rr:objectMap  [ rr:column "\"id\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :amount ;
+        rr:objectMap  [ rr:column "\"amount\"" ; rr:datatype xsd:double ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :currency ;
+        rr:objectMap  [ rr:column "\"currency\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    # DATE on the first of the month. Derive quarters with YEAR and QUARTER,
+    # never by string-slicing the label.
+    rr:predicateObjectMap [
+        rr:predicate  :period ;
+        rr:objectMap  [ rr:column "\"period\"" ; rr:datatype xsd:date ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :reconciled ;
+        rr:objectMap  [ rr:column "\"reconciled\"" ; rr:datatype xsd:boolean ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :bookedTo ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/BusinessUnit/{\"businessUnitId\"}" ;
+        ] ;
+    ] .
+
+# =============================================================================
+# ComplianceFinding  <-  `graph-on-databricks`.supplier_risk.compliance_findings
+# -----------------------------------------------------------------------------
+# The source column is `type`; the ontology property is :findingType, because
+# "type" collides with rdf:type in every downstream query.
+# =============================================================================
+
+map:ComplianceFindingMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT id,
+                   type,
+                   status,
+                   openedDate,
+                   customerId
+            FROM `graph-on-databricks`.supplier_risk.compliance_findings
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/ComplianceFinding/{\"id\"}" ;
+        rr:class     :ComplianceFinding ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"id\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :id ;
+        rr:objectMap  [ rr:column "\"id\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :findingType ;
+        rr:objectMap  [ rr:column "\"type\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :status ;
+        rr:objectMap  [ rr:column "\"status\"" ; rr:datatype xsd:string ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :openedDate ;
+        rr:objectMap  [ rr:column "\"openedDate\"" ; rr:datatype xsd:date ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :raisedAgainst ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/Customer/{\"customerId\"}" ;
+        ] ;
+    ] .
+
+# =============================================================================
+# SupplyRelationship  <-  `graph-on-databricks`.supplier_risk.supply_relationships
+# -----------------------------------------------------------------------------
+# The table has no key column, only the two endpoints, so the query builds a
+# synthetic one. It identifies the node and gives it a label; it is not emitted
+# as :id, because it is an artifact of this mapping and not a source fact. The
+# link stays a node rather than collapsing into a Supplier attribute because
+# Critical Supplier is measured over paths through it.
+# =============================================================================
+
+map:SupplyRelationshipMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT CONCAT(fromSupplierId, '__', toSupplierId) AS id,
+                   fromSupplierId,
+                   toSupplierId
+            FROM `graph-on-databricks`.supplier_risk.supply_relationships
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/SupplyRelationship/{\"id\"}" ;
+        rr:class     :SupplyRelationship ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"id\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :supplyFrom ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/Supplier/{\"fromSupplierId\"}" ;
+        ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :supplyTo ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/Supplier/{\"toSupplierId\"}" ;
+        ] ;
+    ] .
+
+# =============================================================================
+# OwnershipStake  <-  `graph-on-databricks`.supplier_risk.owned_by
+# -----------------------------------------------------------------------------
+# Also keyless, so the same synthetic-key treatment applies. It has to be a
+# node either way: it carries the weight risk propagates by, and a customer can
+# have more than one owner.
+# =============================================================================
+
+map:OwnershipStakeMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT CONCAT(customer_id, '__', parent_customer_id) AS id,
+                   customer_id,
+                   parent_customer_id,
+                   ownershipPct
+            FROM `graph-on-databricks`.supplier_risk.owned_by
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/OwnershipStake/{\"id\"}" ;
+        rr:class     :OwnershipStake ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  rdfs:label ;
+        rr:objectMap  [ rr:column "\"id\"" ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :ownershipPct ;
+        rr:objectMap  [ rr:column "\"ownershipPct\"" ; rr:datatype xsd:double ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :stakeOf ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/Customer/{\"customer_id\"}" ;
+        ] ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :stakeHeldBy ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/Customer/{\"parent_customer_id\"}" ;
+        ] ;
+    ] .
+
+# =============================================================================
+# serves  <-  `graph-on-databricks`.supplier_risk.supplier_business_units  (bridge table)
+# -----------------------------------------------------------------------------
+# Many-to-many, so it stays a bridge rather than a column on either side. No
+# rr:class: this TriplesMap contributes one relationship and no new node. It
+# is how a supplier question gets scoped to a business unit.
+# =============================================================================
+
+map:SupplierServesMap
+    a  rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery  """
+            SELECT supplierId,
+                   businessUnitId
+            FROM `graph-on-databricks`.supplier_risk.supplier_business_units
+        """ ;
+    ] ;
+    rr:subjectMap [
+        rr:template  "https://databricks-ontology.com/supplierrisk/Supplier/{\"supplierId\"}" ;
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate  :serves ;
+        rr:objectMap  [
+            rr:template  "https://databricks-ontology.com/supplierrisk/BusinessUnit/{\"businessUnitId\"}" ;
+        ] ;
+    ] .

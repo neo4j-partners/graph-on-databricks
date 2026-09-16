@@ -33,11 +33,11 @@ Re-runnable: tables are CREATE OR REPLACE and the schema/volume are created
 idempotently.
 
 Once the base tables exist they get their semantic metadata (see SEMANTICS): a
-comment on every table, and a comment on the columns whose meaning cannot be read
-off the name. A bare `CREATE TABLE AS SELECT *` leaves Genie nothing but names
-and types. This is metadata about shape, not answers; the graph still owns the
-knowledge layer. `CREATE OR REPLACE TABLE` drops comments, so the step reruns on
-every upload, which also makes the whole script idempotent with no bookkeeping.
+comment on every table and every included column. A bare `CREATE TABLE AS SELECT
+*` leaves Genie and downstream semantic tools with nothing but names and types.
+This is metadata about shape, not answers, so the graph still owns the knowledge
+layer. `CREATE OR REPLACE TABLE` drops comments, so the step reruns on every
+upload, which also makes the whole script idempotent with no bookkeeping.
 
 Then `create_metric_view` builds `customer_risk_exposure`, which is the real fix
 for Genie multiplying customer aggregates: it declares the invoice and finding
@@ -111,12 +111,11 @@ class TableSemantics:
     """The semantic metadata Genie reads: a table comment and column comments.
 
     `CREATE OR REPLACE TABLE ... AS SELECT *` leaves a table with column names
-    and types and nothing else, so Genie has to guess what a row means. The table
-    comment states the grain. Column comments are deliberately sparse: only
-    columns whose meaning cannot be read off the name get one. Databricks' Genie
-    guidance calls descriptions critical and in the same breath warns against
-    unnecessary detail, and a comment restating the column name is noise
-    competing with the comments that carry real information.
+    and types and nothing else, so Genie and OntoBricks cannot reliably interpret
+    what a row or column represents. The table comment states the grain and every
+    included column gets a concise description. This preserves the semantic
+    contract expected by downstream catalog tooling without revealing graph-only
+    findings or traversal logic.
     """
 
     comment: str
@@ -211,11 +210,10 @@ STALE_GOLD_TABLES = ("classifications", "business_unit_exposure")
 # so a comment that hints at a traversal or pre-judges what a metric implies
 # would hand over the answer and break the premise.
 #
-# A column earns a comment only if its meaning cannot be read off its name. That
-# leaves three kinds: coded vocabularies (segment, status, region), units and
-# scales (EUR amounts, 0-100 scores), and grain rules. "Registered customer name"
-# is not a comment, it is the column name with extra words, and every one of
-# those dilutes the ones that matter.
+# Every column that lands in Unity Catalog has a concise description. Coded
+# vocabularies (segment, status, region), units and scales (EUR amounts, 0-100
+# scores), and join keys need more detail; identifiers and names still receive
+# clear descriptions so metadata import has complete coverage.
 #
 # Three observed failures set the emphasis, and every comment that survives past
 # a bare definition is here because one of them happened. Genie rendered euro
@@ -248,6 +246,9 @@ SEMANTICS: dict[str, TableSemantics] = {
             "customer-grain table."
         ),
         columns={
+            "id": "Unique customer identifier.",
+            "businessUnitId": "Identifier of the internal business unit that manages this customer. Joins to business_units.id.",
+            "name": "Customer account name.",
             "segment": "Commercial tier: platinum, gold, or silver.",
             "creditLimit": "Total committed credit facility in EUR.",
             "defaultedPeriod": (
@@ -264,6 +265,8 @@ SEMANTICS: dict[str, TableSemantics] = {
             "bridge."
         ),
         columns={
+            "id": "Unique supplier identifier.",
+            "name": "Supplier name.",
             "category": "Procurement category: ingredients, packaging, logistics, equipment, or services.",
             "subcategory": "Specialty within the category.",
             "riskScore": "Procurement risk score, 0-100, higher is riskier.",
@@ -272,6 +275,8 @@ SEMANTICS: dict[str, TableSemantics] = {
     "business_units": TableSemantics(
         comment="One row per business unit.",
         columns={
+            "id": "Unique business unit identifier.",
+            "name": "Business unit name.",
             "region": (
                 "Region code: AMER is the Americas, EMEA is Europe, Middle East and "
                 "Africa, APAC is Asia Pacific."
@@ -284,8 +289,13 @@ SEMANTICS: dict[str, TableSemantics] = {
             "before joining to another customer-grain table."
         ),
         columns={
+            "id": "Unique invoice identifier.",
+            "customerId": "Identifier of the billed customer. Joins to customers.id.",
             "amount": "Invoice amount in EUR.",
             "currency": "ISO 4217 currency code. Every amount in this dataset is EUR; render amounts with the euro symbol.",
+            "issueDate": "Date the invoice was issued.",
+            "dueDate": "Date payment is due.",
+            "paidDate": "Date the invoice was paid. Null when it has not been paid.",
             "daysLate": "Days between dueDate and payment.",
             "status": "Lifecycle state: paid, open, or overdue.",
         },
@@ -293,19 +303,25 @@ SEMANTICS: dict[str, TableSemantics] = {
     "revenue_entries": TableSemantics(
         comment="One row per business unit per accounting period.",
         columns={
+            "id": "Unique revenue-entry identifier.",
+            "businessUnitId": "Identifier of the business unit recognizing the revenue. Joins to business_units.id.",
             "period": (
                 "Accounting month, stored as a DATE on the first of the month. "
                 "Derive quarters with YEAR and QUARTER."
             ),
             "amount": "Recognized revenue in EUR.",
             "currency": "ISO 4217 currency code. Every amount in this dataset is EUR; render amounts with the euro symbol.",
+            "reconciled": "Whether the revenue entry has been reconciled.",
         },
     ),
     "compliance_findings": TableSemantics(
         comment="One row per compliance finding, many per customer.",
         columns={
+            "id": "Unique compliance-finding identifier.",
+            "customerId": "Identifier of the customer associated with the finding. Joins to customers.id.",
             "type": "Finding category: KYC, AML, or sanctions.",
             "status": "Finding state: open or closed.",
+            "openedDate": "Date the compliance finding was opened.",
         },
     ),
     "supplier_business_units": TableSemantics(
@@ -315,6 +331,10 @@ SEMANTICS: dict[str, TableSemantics] = {
             "this table to scope a supplier question to a region or unit. One row "
             "per supplier-unit pair."
         ),
+        columns={
+            "supplierId": "Identifier of the supplier. Joins to suppliers.id.",
+            "businessUnitId": "Identifier of the business unit served by the supplier. Joins to business_units.id.",
+        },
     ),
     "supply_relationships": TableSemantics(
         comment=(
@@ -322,6 +342,10 @@ SEMANTICS: dict[str, TableSemantics] = {
             "fromSupplierId supplies the supplier in toSupplierId; both sides join "
             "to suppliers.id. A supplier can appear on either side, or on both."
         ),
+        columns={
+            "fromSupplierId": "Identifier of the supplying supplier. Joins to suppliers.id.",
+            "toSupplierId": "Identifier of the supplied supplier. Joins to suppliers.id.",
+        },
     ),
     "owned_by": TableSemantics(
         comment=(
@@ -331,6 +355,11 @@ SEMANTICS: dict[str, TableSemantics] = {
             "customers.id. A customer can have more than one owner, so this is not "
             "a single parent column."
         ),
+        columns={
+            "customer_id": "Identifier of the owned customer. Joins to customers.id.",
+            "parent_customer_id": "Identifier of the owning customer. Joins to customers.id.",
+            "ownershipPct": "Ownership fraction held by the parent customer, from 0 to 1.",
+        },
     ),
 }
 
@@ -793,14 +822,18 @@ def check_semantics(spec: TableSpec, header: set[str]) -> None:
     """Offline: confirm this table's comments still match its CSV.
 
     Comments are written by column name, so a renamed or dropped column would
-    otherwise fail mid-upload as a SQL error. There is no converse check that
-    every column carries a comment: most deliberately do not.
+    otherwise fail mid-upload as a SQL error. Every column that reaches Unity
+    Catalog must carry a description. CSV columns excluded from the lakehouse
+    table are intentionally exempt.
     """
     semantics = SEMANTICS.get(spec.table)
     if semantics is None:
         sys.exit(f"{spec.table}: no SEMANTICS entry; add one before uploading.")
-    if ghosts := sorted(set(semantics.columns) - header):
+    visible_columns = header - set(spec.exclude)
+    if ghosts := sorted(set(semantics.columns) - visible_columns):
         sys.exit(f"{spec.table}: comments name absent column(s) {', '.join(ghosts)}")
+    if undocumented := sorted(visible_columns - set(semantics.columns)):
+        sys.exit(f"{spec.table}: missing column comment(s) {', '.join(undocumented)}")
 
 
 def check(data_dir: Path) -> None:

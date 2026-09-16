@@ -4,9 +4,14 @@ Neo4j Virtual Graph lets you query Databricks tables as a property graph in Aura
 
 > Virtual Graph is in preview. The official docs advise against using sensitive or production data with it during the preview.
 
-## 1. Complete the Common Setup
+## 1. Complete the Canonical Setup
 
-Before setting up the Virtual Graph, run the **Common Setup** in the [finance-genie README](../README.md). That step creates the shared `.env`, provisions the Databricks secrets, uploads the synthetic dataset, and applies `sql/schema.sql` to create the base tables. The Virtual Graph reads those tables, so they must exist first. The [virtual-graph-demo README](./README.md) lists the minimum subset of those steps the demo needs.
+Before setting up the Virtual Graph, run the **Canonical Setup** in the
+[Finance Genie README](../README.md): create `finance-genie/.env`, then run
+`make demo` from the Finance Genie root. It creates the shared Silver tables,
+Neo4j graph, GDS results, Gold tables, secret scope, and Genie Spaces. The
+Virtual Graph reads the Silver tables, but it is an optional product and is not
+created by `make demo`.
 
 The tables you will model are the Finance Genie Silver tables: `accounts`, `merchants`, `transactions`, and `account_links`. The `account_labels` table stays out of the graph. It holds the fraud ground truth used for evaluation, not graph structure.
 
@@ -36,7 +41,7 @@ To find your catalog and schema:
 2. Select your catalog.
 3. The **Overview** tab lists the available schemas.
 
-For Finance Genie, the catalog and schema are the ones holding the Silver tables created during Common Setup.
+For Finance Genie, the catalog and schema are the ones holding the Silver tables created during Canonical Setup.
 
 ## 3. Create the Virtual Graph in Aura
 
@@ -60,7 +65,7 @@ In the Aura console:
 
 When the connection verifies, the **Confirm** step lists your Databricks data source along with the discovered tables and columns. A successful Finance Genie setup looks like this:
 
-![Finance Genie Virtual Graph connection confirmed](./docs/images/finance-genie-vg.png)
+![Finance Genie Virtual Graph connection confirmed](../docs/images/finance-genie-vg.png)
 
 The panel shows the data source set to Databricks with the server hostname, HTTP path, catalog, and schema you entered, and the discovered tables on the right. The table list is scrollable; the screenshot shows the top of it:
 
@@ -107,7 +112,7 @@ Build that model with the following steps.
    - Under **Node ID mapping**, set **From** to `Account`, with ID property `account_id` mapped from ID column `account_id`.
    - Set **To** to `Merchant`, with ID property `merchant_id` mapped from ID column `merchant_id`.
 
-   ![Create the TRANSACTED_WITH relationship](./docs/images/load-vg-step-1.png)
+   ![Create the TRANSACTED_WITH relationship](../docs/images/load-vg-step-1.png)
 
 6. Create the `TRANSFERRED_TO` relationship, as shown below. Both ends map to the `Account` node; the source and destination differ only by which column supplies the ID:
 
@@ -124,7 +129,7 @@ Build that model with the following steps.
    - Under **Node ID mapping**, set **From** to `Account`, with ID property `account_id` mapped from ID column `src_account_id`.
    - Set **To** to `Account`, with ID property `account_id` mapped from ID column `dst_account_id`.
 
-   ![Create the TRANSFERRED_TO relationship](./docs/images/load-vg-step-2.png)
+   ![Create the TRANSFERRED_TO relationship](../docs/images/load-vg-step-2.png)
 
 7. Select **Create Virtual Graph** to save the model.
 
@@ -145,7 +150,8 @@ None of those sit on the columns the demo queries filter by. The fraud queries a
 session window all filter on timestamps, amounts, and account dates, not on the ID
 columns. The Aura Import guidance is to add a range index to any property you regularly
 filter by range. The five additions below map to the queries in
-[`finding-fraud.md`](finding-fraud.md) and the GDS path in [`gds-guide.md`](gds-guide.md),
+[`finding-fraud.md`](finding-fraud.md) and the
+[`fast-gds` path](README.md#fast-gds-demo),
 ordered by how many queries each one serves:
 
 | Index | Type | Backs |
@@ -205,7 +211,7 @@ RETURN a, t, b LIMIT 100
 
 `EXPLAIN` returns the query plan with the generated SQL instead of running the query:
 
-![Virtual Graph query plan showing the generated SQL](./docs/images/explain-vg-plan.png)
+![Virtual Graph query plan showing the generated SQL](../docs/images/explain-vg-plan.png)
 
 ### Account balance tiers
 

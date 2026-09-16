@@ -266,3 +266,103 @@ RETURN * LIMIT 50
 - **The `OWNED_BY` path is the explanation:** it draws the ownership chain the failure propagates along, which is the thing no column holds.
 - **Order matters:** run this only after `gds.py` completes, since the `pagerank` property does not exist before then.
 - **Composing the legs:** both customer legs drop into the combined query above as further `CALL (bu) { ... }` blocks. Keep each one's `RETURN` explicit and its `LIMIT` local, so no leg starves another of rows.
+
+## Sample queries for exploring the graph
+
+Run these read-only queries in Neo4j Browser or another Cypher client after `make demo`. Queries that return a `path` render as a graph in Neo4j Browser.
+
+### Count nodes by label
+
+```cypher
+CYPHER 25
+MATCH (node)
+UNWIND labels(node) AS label
+RETURN label, count(*) AS nodeCount
+ORDER BY nodeCount DESC, label
+```
+
+### Count relationships by type
+
+```cypher
+CYPHER 25
+MATCH ()-[relationship]->()
+RETURN type(relationship) AS relationshipType,
+       count(*) AS relationshipCount
+ORDER BY relationshipCount DESC, relationshipType
+```
+
+### Sample suppliers
+
+```cypher
+CYPHER 25
+MATCH (supplier:Supplier)
+RETURN supplier {
+  .id,
+  .name,
+  .category,
+  .subcategory,
+  .riskScore
+} AS supplier
+LIMIT 10
+```
+
+### Sample customers
+
+```cypher
+CYPHER 25
+MATCH (customer:Customer)
+RETURN customer {
+  .id,
+  .name,
+  .segment,
+  .avgDaysLate,
+  .overdueShare,
+  .creditLimit
+} AS customer
+LIMIT 10
+```
+
+### Explore supplier-to-supplier connections
+
+```cypher
+CYPHER 25
+MATCH path = (upstream:Supplier)-[:SUPPLIES]->(downstream:Supplier)
+RETURN path
+LIMIT 25
+```
+
+### Explore suppliers serving business units
+
+```cypher
+CYPHER 25
+MATCH path = (supplier:Supplier)-[:SUPPLIES]->(businessUnit:BusinessUnit)
+RETURN path
+LIMIT 25
+```
+
+### Explore customers and their business units
+
+```cypher
+CYPHER 25
+MATCH path = (customer:Customer)-[:BELONGS_TO]->(businessUnit:BusinessUnit)
+RETURN path
+LIMIT 25
+```
+
+### Explore customers and their invoices
+
+```cypher
+CYPHER 25
+MATCH path = (customer:Customer)-[:HAS_INVOICE]->(invoice:Invoice)
+RETURN path
+LIMIT 25
+```
+
+### Explore customer ownership
+
+```cypher
+CYPHER 25
+MATCH path = (customer:Customer)-[stake:OWNED_BY]->(owner:Customer)
+RETURN path, stake.ownershipPct AS ownershipPct
+LIMIT 25
+```

@@ -32,8 +32,9 @@ The queries build up gradually, from simple counts, through fraud-signal queries
 graph algorithms like PageRank, so you can see both what runs well and where the Virtual
 Graph reaches its current limits.
 
-Getting it running is three steps: create the Silver tables on Databricks, build the
-Virtual Graph over them in Aura, then run the demos.
+Getting it running is three steps: establish the canonical Finance Genie
+environment, build the Virtual Graph over its Silver tables in Aura, then run the
+demos. The Virtual Graph itself is optional and is not created by `make demo`.
 
 ## Quick start
 
@@ -55,30 +56,27 @@ Prerequisites:
   At demo runtime only the `NEO4J_*` values are read; the `DATABRICKS_*` values are
   used once, by the table-creation step (Step 1).
 
-- The Databricks secret scopes provisioned from that `.env`. After filling it in, run
-  `setup_secrets.sh` once from the `finance-genie` root, the parent of this directory. It
-  reads `.env` and creates the secret scopes used by the enrichment pipeline and the agent
-  surfaces. The demos themselves read `NEO4J_*` from `.env` directly, so this step is for
-  the pipeline rather than for `vg-demo`:
+- The canonical Finance Genie environment. From the parent directory, run this
+  once after creating `.env`:
 
   ```bash
-  cd ..   # the finance-genie root
-  ./setup_secrets.sh
+  cd ..
+  make demo
   ```
+
+  This creates the Silver tables that the Virtual Graph reads. It does not
+  create the Virtual Graph, deploy an app, or deploy an agent.
 
 ## Step 1: Create the Silver tables
 
-The Virtual Graph reads the Finance Genie Silver tables, so they must exist before you
-build it. The committed dataset in `finance-genie/data/` loads into the five base tables
-with one script:
+The Virtual Graph reads the Silver tables created by `make demo`; do not run the
+pipeline's table-upload script separately. The committed data becomes five base
+tables with the required column comments.
 
 ```bash
-cd ../enrichment-pipeline
-./upload_and_create_tables.sh
+cd ..
+make demo
 ```
-
-This uploads the CSVs to a Unity Catalog Volume, applies `sql/schema.sql`, and loads
-the data.
 
 ## Step 2: Build the Virtual Graph
 
@@ -114,8 +112,7 @@ server timeout (default 120s), `--query N` / `--only N M` pick specific fraud qu
 | [`basic-graph-examples.md`](basic-graph-examples.md) | Warm-up counts and small relationship traversals that show the graph's value without fraud logic (backs `--demo basic`). |
 | [`finding-fraud.md`](finding-fraud.md) | Plain-English walkthrough of the fraud-signal queries and how to read them (backs `--demo fraud`). |
 | [`best-practices.md`](best-practices.md) | How to write Cypher that pushes down well to Databricks, plus how the warehouse and the connection pool shape performance. |
-| [`gds-guide.md`](gds-guide.md) | How to run Graph Data Science via a GDS Session on a Virtual Graph, including the no-write-back constraint. |
-| [`gds-limitations.md`](gds-limitations.md) | Findings and current limitations from running GDS against a Virtual Graph. |
+| [GDS demo sections](#fast-gds-demo) | How the fast, slow, and probe commands exercise GDS Sessions over a Virtual Graph. |
 
 ## What the demos provide
 
@@ -240,8 +237,8 @@ runs:
 Each rejection comes back in under a second, before the session provisions, as
 `IllegalArgumentException: The property ... contained a value of type DateTime/String,
 which is not supported`. This is standard GDS typing, not a Virtual Graph defect: project
-only numeric columns, and cast or drop temporal and string ones. See the modeling note in
-[`gds-guide.md`](gds-guide.md). Use `--count-only` to introspect the schema without
+only numeric columns, and cast or drop temporal and string ones. See the
+[`fast-gds` guidance](#fast-gds-demo). Use `--count-only` to introspect the schema without
 provisioning, and `--since-hours` / `--since-days` to size the window.
 
 ### Support scripts

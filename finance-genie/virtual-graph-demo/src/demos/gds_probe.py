@@ -1,6 +1,7 @@
 """Gds-probe demo (``--demo gds-probe``).
 
-Isolate the edge-case projection failure noted in ``gds-limitations.md``: "Cypher
+Isolate the edge-case projection failure documented in the README's
+``gds-probe`` section: "Cypher
 projections can fail on certain relationship property values." The working fast-gds
 projection maps only labels and ``relationshipType``; it never projects ``amount`` or
 ``transfer_timestamp`` as graph properties. A GDS in-memory graph only accepts numeric

@@ -108,4 +108,4 @@ Show me accounts in a shared-identity cluster
 
 > Resolves to `gold_accounts.identity_cluster_size > 1`. Returns the same eight accounts, all carrying one `identity_cluster_id` with `identity_cluster_size` = 8. No single phone connects all eight; the shared address is the bridge that collapses the two phone groups into one Weakly Connected Component. That traversal is what a warehouse cannot express in one hop.
 
-> Both questions read from graph-derived columns. Money movement flagged the ring; identity resolution proves the eight accounts are one person wearing eight masks. See `KYC_DEMO.md` for the full walkthrough, including the knowledge-layer provenance query that names the policy, definition, and source columns behind the classification.
+> Both questions read from graph-derived columns. Money movement flagged the ring; identity resolution proves the eight accounts are one person wearing eight masks. See [KYC_README.md](../../KYC_README.md) for the full walkthrough, including the knowledge-layer provenance query that names the policy, definition, and source columns behind the classification.

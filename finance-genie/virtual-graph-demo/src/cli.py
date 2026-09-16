@@ -13,13 +13,14 @@ A single entry point with four demos, selected with ``--demo``:
   show the value of the relationships without any fraud logic.
 * ``--demo fast-gds`` — the working GDS Session + PageRank path over a small, recent
   window of the Account transfer network, provisioned via the Cypher-projection form
-  of ``gds.graph.project(...)``. See ``gds-guide.md``.
+  of ``gds.graph.project(...)``. See the README's ``fast-gds`` section.
 * ``--demo slow-gds`` — the GDS forms that do not work, kept to demonstrate the
   failures: the classic ``CALL gds.graph.project('g', 'Account', ...)`` form (rejected
   with ``42NG0``) and a large-window projection (trips the 60s Bolt read timeout).
 * ``--demo gds-probe`` — sweep projections that add node / relationship properties one
   at a time on a thin window, to isolate which property configs the projection rejects
-  (the edge-case bug in ``gds-limitations.md``). See ``src/demos/gds_probe.py``.
+  (the edge-case bug documented under ``gds-probe`` in the README). See
+  ``src/demos/gds_probe.py``.
 
 Connection details come from the parent ``finance-genie/.env`` (NEO4J_URI,
 NEO4J_USERNAME, NEO4J_PASSWORD), which points at the Aura Virtual Graph engine.

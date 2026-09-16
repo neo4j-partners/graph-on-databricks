@@ -76,7 +76,7 @@ to make the structural patterns visible so analysts can investigate.
 
 ---
 
-![bg contain](./silver-data-model.png)
+![bg contain](../silver-data-model.svg)
 
 ---
 

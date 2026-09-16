@@ -7,7 +7,7 @@
 #     "pandas>=2.0",
 # ]
 # ///
-"""Official one-shot GDS setup for the graph-fraud-analyst Databricks App.
+"""Official one-shot GDS setup for the Fraud Signal Workbench Databricks App.
 
 Run this once after ingesting account data into Aura. It writes the node
 properties the deployed app and the gold pull read via live Cypher:

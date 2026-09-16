@@ -2,7 +2,7 @@
 
 The working GDS Session + PageRank path over a small, recent window of the Account
 transfer network, provisioned via the Cypher-projection form of
-``gds.graph.project(...)``. See ``gds-guide.md``.
+``gds.graph.project(...)``. See the README's ``fast-gds`` section.
 """
 
 from __future__ import annotations

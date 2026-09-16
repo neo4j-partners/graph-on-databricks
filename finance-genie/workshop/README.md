@@ -45,12 +45,12 @@ first notebook:
 2. **The `neo4j-graph-engineering` secret scope** contains `uri`, `username`,
    `password`, `genie_space_id_before`, and `genie_space_id_after`. The demo
    owner populates these through the root
-   [Common Setup](../README.md#common-setup) (`./setup_secrets.sh`). Participants
+   [Canonical Setup](../README.md#canonical-setup) (`make demo`). Participants
    can also store them interactively by running `01_required_setup.ipynb`.
 3. **The base tables** (`accounts`, `customers`, `merchants`, `transactions`,
    `account_links`, `account_labels`) exist in
    `graph-on-databricks.graph-enriched-schema`. The demo owner loads them with
-   `enrichment-pipeline/upload_and_create_tables.sh`. Participants can also
+   `make demo`. Participants can also
    create and load them interactively by running `00_setup_data.ipynb`, which
    fetches the committed CSVs from GitHub and writes the same tables. The
    `customers` table feeds the KYC identity layer in `03_neo4j_ingest` and
@@ -74,9 +74,8 @@ Silver base tables (`accounts`, `customers`, `merchants`, `transactions`,
 `account_links`, `account_labels`) in `graph-on-databricks.graph-enriched-schema`. Fetches
 the committed CSVs and `ground_truth.json` from the public GitHub repo, writes
 them to a Unity Catalog Volume, creates the tables with column comments, and
-loads the data. The notebook equivalent of
-`enrichment-pipeline/upload_and_create_tables.sh`. Run once if the admin has not
-already loaded the base tables.
+loads the data. It is the notebook equivalent of the table-loading portion of
+`make demo`. Run once if the admin has not already loaded the base tables.
 
 **`01_required_setup.ipynb`**: Stores Neo4j credentials and both Genie Space IDs
 in the `neo4j-graph-engineering` scope, then verifies the Aura connection. Run
@@ -131,7 +130,7 @@ and classifies every shared-identity customer with a `:CLASSIFIED_AS` edge that
 names the policy, definition, and source columns behind the call. The four KYC
 columns land on `gold_accounts` beside `risk_score` and `community_id`, so the
 AFTER Genie space can answer synthetic-identity questions. The notebook closes
-with a presenter walkthrough. `KYC_DEMO.md` is the full operator-and-presenter
+with a presenter walkthrough. `KYC_README.md` is the full operator-and-presenter
 guide this notebook implements for the workshop path.
 
 ## Reference Material
@@ -147,7 +146,7 @@ guide this notebook implements for the workshop path.
   tab, an alternative to the Python-client notebook, covering both the fraud
   algorithms (`04_gds_enrichment`) and the WCC identity resolution
   (`06_kyc_walkthrough`)
-- [`../KYC_DEMO.md`](../KYC_DEMO.md): the full KYC operator-and-presenter guide
+- [`../KYC_README.md`](../KYC_README.md): the full KYC operator-and-presenter guide
   that `06_kyc_walkthrough.ipynb` implements, including the planted story ring
   and expected values
 - `diagrams/`: architecture diagrams for the workshop

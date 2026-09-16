@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Provisions finance-genie Databricks secret scopes from the root .env file.
+# Provisions the canonical Finance Genie Databricks secret scope from the root
+# .env file. Optional products provision their own credentials separately.
 #
 # Usage:
 #   ./setup_secrets.sh [--profile NAME] [ENV_FILE]
 #
-# ENV_FILE defaults to finance-genie/.env. This script intentionally provisions
-# separate scopes for separate runtime surfaces, while using one root env file
-# as the operator-facing source of truth.
+# ENV_FILE defaults to finance-genie/.env.
 
 set -euo pipefail
 
@@ -70,8 +69,6 @@ echo "Using Databricks profile: $DATABRICKS_CONFIG_PROFILE"
 : "${GENIE_SPACE_ID_AFTER:?GENIE_SPACE_ID_AFTER is not set in $ENV_FILE}"
 
 NEO4J_SECRET_SCOPE="${NEO4J_SECRET_SCOPE:-neo4j-graph-engineering}"
-SIMPLE_FINANCE_ANALYST_SECRET_SCOPE="${SIMPLE_FINANCE_ANALYST_SECRET_SCOPE:-simple-finance-analyst}"
-GENIE_SPACE_ID="${GENIE_SPACE_ID:-$GENIE_SPACE_ID_AFTER}"
 
 ensure_scope() {
   local scope="$1"
@@ -108,58 +105,6 @@ put_secret "$NEO4J_SECRET_SCOPE" "password" "$NEO4J_PASSWORD"
 put_secret "$NEO4J_SECRET_SCOPE" "genie_space_id_before" "$GENIE_SPACE_ID_BEFORE"
 put_secret "$NEO4J_SECRET_SCOPE" "genie_space_id_after" "$GENIE_SPACE_ID_AFTER"
 put_secret "$NEO4J_SECRET_SCOPE" "genie_space_id" "$GENIE_SPACE_ID_BEFORE"
-
-echo
-echo "Writing simple-finance-analyst real-backend secrets"
-ensure_scope "$SIMPLE_FINANCE_ANALYST_SECRET_SCOPE"
-put_secret "$SIMPLE_FINANCE_ANALYST_SECRET_SCOPE" "neo4j_uri" "$NEO4J_URI"
-put_secret "$SIMPLE_FINANCE_ANALYST_SECRET_SCOPE" "neo4j_username" "$NEO4J_USERNAME"
-put_secret "$SIMPLE_FINANCE_ANALYST_SECRET_SCOPE" "neo4j_password" "$NEO4J_PASSWORD"
-put_secret "$SIMPLE_FINANCE_ANALYST_SECRET_SCOPE" "genie_space_id" "$GENIE_SPACE_ID"
-
-store_agentcore_secrets() {
-  local credentials_path="${AGENTCORE_CREDENTIALS_PATH:-}"
-  local scope="${MCP_SECRET_SCOPE:-mcp-neo4j-secrets}"
-  if [[ -z "$credentials_path" ]]; then
-    return
-  fi
-  if [[ "$credentials_path" != /* ]]; then
-    credentials_path="${ROOT_DIR}/${credentials_path}"
-  fi
-  if [[ ! -f "$credentials_path" ]]; then
-    echo
-    echo "Skipping MCP OAuth secrets; credential file not found: $credentials_path"
-    return
-  fi
-
-  echo
-  echo "Writing MCP OAuth secrets"
-  ensure_scope "$scope"
-  while IFS=$'\t' read -r key value; do
-    put_secret "$scope" "$key" "$value"
-  done < <(python3 - "$credentials_path" <<'PY'
-import json
-import sys
-from urllib.parse import urlparse
-
-path = sys.argv[1]
-data = json.load(open(path, encoding="utf-8"))
-gateway_url = data["gateway_url"]
-host = f"{urlparse(gateway_url).scheme}://{urlparse(gateway_url).netloc}"
-items = {
-    "gateway_host": host,
-    "client_id": data["client_id"],
-    "client_secret": data["client_secret"],
-    "token_endpoint": data["token_url"],
-    "oauth_scope": data["scope"],
-}
-for key, value in items.items():
-    print(f"{key}\t{value}")
-PY
-)
-}
-
-store_agentcore_secrets
 
 echo
 echo "Done."

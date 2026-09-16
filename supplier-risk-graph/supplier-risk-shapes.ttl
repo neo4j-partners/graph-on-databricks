@@ -1,0 +1,497 @@
+# =============================================================================
+# SupplierRisk — SHACL shapes for the OntoBricks Data Quality tab
+# =============================================================================
+#
+# Import path (OntoBricks UI):
+#   Ontology -> Import -> RDFS tab -> From Local File (this file).
+#   A file containing sh:NodeShape is detected and routed to Data Quality
+#   instead of the ontology class list. Import this AFTER
+#   supplier-risk-ontology.ttl and AFTER the R2RML mapping has been built, so
+#   the shapes have triples to check.
+#
+# Deliberately contains no owl:Class and no owl:DatatypeProperty declarations.
+# The importer only routes a file to Data Quality when the OWL parse finds no
+# classes and no properties, so a single combined file would import as an
+# ontology and drop every shape.
+#
+# What each shape becomes:
+#   sh:property + sh:minCount/maxCount   -> completeness / cardinality check
+#   sh:property + sh:pattern             -> conformance check (Spark RLIKE)
+#   sh:property + sh:min/maxInclusive    -> conformance check (numeric bounds)
+#   sh:property + sh:class               -> consistency check (target is typed)
+#   sh:sparql                            -> structural check
+#
+# ---- THINGS THAT DO NOT SURVIVE THE IMPORT — do not add them here ----------
+#   sh:in            not parsed at all. Coded vocabularies are written as
+#                    sh:pattern "^(a|b|c)$" below for that reason.
+#   sh:datatype      parsed, but the generated SQL looks the datatype up by
+#                    short name ("integer"), never by the full XSD IRI a
+#                    Turtle file carries, so the check never runs. Numeric
+#                    columns use range bounds below instead.
+#   sh:closed        parsed into a row that has no SQL translation, so it
+#                    imports as a check that can never execute.
+#   arbitrary        only three SPARQL shapes translate to SQL: isolated
+#   sh:sparql        entities, missing rdfs:label, and multiple rdf:type.
+#                    Anything else imports as a dead row. The two used below
+#                    are the first two; multiple rdf:type is left out on
+#                    purpose, because reasoning legitimately gives a Customer
+#                    a second type (DefaultedCustomer, RiskyCustomer, ...).
+#
+# One constraint per sh:property block, on purpose. A block carrying both a
+# cardinality and a value constraint is translated as the cardinality one
+# only, and the value half is silently dropped.
+#
+# Re-importing appends: shape ids carry a random suffix, so a second import
+# of this file adds a duplicate set rather than replacing the first. Clear the
+# Data Quality rules before re-importing.
+#
+# Property IRIs are slash-separated to match the ontology namespace and the
+# predicates the R2RML mapping materializes.
+# =============================================================================
+
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix :     <https://databricks-ontology.com/supplierrisk/> .
+
+# =============================================================================
+# Customer
+# =============================================================================
+
+:CustomerShape
+    a                sh:NodeShape ;
+    sh:targetClass   :Customer ;
+
+    sh:property [
+        sh:path      :id ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Customer has no id triple — the mapping did not materialize its key" ;
+    ] ;
+    sh:property [
+        sh:path      :id ;
+        sh:pattern   "^CUST-[0-9]{3}$" ;
+        sh:severity  sh:Warning ;
+        sh:message   "Customer id is not in CUST-nnn form" ;
+    ] ;
+    sh:property [
+        sh:path      :name ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Customer has no name" ;
+    ] ;
+    sh:property [
+        sh:path      :segment ;
+        sh:pattern   "^(platinum|gold|silver)$" ;
+        sh:severity  sh:Violation ;
+        sh:message   "segment is outside the governed tier vocabulary (platinum, gold, silver)" ;
+    ] ;
+    sh:property [
+        sh:path         :creditLimit ;
+        sh:minInclusive 0 ;
+        sh:severity     sh:Violation ;
+        sh:message      "creditLimit is negative — a credit facility cannot be below zero (RULE-08)" ;
+    ] ;
+    sh:property [
+        sh:path      :defaultedPeriod ;
+        sh:pattern   "^[0-9]{4}-Q[1-4]$" ;
+        sh:severity  sh:Violation ;
+        sh:message   "defaultedPeriod is not a YYYY-Qn quarter" ;
+    ] ;
+    sh:property [
+        sh:path      :belongsTo ;
+        sh:class     :BusinessUnit ;
+        sh:severity  sh:Violation ;
+        sh:message   "belongsTo points at something that is not a BusinessUnit" ;
+    ] ;
+    sh:property [
+        sh:path      :belongsTo ;
+        sh:maxCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Customer rolls up into more than one business unit" ;
+    ] .
+
+# =============================================================================
+# Supplier
+# =============================================================================
+
+:SupplierShape
+    a                sh:NodeShape ;
+    sh:targetClass   :Supplier ;
+
+    sh:property [
+        sh:path      :id ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Supplier has no id triple" ;
+    ] ;
+    sh:property [
+        sh:path      :id ;
+        sh:pattern   "^SUP-[0-9]{3}$" ;
+        sh:severity  sh:Warning ;
+        sh:message   "Supplier id is not in SUP-nnn form" ;
+    ] ;
+    sh:property [
+        sh:path      :name ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Supplier has no name" ;
+    ] ;
+    sh:property [
+        sh:path      :category ;
+        sh:pattern   "^(ingredients|packaging|logistics|equipment|services)$" ;
+        sh:severity  sh:Violation ;
+        sh:message   "category is outside the procurement vocabulary" ;
+    ] ;
+    sh:property [
+        sh:path      :riskScore ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Supplier has no riskScore, so RULE-04 cannot be evaluated on it" ;
+    ] ;
+    sh:property [
+        sh:path         :riskScore ;
+        sh:minInclusive 0 ;
+        sh:maxInclusive 100 ;
+        sh:severity     sh:Violation ;
+        sh:message      "riskScore is outside 0-100" ;
+    ] .
+
+# =============================================================================
+# BusinessUnit
+# =============================================================================
+
+:BusinessUnitShape
+    a                sh:NodeShape ;
+    sh:targetClass   :BusinessUnit ;
+
+    sh:property [
+        sh:path      :id ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "BusinessUnit has no id triple" ;
+    ] ;
+    sh:property [
+        sh:path      :name ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "BusinessUnit has no name" ;
+    ] ;
+    sh:property [
+        sh:path      :region ;
+        sh:pattern   "^(AMER|EMEA|APAC)$" ;
+        sh:severity  sh:Violation ;
+        sh:message   "region is not one of AMER, EMEA, APAC" ;
+    ] .
+
+# =============================================================================
+# Invoice
+# =============================================================================
+
+:InvoiceShape
+    a                sh:NodeShape ;
+    sh:targetClass   :Invoice ;
+
+    sh:property [
+        sh:path      :id ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Invoice has no id triple" ;
+    ] ;
+    sh:property [
+        sh:path      :id ;
+        sh:pattern   "^INV-[0-9]{4}$" ;
+        sh:severity  sh:Warning ;
+        sh:message   "Invoice id is not in INV-nnnn form" ;
+    ] ;
+    sh:property [
+        sh:path      :amount ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Invoice has no amount" ;
+    ] ;
+    sh:property [
+        sh:path         :amount ;
+        sh:minExclusive 0 ;
+        sh:severity     sh:Violation ;
+        sh:message      "Invoice amount is zero or negative" ;
+    ] ;
+    sh:property [
+        sh:path      :currency ;
+        sh:pattern   "^EUR$" ;
+        sh:severity  sh:Warning ;
+        sh:message   "Invoice is not in EUR — every amount in this dataset is EUR, so a different code means the source changed and the risk figures are no longer comparable" ;
+    ] ;
+    sh:property [
+        sh:path      :status ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Invoice has no status" ;
+    ] ;
+    sh:property [
+        sh:path      :status ;
+        sh:pattern   "^(paid|open|overdue)$" ;
+        sh:severity  sh:Violation ;
+        sh:message   "status is outside the invoice lifecycle vocabulary (paid, open, overdue)" ;
+    ] ;
+    sh:property [
+        sh:path         :daysLate ;
+        sh:minInclusive 0 ;
+        sh:severity     sh:Violation ;
+        sh:message      "daysLate is negative — early payment is recorded as 0, not as a negative delay" ;
+    ] ;
+    sh:property [
+        sh:path      :billedTo ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "Invoice is not billed to any customer" ;
+    ] ;
+    sh:property [
+        sh:path      :billedTo ;
+        sh:class     :Customer ;
+        sh:severity  sh:Violation ;
+        sh:message   "billedTo points at something that is not a Customer" ;
+    ] .
+
+# =============================================================================
+# RevenueEntry
+# =============================================================================
+
+:RevenueEntryShape
+    a                sh:NodeShape ;
+    sh:targetClass   :RevenueEntry ;
+
+    sh:property [
+        sh:path      :id ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "RevenueEntry has no id triple" ;
+    ] ;
+    sh:property [
+        sh:path      :amount ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "RevenueEntry has no amount" ;
+    ] ;
+    sh:property [
+        sh:path         :amount ;
+        sh:minInclusive 0 ;
+        sh:severity     sh:Violation ;
+        sh:message      "Recognized revenue is negative" ;
+    ] ;
+    sh:property [
+        sh:path      :period ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "RevenueEntry has no accounting period" ;
+    ] ;
+    sh:property [
+        sh:path      :bookedTo ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "RevenueEntry is not booked to any business unit" ;
+    ] ;
+    sh:property [
+        sh:path      :bookedTo ;
+        sh:class     :BusinessUnit ;
+        sh:severity  sh:Violation ;
+        sh:message   "bookedTo points at something that is not a BusinessUnit" ;
+    ] .
+
+# =============================================================================
+# ComplianceFinding
+# =============================================================================
+
+:ComplianceFindingShape
+    a                sh:NodeShape ;
+    sh:targetClass   :ComplianceFinding ;
+
+    sh:property [
+        sh:path      :id ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "ComplianceFinding has no id triple" ;
+    ] ;
+    sh:property [
+        sh:path      :findingType ;
+        sh:pattern   "^(KYC|AML|sanctions)$" ;
+        sh:severity  sh:Violation ;
+        sh:message   "finding type is outside the vocabulary (KYC, AML, sanctions)" ;
+    ] ;
+    sh:property [
+        sh:path      :status ;
+        sh:pattern   "^(open|closed)$" ;
+        sh:severity  sh:Violation ;
+        sh:message   "finding status is neither open nor closed" ;
+    ] ;
+    sh:property [
+        sh:path      :raisedAgainst ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "ComplianceFinding is not raised against any customer" ;
+    ] ;
+    sh:property [
+        sh:path      :raisedAgainst ;
+        sh:class     :Customer ;
+        sh:severity  sh:Violation ;
+        sh:message   "raisedAgainst points at something that is not a Customer" ;
+    ] .
+
+# =============================================================================
+# Reified link classes
+# -----------------------------------------------------------------------------
+# Both ends required and correctly typed on every row: a half-built supply or
+# ownership link silently shortens a path, and both stories are decided by
+# paths.
+# =============================================================================
+
+:SupplyRelationshipShape
+    a                sh:NodeShape ;
+    sh:targetClass   :SupplyRelationship ;
+
+    sh:property [
+        sh:path      :supplyFrom ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "supply link has no supplying end — the path through it is broken" ;
+    ] ;
+    sh:property [
+        sh:path      :supplyFrom ;
+        sh:class     :Supplier ;
+        sh:severity  sh:Violation ;
+        sh:message   "supplyFrom points at something that is not a Supplier" ;
+    ] ;
+    sh:property [
+        sh:path      :supplyTo ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "supply link has no receiving end — the path through it is broken" ;
+    ] ;
+    sh:property [
+        sh:path      :supplyTo ;
+        sh:class     :Supplier ;
+        sh:severity  sh:Violation ;
+        sh:message   "supplyTo points at something that is not a Supplier" ;
+    ] .
+
+:OwnershipStakeShape
+    a                sh:NodeShape ;
+    sh:targetClass   :OwnershipStake ;
+
+    sh:property [
+        sh:path      :stakeOf ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "ownership stake names no owned customer" ;
+    ] ;
+    sh:property [
+        sh:path      :stakeOf ;
+        sh:class     :Customer ;
+        sh:severity  sh:Violation ;
+        sh:message   "stakeOf points at something that is not a Customer" ;
+    ] ;
+    sh:property [
+        sh:path      :stakeHeldBy ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "ownership stake names no owning customer" ;
+    ] ;
+    sh:property [
+        sh:path      :stakeHeldBy ;
+        sh:class     :Customer ;
+        sh:severity  sh:Violation ;
+        sh:message   "stakeHeldBy points at something that is not a Customer" ;
+    ] ;
+    sh:property [
+        sh:path      :ownershipPct ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "ownership stake carries no percentage, so risk cannot be weighted along it (RULE-06)" ;
+    ] ;
+    sh:property [
+        sh:path         :ownershipPct ;
+        sh:minExclusive 0 ;
+        sh:maxInclusive 1 ;
+        sh:severity     sh:Violation ;
+        sh:message      "ownershipPct is outside (0, 1] — it is a fraction, not a percent" ;
+    ] .
+
+# =============================================================================
+# Classification consistency
+# -----------------------------------------------------------------------------
+# These check the output of the reasoning step against the governed threshold
+# it claims to apply, so a drifted or hand-edited classification shows up as a
+# quality violation rather than as a wrong answer in a demo.
+# =============================================================================
+
+:HighRiskSupplierShape
+    a                sh:NodeShape ;
+    sh:targetClass   :HighRiskSupplier ;
+
+    sh:property [
+        sh:path         :riskScore ;
+        sh:minInclusive 70 ;
+        sh:severity     sh:Violation ;
+        sh:message      "classified HighRiskSupplier but riskScore is below the Supplier Risk Threshold of 70 (THR-01 / RULE-04)" ;
+    ] .
+
+:LateInvoiceShape
+    a                sh:NodeShape ;
+    sh:targetClass   :LateInvoice ;
+
+    sh:property [
+        sh:path         :daysLate ;
+        sh:minExclusive 60 ;
+        sh:severity     sh:Violation ;
+        sh:message      "classified LateInvoice but daysLate is not above the Late Payment Threshold of 60 (THR-02)" ;
+    ] .
+
+:DefaultedCustomerShape
+    a                sh:NodeShape ;
+    sh:targetClass   :DefaultedCustomer ;
+
+    sh:property [
+        sh:path      :defaultedPeriod ;
+        sh:minCount  1 ;
+        sh:severity  sh:Violation ;
+        sh:message   "classified DefaultedCustomer but no defaultedPeriod is recorded (RULE-02)" ;
+    ] .
+
+# =============================================================================
+# Graph-wide structural checks
+# -----------------------------------------------------------------------------
+# The two SPARQL shapes the engine translates to native SQL. Both are global:
+# the generated SQL scans every typed subject and ignores sh:targetClass, so
+# they are stated once here rather than repeated per class.
+# =============================================================================
+
+:GraphStructureShape
+    a  sh:NodeShape ;
+
+    sh:sparql [
+        sh:message   "isolated entity: has a type but no relationship in either direction, so no path reaches it and neither the supply nor the ownership story can see it" ;
+        sh:severity  sh:Violation ;
+        sh:select    """
+            SELECT $this
+            WHERE {
+                $this a ?cls .
+                FILTER NOT EXISTS {
+                    { $this ?p ?o . FILTER (?p != <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>) }
+                    UNION
+                    { ?other ?q $this }
+                }
+            }
+        """ ;
+    ] ;
+
+    sh:sparql [
+        sh:message   "missing rdfs:label: the entity was materialized without a display label, so it shows as a bare URI in the graph view" ;
+        sh:severity  sh:Warning ;
+        sh:select    """
+            SELECT $this
+            WHERE {
+                $this a ?cls .
+                FILTER NOT EXISTS { $this <http://www.w3.org/2000/01/rdf-schema#label> ?displayLabel }
+            }
+        """ ;
+    ] .
