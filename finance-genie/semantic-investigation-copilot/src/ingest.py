@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+from dataclasses import asdict
 
 from databricks import sql
 from databricks.sdk.core import Config
@@ -17,6 +19,7 @@ from config import (
     load_demo_env,
     require_env,
 )
+from semantic_graph import load_semantic_graph
 
 
 def databricks_access_token() -> str:
@@ -65,10 +68,16 @@ def main() -> None:
                 value_sample_limit=0,
             )
             connector.ingest(schema=schema)
+        semantic_counts = load_semantic_graph(
+            driver,
+            neo4j_database,
+            embedding_model=require_env("EMBEDDING_MODEL"),
+        )
     finally:
         driver.close()
 
     print(f"Ingested metadata for {catalog}.{schema} with value sampling disabled.")
+    print(json.dumps({"semantic_graph": asdict(semantic_counts)}, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

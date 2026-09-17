@@ -9,7 +9,7 @@ UV ?= uv
 PIPELINE_DIR := enrichment-pipeline
 
 .DEFAULT_GOAL := help
-.PHONY: help demo check data
+.PHONY: help demo graph check data
 
 help:
 	@echo "Finance Genie canonical environment"
@@ -18,6 +18,7 @@ help:
 	@echo "              Creates or reconciles the canonical BEFORE and AFTER Genie"
 	@echo "              spaces, then stores their IDs in the local .env file."
 	@echo "              Does not deploy optional apps, agents, or a Virtual Graph."
+	@echo "  make graph  Rebuild Neo4j and its GDS properties from existing Silver tables."
 	@echo "  make check  Validate Databricks, Neo4j, and the committed fraud dataset."
 	@echo "  make data   Regenerate the local synthetic dataset only."
 	@echo "  make help   Show this message."
@@ -28,6 +29,11 @@ help:
 demo:
 	@echo "==> Building the canonical Finance Genie environment"
 	cd $(PIPELINE_DIR) && $(UV) run python run_existing_data_pipeline.py
+
+graph:
+	@echo "==> Building the Finance Genie graph from existing Silver tables"
+	cd $(PIPELINE_DIR) && PIPELINE_START_STEP=7 PIPELINE_STOP_STEP=8 $(UV) run python run_existing_data_pipeline.py
+	cd $(PIPELINE_DIR) && PIPELINE_START_STEP=10 PIPELINE_STOP_STEP=12 $(UV) run python run_existing_data_pipeline.py
 
 check:
 	@echo "==> Validating the canonical Finance Genie environment"

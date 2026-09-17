@@ -6,12 +6,38 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 DEMO_DIR = Path(__file__).resolve().parents[1]
 ENV_FILE = DEMO_DIR / ".env"
+ENV_CONTRACT_NAMES = frozenset(
+    {
+        "DATABRICKS_CATALOG",
+        "DATABRICKS_HOST",
+        "DATABRICKS_HTTP_PATH",
+        "DATABRICKS_PROFILE",
+        "DATABRICKS_SCHEMA",
+        "DATABRICKS_SERVER_HOSTNAME",
+        "DATABRICKS_TOKEN",
+        "DATABRICKS_WAREHOUSE_ID",
+        "EMBEDDING_MODEL",
+        "NEO4J_DATABASE",
+        "NEO4J_PASSWORD",
+        "NEO4J_URI",
+        "NEO4J_USERNAME",
+        "NEOCARTA_ALLOW_REMOTE_STORE",
+    }
+)
+AMBIENT_CONNECTION_NAMES = frozenset(
+    {
+        "DATABRICKS_API_BASE",
+        "DATABRICKS_API_KEY",
+        "DATABRICKS_CONFIG_PROFILE",
+        "EMBEDDING_DIMENSIONS",
+    }
+)
 OPERATIONAL_GRAPH_LABELS = ["Account", "Customer", "Phone", "Address"]
-OPERATIONAL_GRAPH_QUERY = """
+OPERATIONAL_GRAPH_QUERY = """CYPHER 25
 MATCH (node)
 WHERE any(node_label IN labels(node) WHERE node_label IN $operational_labels)
 RETURN count(node) AS operational_node_count
@@ -22,7 +48,18 @@ def load_demo_env() -> Path:
     """Load the demo-local environment file as the prototype's source of truth."""
     if not ENV_FILE.is_file():
         raise RuntimeError(f"Missing {ENV_FILE}. Copy .env.example and fill in local values.")
-    load_dotenv(ENV_FILE, override=True)
+
+    values = dotenv_values(ENV_FILE, interpolate=False)
+    unknown_names = set(values).difference(ENV_CONTRACT_NAMES)
+    if unknown_names:
+        raise RuntimeError(f"Unsupported variables in {ENV_FILE}: {sorted(unknown_names)}")
+
+    for name in ENV_CONTRACT_NAMES | AMBIENT_CONNECTION_NAMES:
+        os.environ.pop(name, None)
+    for name, value in values.items():
+        if value is not None:
+            os.environ[name] = value
+
     profile = os.getenv("DATABRICKS_PROFILE", "").strip()
     if profile:
         os.environ["DATABRICKS_CONFIG_PROFILE"] = profile

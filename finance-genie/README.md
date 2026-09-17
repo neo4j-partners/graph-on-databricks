@@ -32,6 +32,19 @@ deliberately want a new dataset.
 Neo4j graph. Run `make check` for the read-only Databricks, Neo4j, and data
 preflight.
 
+If you are using an existing Lakehouse where the Finance Genie Silver tables
+are already available, you can build only the Neo4j graph and its GDS
+properties:
+
+```bash
+make graph
+```
+
+This reuses the existing Silver tables and skips Lakehouse table creation,
+Gold table generation, and Genie evaluation. Databricks authentication and job
+compute still need to be configured because the graph ingest reads the Silver
+tables through a Databricks job.
+
 This setup deliberately does **not** deploy an optional product. The MCP agent
 needs external OAuth credentials and a serving endpoint; the Fraud Signal
 Workbench needs an app deployment and service-principal grants; the Virtual

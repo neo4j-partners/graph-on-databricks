@@ -13,10 +13,14 @@ dependencies = [
 ]
 
 [project.scripts]
+finance-semantic-demo = "demo_trace:main"
 finance-semantic-ingest = "ingest:main"
 finance-semantic-mcp = "mcp_server:main"
+finance-semantic-validate-demo = "validate_demo:main"
 finance-semantic-validate-embeddings = "validate_embeddings:main"
+finance-semantic-validate-graph = "validate_semantic:main"
 finance-semantic-validate-mcp = "validate_mcp:main"
+finance-semantic-validate-sources = "validate_sources:main"
 finance-semantic-validate-store = "validate_store:main"
 
 [dependency-groups]
@@ -26,16 +30,23 @@ dev = [
 ]
 
 [tool.uv.sources]
-neocarta = { path = "../../../../neo4j-labs/neocarta", editable = true }
+neocarta = { git = "https://github.com/neo4j-labs/neocarta.git", rev = "ba6bf7945bf9c60640c664a03ccc26d0013996bf" }
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 py-modules = [
+    "business_context",
     "config",
+    "demo_trace",
     "ingest",
     "mcp_server",
+    "runtime_contract",
+    "semantic_graph",
+    "validate_demo",
     "validate_embeddings",
     "validate_mcp",
+    "validate_semantic",
+    "validate_sources",
     "validate_store",
 ]
 

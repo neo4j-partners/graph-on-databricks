@@ -22,7 +22,7 @@
     "tool": "get_business_concept_context",
     "input": "A business concept or natural-language phrase.",
     "output": "The matched definition plus Databricks table/column mappings and Neo4j label/relationship/property paths.",
-    "implementation_phase": 3
+    "implementation": "semantic_graph"
   },
   "guardrails": [
     "Store schema names, descriptions, and mappings only.",

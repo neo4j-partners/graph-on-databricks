@@ -1,11 +1,14 @@
-"""Contract tests for the Phase 1 semantic mappings."""
+"""Contract tests for the semantic source mappings."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+from validate_sources import load_json, validate_evidence_coverage
+
 MAPPINGS = Path(__file__).parents[1] / "mappings" / "semantic-mappings.json"
+EVIDENCE = Path(__file__).parents[1] / "validation" / "source-mapping-validation.json"
 
 
 def test_mapping_contract_has_five_concepts_and_one_primary() -> None:
@@ -32,3 +35,7 @@ def test_shared_identity_maps_both_sources() -> None:
     assert "identity_cluster_size" in shared_identity["databricks"]["columns"]
     assert "Customer" in shared_identity["neo4j"]["node_labels"]
     assert "CLASSIFIED_AS" in shared_identity["neo4j"]["relationship_types"]
+
+
+def test_source_evidence_covers_every_mapping_claim() -> None:
+    validate_evidence_coverage(load_json(MAPPINGS), load_json(EVIDENCE))

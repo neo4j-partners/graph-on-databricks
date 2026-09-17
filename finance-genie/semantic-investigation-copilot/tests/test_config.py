@@ -66,6 +66,48 @@ def test_demo_env_overrides_ambient_values(monkeypatch: pytest.MonkeyPatch, tmp_
     assert config.require_env("NEO4J_URI") == "bolt://127.0.0.1:17687"
 
 
+def test_demo_env_clears_optional_ambient_connection_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "DATABRICKS_HOST=https://dbc-example.cloud.databricks.com\n"
+        "DATABRICKS_PROFILE=demo-profile\n"
+    )
+    monkeypatch.setattr(config, "ENV_FILE", env_file)
+    for name in (
+        "DATABRICKS_API_BASE",
+        "DATABRICKS_API_KEY",
+        "DATABRICKS_HTTP_PATH",
+        "DATABRICKS_SERVER_HOSTNAME",
+        "DATABRICKS_TOKEN",
+        "EMBEDDING_DIMENSIONS",
+    ):
+        monkeypatch.setenv(name, "ambient-value")
+
+    load_demo_env()
+
+    for name in (
+        "DATABRICKS_API_BASE",
+        "DATABRICKS_API_KEY",
+        "DATABRICKS_HTTP_PATH",
+        "DATABRICKS_SERVER_HOSTNAME",
+        "DATABRICKS_TOKEN",
+        "EMBEDDING_DIMENSIONS",
+    ):
+        assert name not in config.os.environ
+    assert config.os.environ["DATABRICKS_CONFIG_PROFILE"] == "demo-profile"
+
+
+def test_demo_env_rejects_unknown_variables(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("UNKNOWN_SETTING=value\n")
+    monkeypatch.setattr(config, "ENV_FILE", env_file)
+
+    with pytest.raises(RuntimeError, match="UNKNOWN_SETTING"):
+        load_demo_env()
+
+
 def test_accepts_metadata_only_graph() -> None:
     assert_no_operational_graph_nodes(StubDriver(0), "neo4j")
 

@@ -620,7 +620,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "neocarta", extras = ["cli", "databricks", "mcp"], editable = "../../../../neo4j-labs/neocarta" }]
+requires-dist = [{ name = "neocarta", extras = ["cli", "databricks", "mcp"], git = "https://github.com/neo4j-labs/neocarta.git?rev=ba6bf7945bf9c60640c664a03ccc26d0013996bf" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1490,7 +1490,7 @@ wheels = [
 [[package]]
 name = "neocarta"
 version = "0.8.1"
-source = { editable = "../../../../neo4j-labs/neocarta" }
+source = { git = "https://github.com/neo4j-labs/neocarta.git?rev=ba6bf7945bf9c60640c664a03ccc26d0013996bf#ba6bf7945bf9c60640c664a03ccc26d0013996bf" }
 dependencies = [
     { name = "google-cloud-bigquery", extra = ["pandas"] },
     { name = "google-cloud-bigquery-storage" },
@@ -1519,55 +1519,6 @@ mcp = [
     { name = "fastmcp" },
     { name = "mcp" },
     { name = "pydantic-settings" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", marker = "extra == 'cli'", specifier = ">=8.1.0" },
-    { name = "databricks-sdk", marker = "extra == 'databricks'", specifier = ">=0.118.0" },
-    { name = "databricks-sql-connector", marker = "extra == 'databricks'", specifier = ">=3.0.0" },
-    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=2.14.4,<3" },
-    { name = "google-cloud-bigquery", extras = ["pandas"], specifier = ">=3.40.0" },
-    { name = "google-cloud-bigquery-storage", specifier = ">=2.36.2" },
-    { name = "google-cloud-dataplex", specifier = ">=2.16.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "litellm", specifier = ">=1.55.0" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.26.0" },
-    { name = "neo4j", specifier = ">=6.1.0" },
-    { name = "neo4j-rust-ext", marker = "extra == 'performance'", specifier = ">=6.2.0.0" },
-    { name = "openai", specifier = ">=2.15.0" },
-    { name = "pandas", specifier = ">=2.0.0,<3" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pydantic-settings", marker = "extra == 'cli'", specifier = ">=2.12.0" },
-    { name = "pydantic-settings", marker = "extra == 'mcp'", specifier = ">=2.12.0" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
-    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0.0" },
-    { name = "snowflake-connector-python", extras = ["pandas"], marker = "extra == 'snowflake'", specifier = ">=3.12.0" },
-    { name = "sqlglot", specifier = ">=28.10.1" },
-]
-provides-extras = ["performance", "mcp", "cli", "databricks", "snowflake"]
-
-[package.metadata.requires-dev]
-agent = [
-    { name = "google-cloud-bigquery", specifier = ">=3.40.0" },
-    { name = "langchain", specifier = ">=1.2.7" },
-    { name = "langchain-litellm", specifier = ">=0.2.4" },
-    { name = "langchain-mcp-adapters", specifier = ">=0.2.1" },
-    { name = "langchain-openai", specifier = ">=1.1.7" },
-    { name = "langgraph", specifier = ">=1.0.7" },
-]
-dev = [
-    { name = "coverage", extras = ["toml"], specifier = ">=7.15.2" },
-    { name = "ipykernel", specifier = ">=7.1.0" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
-    { name = "ruff", specifier = ">=0.15.10" },
-    { name = "testcontainers", extras = ["neo4j", "postgres"], specifier = ">=4.14.2" },
-]
-eval = [
-    { name = "fastmcp", specifier = ">=2.14.4" },
-    { name = "mcp", specifier = ">=1.26.0" },
-    { name = "tiktoken", specifier = ">=0.12.0" },
 ]
 
 [[package]]
