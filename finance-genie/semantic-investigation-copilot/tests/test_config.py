@@ -11,6 +11,8 @@ from config import (
     databricks_http_path,
     databricks_server_hostname,
     load_demo_env,
+    optional_bool_env,
+    source_neo4j_connection,
 )
 
 
@@ -42,6 +44,18 @@ def test_rejects_nonlocal_semantic_store(monkeypatch: pytest.MonkeyPatch) -> Non
         assert_semantic_store_target()
 
 
+def test_optional_bool_env_is_strict(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DATABRICKS_INGEST_GOVERNED_TAGS", raising=False)
+    assert not optional_bool_env("DATABRICKS_INGEST_GOVERNED_TAGS")
+
+    monkeypatch.setenv("DATABRICKS_INGEST_GOVERNED_TAGS", "yes")
+    assert optional_bool_env("DATABRICKS_INGEST_GOVERNED_TAGS")
+
+    monkeypatch.setenv("DATABRICKS_INGEST_GOVERNED_TAGS", "sometimes")
+    with pytest.raises(RuntimeError, match="must be one of"):
+        optional_bool_env("DATABRICKS_INGEST_GOVERNED_TAGS")
+
+
 def test_accepts_local_semantic_store(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NEO4J_URI", "bolt://127.0.0.1:17687")
 
@@ -53,6 +67,24 @@ def test_accepts_approved_remote_semantic_store(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("NEOCARTA_ALLOW_REMOTE_STORE", "true")
 
     assert_semantic_store_target()
+
+
+def test_rejects_operational_source_equal_to_semantic_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    source_env = tmp_path / "source.env"
+    source_env.write_text(
+        "NEO4J_URI=bolt://127.0.0.1:17687\n"
+        "NEO4J_USERNAME=reader\n"
+        "NEO4J_PASSWORD=secret\n"
+        "NEO4J_DATABASE=neo4j\n"
+    )
+    monkeypatch.setattr(config, "SOURCE_ENV_FILE", source_env)
+    monkeypatch.setenv("NEO4J_URI", "bolt://127.0.0.1:17687")
+    monkeypatch.setenv("NEO4J_DATABASE", "neo4j")
+
+    with pytest.raises(RuntimeError, match="same Neo4j database"):
+        source_neo4j_connection()
 
 
 def test_demo_env_overrides_ambient_values(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

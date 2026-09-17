@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -10,11 +11,13 @@ from dotenv import dotenv_values
 
 DEMO_DIR = Path(__file__).resolve().parents[1]
 ENV_FILE = DEMO_DIR / ".env"
+SOURCE_ENV_FILE = DEMO_DIR.parent / ".env"
 ENV_CONTRACT_NAMES = frozenset(
     {
         "DATABRICKS_CATALOG",
         "DATABRICKS_HOST",
         "DATABRICKS_HTTP_PATH",
+        "DATABRICKS_INGEST_GOVERNED_TAGS",
         "DATABRICKS_PROFILE",
         "DATABRICKS_SCHEMA",
         "DATABRICKS_SERVER_HOSTNAME",
@@ -42,6 +45,16 @@ MATCH (node)
 WHERE any(node_label IN labels(node) WHERE node_label IN $operational_labels)
 RETURN count(node) AS operational_node_count
 """
+
+
+@dataclass(frozen=True)
+class SourceNeo4jConnection:
+    """Read-only connection details for the Finance Genie operational graph."""
+
+    uri: str
+    username: str
+    password: str
+    database: str
 
 
 def load_demo_env() -> Path:
@@ -72,6 +85,46 @@ def require_env(name: str) -> str:
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
+
+
+def source_neo4j_connection() -> SourceNeo4jConnection:
+    """Return the Finance Genie root environment's operational Neo4j connection."""
+    if not SOURCE_ENV_FILE.is_file():
+        raise RuntimeError(f"Missing {SOURCE_ENV_FILE}. Configure the Finance Genie source first.")
+    values = dotenv_values(SOURCE_ENV_FILE, interpolate=False)
+
+    def source_value(name: str, *, default: str | None = None) -> str:
+        value = str(values.get(name) or default or "").strip()
+        if not value:
+            raise RuntimeError(f"Missing {name} in {SOURCE_ENV_FILE}")
+        return value
+
+    connection = SourceNeo4jConnection(
+        uri=source_value("NEO4J_URI"),
+        username=source_value("NEO4J_USERNAME"),
+        password=source_value("NEO4J_PASSWORD"),
+        database=source_value("NEO4J_DATABASE", default="neo4j"),
+    )
+    if connection.uri == require_env("NEO4J_URI") and connection.database == require_env(
+        "NEO4J_DATABASE"
+    ):
+        raise RuntimeError(
+            "The Finance Genie source and semantic-store environments identify the same "
+            "Neo4j database. Configure them as distinct databases."
+        )
+    return connection
+
+
+def optional_bool_env(name: str, *, default: bool = False) -> bool:
+    """Read an optional boolean environment value with strict validation."""
+    value = os.getenv(name, "").strip().lower()
+    if not value:
+        return default
+    if value in {"1", "true", "yes"}:
+        return True
+    if value in {"0", "false", "no"}:
+        return False
+    raise RuntimeError(f"{name} must be one of true, false, yes, no, 1, or 0")
 
 
 def databricks_server_hostname() -> str:

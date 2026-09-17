@@ -11,7 +11,7 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from config import DEMO_DIR, load_demo_env, require_env
+from config import DEMO_DIR, load_demo_env, require_env, source_neo4j_connection
 from runtime_contract import EXPECTED_TABLES, KNOWN_COLUMN, KNOWN_TABLE
 
 
@@ -34,14 +34,6 @@ def parse_tool_result(result: Any) -> list[dict[str, Any]]:
     return payload
 
 
-def parse_tool_object(result: Any) -> dict[str, Any]:
-    """Parse an object payload returned by a demo-specific MCP tool."""
-    payload = parse_tool_payload(result)
-    if not isinstance(payload, dict):
-        raise TypeError("Demo MCP tool returned a non-object payload")
-    return payload
-
-
 def records_for_source(
     records: list[dict[str, Any]], catalog: str, schema: str
 ) -> list[dict[str, Any]]:
@@ -58,6 +50,7 @@ async def validate() -> dict[str, Any]:
     load_demo_env()
     catalog_name = require_env("DATABRICKS_CATALOG")
     schema_name = require_env("DATABRICKS_SCHEMA")
+    source_database = source_neo4j_connection().database
     server = StdioServerParameters(
         command=sys.executable,
         args=["-m", "mcp_server"],
@@ -74,23 +67,32 @@ async def validate() -> dict[str, Any]:
         tool_names = sorted(tool.name for tool in listed_tools.tools)
 
         expected_tools = {
-            "get_business_concept_context",
             "get_context_by_column_full_text_search",
             "get_context_by_table_full_text_search",
             "get_full_metadata_schema",
+            "get_neo4j_schema_context",
             "list_schemas",
             "list_tables_by_schema",
         }
         missing_tools = expected_tools.difference(tool_names)
         if missing_tools:
             raise RuntimeError(f"Required MCP tools were not registered: {sorted(missing_tools)}")
+        if "get_business_concept_context" in tool_names:
+            raise RuntimeError("Custom business-context retrieval must not be registered")
+
+        schema_context = parse_tool_payload(await session.call_tool("get_neo4j_schema_context", {}))
+        if not isinstance(schema_context, dict) or not schema_context.get("nodes"):
+            raise RuntimeError("MCP Neo4j schema-context retrieval returned no canonical metadata")
 
         schemas = parse_tool_result(await session.call_tool("list_schemas", {}))
         schema_sources = {(record["database_name"], record["schema_name"]) for record in schemas}
-        expected_source = {(catalog_name, schema_name)}
-        if schema_sources != expected_source:
+        expected_sources = {
+            (catalog_name, schema_name),
+            (source_database, "default"),
+        }
+        if schema_sources != expected_sources:
             raise RuntimeError(
-                f"MCP schema inventory changed: expected {expected_source}, "
+                f"MCP schema inventory changed: expected {expected_sources}, "
                 f"received {schema_sources}"
             )
 
@@ -142,42 +144,18 @@ async def validate() -> dict[str, Any]:
                 f"MCP column full-text lookup did not find catalog-qualified {KNOWN_COLUMN}"
             )
 
-        concept_context = parse_tool_object(
-            await session.call_tool(
-                "get_business_concept_context",
-                {"text_content": "shared identity", "max_results": 5},
-            )
-        )
-        matches = concept_context.get("matches", [])
-        if not matches or matches[0].get("concept_id") != "shared_identity":
-            raise RuntimeError("Business-concept retrieval did not rank shared_identity first")
-        if concept_context.get("retrieval_mode") != "vector":
-            raise RuntimeError("Business-concept retrieval did not use the vector index")
-        shared_identity = matches[0]
-        expected_table = f"{catalog_name}.{schema_name}.{KNOWN_TABLE}"
-        expected_column = f"{expected_table}.{KNOWN_COLUMN}"
-        if expected_table not in shared_identity.get("databricks", {}).get("tables", []):
-            raise RuntimeError("Shared-identity context omitted the mapped Databricks table")
-        if expected_column not in shared_identity.get("databricks", {}).get("columns", []):
-            raise RuntimeError("Shared-identity context omitted the mapped Databricks column")
-        graph_context = shared_identity.get("neo4j", {})
-        if "Customer" not in graph_context.get("node_labels", []):
-            raise RuntimeError("Shared-identity context omitted the Customer graph label")
-        if not graph_context.get("paths"):
-            raise RuntimeError("Shared-identity context omitted the operational graph paths")
-
     return {
         "status": "passed",
         "transport": "stdio",
         "registered_tools": tool_names,
         "catalog": catalog_name,
         "schema": schema_name,
+        "neo4j_schema": {"database": source_database, "schema": "default"},
         "catalog_table_count": len(table_names),
         "full_schema_table_count": len(qualified_schema),
+        "neo4j_schema_node_count": len(schema_context["nodes"]),
         "table_full_text_hit": KNOWN_TABLE,
         "column_full_text_hit": KNOWN_COLUMN,
-        "business_concept": "shared_identity",
-        "business_concept_retrieval": concept_context["retrieval_mode"],
     }
 
 

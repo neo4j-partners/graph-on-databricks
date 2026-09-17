@@ -29,6 +29,7 @@ UNWIND ['__neocarta_graph__', 'Database', 'Schema', 'Table', 'Column', 'Value'] 
 CALL (label) {
   MATCH (n)
   WHERE label IN labels(n)
+    AND (NOT (label IN ['Database', 'Schema']) OR n.source_scope IS NULL)
   RETURN count(n) AS count
 }
 RETURN label, count
@@ -38,8 +39,9 @@ ORDER BY label
 RELATIONSHIP_COUNTS_QUERY = """CYPHER 25
 UNWIND ['HAS_SCHEMA', 'HAS_TABLE', 'HAS_COLUMN', 'HAS_VALUE', 'REFERENCES'] AS rel_type
 CALL (rel_type) {
-  MATCH ()-[r]->()
+  MATCH (source)-[r]->()
   WHERE type(r) = rel_type
+    AND (rel_type <> 'HAS_SCHEMA' OR source.source_scope IS NULL)
   RETURN count(r) AS count
 }
 RETURN rel_type, count

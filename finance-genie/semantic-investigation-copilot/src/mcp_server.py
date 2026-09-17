@@ -1,21 +1,20 @@
-"""Start Neocarta's stdio MCP server with the demo-local environment."""
+"""Start Neocarta's standard stdio MCP server with the demo-local environment."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 
-from config import assert_semantic_store_target, load_demo_env
+from config import assert_semantic_store_target, load_demo_env, source_neo4j_connection
+from neo4j_schema_map import register_schema_context_tool, source_scope
 
 
 async def run_server() -> None:
-    """Create Neocarta's server and add the demo business-concept tool."""
+    """Create and run Neocarta's standard catalog server."""
     from neo4j import AsyncGraphDatabase, NotificationMinimumSeverity
     from neocarta._mcp.embeddings import create_embedder
     from neocarta._mcp.server import create_mcp_server
     from neocarta._mcp.settings import mcp_server_settings
-
-    from business_context import register
 
     # Neocarta intentionally probes optional OSI, value, and aspect schema
     # elements. Neo4j logs the expected absences as full-query warnings.
@@ -32,7 +31,12 @@ async def run_server() -> None:
         database = mcp_server_settings.neo4j_database
         embedder = create_embedder(driver, database)
         server = await create_mcp_server(driver, database, embedder)
-        register(server, driver, database, embedder)
+        register_schema_context_tool(
+            server,
+            driver,
+            database,
+            source_scope(source_neo4j_connection()),
+        )
         await server.run_stdio_async()
     finally:
         await driver.close()

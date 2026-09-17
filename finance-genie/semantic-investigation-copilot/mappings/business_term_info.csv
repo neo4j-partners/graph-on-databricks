@@ -1,6 +1,0 @@
-glossary_name,category_name,category_id,term_name,business_term_id,name,description
-finance_investigation,investigation_signals,finance_investigation.investigation_signals,shared_identity,shared_identity,Shared identity,Customers connected into one identity cluster through a shared phone number or mailing address.
-finance_investigation,investigation_signals,finance_investigation.investigation_signals,kyc_review_candidate,kyc_review_candidate,KYC review candidate,An account whose owning customer belongs to a shared-identity cluster containing more than one customer.
-finance_investigation,investigation_signals,finance_investigation.investigation_signals,transfer_exposure,transfer_exposure,Transfer exposure,Directed account-to-account money movement and the accounts exposed through those transfers.
-finance_investigation,investigation_signals,finance_investigation.investigation_signals,fraud_ring_candidate,fraud_ring_candidate,Fraud-ring candidate,An account or community whose transfer topology and graph-derived scores meet the configured ring-candidate thresholds.
-finance_investigation,investigation_signals,finance_investigation.investigation_signals,high_risk,high_risk,High risk,"The lakehouse risk tier assigned from ring-community membership, supported by graph centrality and community evidence."
