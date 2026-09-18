@@ -9,10 +9,10 @@ account never tries to render the whole graph.
 from __future__ import annotations
 
 import streamlit as st
-import streamlit.components.v1 as components
 from neo4j import Driver, RoutingControl
 from neo4j_viz import ColorSpace
 from neo4j_viz.neo4j import from_neo4j
+from neo4j_viz.streamlit import display_widget
 
 import semantic_map
 from app_connections import GraphConnection
@@ -119,7 +119,7 @@ def render_data_subgraph(result, height: int = 480) -> int:
         vg.color_nodes(property="risk_score", color_space=ColorSpace.CONTINUOUS)
     else:
         vg.color_nodes(field="caption")
-    components.html(vg.render(height=f"{height}px").data, height=height + 20, scrolling=False)
+    display_widget(vg.render_widget(height=f"{height}px"), key="operational-data-subgraph")
     return len(vg.nodes)
 
 
@@ -186,6 +186,7 @@ def render(operational_graph: GraphConnection, semantic_store: GraphConnection) 
         database,
         semantic_map.GRAPH_MAP_QUERY,
         {"scope": scope},
+        key="operational-map",
         hidden_labels=hidden_labels,
         hidden_relationship_types=hidden_relationship_types,
         is_traced_node=is_traced,

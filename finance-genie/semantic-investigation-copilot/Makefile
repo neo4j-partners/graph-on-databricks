@@ -13,6 +13,7 @@
 	neo4j-up \
 	test \
 	validate \
+	validate-ask \
 	validate-embeddings \
 	validate-mcp \
 	validate-neo4j-schema
@@ -54,6 +55,9 @@ neo4j-schema-context:
 
 validate:
 	uv run finance-semantic-validate-store
+
+validate-ask:
+	uv run finance-semantic-validate-ask
 
 validate-embeddings:
 	uv run finance-semantic-validate-embeddings

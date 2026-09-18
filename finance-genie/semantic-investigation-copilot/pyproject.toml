@@ -22,6 +22,7 @@ finance-semantic-mcp = "mcp_server:main"
 finance-semantic-neo4j-schema-context = "neo4j_schema_map:context_main"
 finance-semantic-neo4j-schema-ingest = "neo4j_schema_map:main"
 finance-semantic-query = "query_semantic_map:main"
+finance-semantic-validate-ask = "validate_ask:main"
 finance-semantic-validate-embeddings = "validate_embeddings:main"
 finance-semantic-validate-mcp = "validate_mcp:main"
 finance-semantic-validate-neo4j-schema = "validate_neo4j_schema:main"
@@ -55,6 +56,7 @@ py-modules = [
     "query_semantic_map",
     "runtime_contract",
     "semantic_map",
+    "validate_ask",
     "validate_embeddings",
     "validate_mcp",
     "validate_neo4j_schema",

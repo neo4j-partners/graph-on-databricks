@@ -28,7 +28,10 @@ FAILURE_STATES = frozenset({"FAILED", "CANCELED", "CLOSED"})
 POLL_TIMEOUT_SECONDS = 180
 DATABRICKS_CLI_TIMEOUT_SECONDS = 65
 RESULT_ROW_LIMIT = 10
-DEFAULT_SHOWCASE_QUESTION = "Which fraud rings share an identity cluster?"
+DEFAULT_SHOWCASE_QUESTION = (
+    "Which accounts act as the biggest bridges between other accounts, "
+    "by betweenness centrality?"
+)
 
 ANSI_RESET = "\033[0m"
 ANSI_BOLD_CYAN = "\033[1;36m"

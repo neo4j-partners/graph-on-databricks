@@ -160,6 +160,7 @@ def render(warehouse: WarehouseCredentials, semantic_store: GraphConnection) -> 
         database,
         semantic_map.LAKEHOUSE_MAP_QUERY,
         {"catalog": warehouse.catalog, "schema": warehouse.schema},
+        key="lakehouse-map",
         hidden_labels=hidden_labels,
         hidden_relationship_types=hidden_relationship_types,
         is_traced_node=is_traced,

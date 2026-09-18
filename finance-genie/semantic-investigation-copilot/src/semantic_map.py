@@ -77,6 +77,7 @@ def render_map(
     query: str,
     params: Mapping[str, Any],
     *,
+    key: str,
     hidden_labels: Iterable[str] = (),
     hidden_relationship_types: Iterable[str] = (),
     is_traced_node: Callable[[dict[str, Any]], bool] = lambda properties: False,
@@ -88,7 +89,9 @@ def render_map(
     `extra_relationships` is a sequence of (source domain id, relationship
     kind, target domain id) triples added on top of the query result; the
     Lakehouse page uses it to roll REFERENCES up to table level when columns
-    are hidden. Returns the rendered (node_count, relationship_count).
+    are hidden. `key` must be a stable, unique Streamlit key so the widget's
+    layout choice survives reruns (and so the Lakehouse and Operational graph
+    maps don't collide). Returns the rendered (node_count, relationship_count).
     """
     result = driver.execute_query(
         query,
@@ -167,6 +170,6 @@ def render_map(
         else:
             rel.color = DIMMED_COLOR
 
-    html = vg.render(height=f"{height}px").data
-    components.html(html, height=height + 20, scrolling=False)
+    widget = vg.render_widget(height=f"{height}px")
+    display_widget(widget, key=key)
     return len(vg.nodes), len(vg.relationships)

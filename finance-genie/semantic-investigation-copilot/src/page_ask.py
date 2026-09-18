@@ -17,7 +17,7 @@ import query_generation
 from app_connections import GraphConnection, WarehouseCredentials, open_warehouse_connection
 
 PRESETS = (
-    "Which fraud rings share an identity cluster?",
+    "Which accounts act as the biggest bridges between other accounts, by betweenness centrality?",
     "Which accounts moved money to a high-risk account?",
     "Where do identity clusters cross regions?",
 )
