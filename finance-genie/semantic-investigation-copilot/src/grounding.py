@@ -30,11 +30,18 @@ class GroundingRow:
     retrieved: bool
 
 
+def _bare_name(name: str) -> str:
+    """Strip a table qualifier so `table.column` matches the bare retrieved name."""
+    return name.rsplit(".", 1)[-1]
+
+
 def ground(declared: list[DeclaredIdentifier], retrieved_names: set[str]) -> list[GroundingRow]:
     """Check each declared identifier for set membership in the retrieved names."""
     return [
         GroundingRow(
-            name=item.name, source_tool=item.source_tool, retrieved=item.name in retrieved_names
+            name=item.name,
+            source_tool=item.source_tool,
+            retrieved=item.name in retrieved_names or _bare_name(item.name) in retrieved_names,
         )
         for item in declared
     ]

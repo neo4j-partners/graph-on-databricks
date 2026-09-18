@@ -142,7 +142,12 @@ def render_map(
             traced_ids.add(rel.target)
 
     for node in vg.nodes:
-        node.caption = node.properties.get("name") or node.properties.get("type") or node.caption
+        node.caption = (
+            node.properties.get("name")
+            or node.properties.get("label")
+            or node.properties.get("type")
+            or node.caption
+        )
         if node.id in traced_ids:
             node.size = TRACED_SIZE
         else:
