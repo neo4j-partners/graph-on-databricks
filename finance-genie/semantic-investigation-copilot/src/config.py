@@ -24,6 +24,7 @@ ENV_CONTRACT_NAMES = frozenset(
         "DATABRICKS_TOKEN",
         "DATABRICKS_WAREHOUSE_ID",
         "EMBEDDING_MODEL",
+        "LLM_ENDPOINT_NAME",
         "NEO4J_DATABASE",
         "NEO4J_PASSWORD",
         "NEO4J_URI",
@@ -146,6 +147,17 @@ def databricks_http_path() -> str:
     if explicit:
         return explicit
     return f"/sql/1.0/warehouses/{require_env('DATABRICKS_WAREHOUSE_ID')}"
+
+
+def databricks_workspace_url() -> str:
+    """Return the workspace base URL for SDK and OpenAI-compatible clients."""
+    host = require_env("DATABRICKS_HOST")
+    return host if "://" in host else f"https://{host}"
+
+
+def llm_endpoint_name() -> str:
+    """Return the configured Foundation Model serving endpoint name."""
+    return require_env("LLM_ENDPOINT_NAME")
 
 
 def assert_semantic_store_target() -> None:

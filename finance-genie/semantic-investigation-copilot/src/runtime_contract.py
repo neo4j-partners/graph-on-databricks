@@ -45,6 +45,7 @@ EXPECTED_INDEXES = {
     "column_full_text_index": ("FULLTEXT", "ONLINE"),
     "column_id_constraint": ("RANGE", "ONLINE"),
     "column_name_index": ("RANGE", "ONLINE"),
+    "column_vector_index": ("VECTOR", "ONLINE"),
     "database_id_constraint": ("RANGE", "ONLINE"),
     "database_name_index": ("RANGE", "ONLINE"),
     "schema_full_text_index": ("FULLTEXT", "ONLINE"),
@@ -53,6 +54,12 @@ EXPECTED_INDEXES = {
     "table_full_text_index": ("FULLTEXT", "ONLINE"),
     "table_id_constraint": ("RANGE", "ONLINE"),
     "table_name_index": ("RANGE", "ONLINE"),
+    "table_vector_index": ("VECTOR", "ONLINE"),
+}
+
+EXPECTED_VECTOR_INDEXES = {
+    "column_vector_index": "Column",
+    "table_vector_index": "Table",
 }
 
 EXPECTED_CONSTRAINTS = {

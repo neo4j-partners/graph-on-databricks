@@ -178,6 +178,14 @@ def canonical_labels(labels: tuple[str, ...]) -> tuple[str, ...]:
     return labels or ("<unlabeled>",)
 
 
+def normalize_relationship_type(value: object) -> str:
+    """Strip the source's `:TYPE` or `` :`TYPE` `` formatting down to the bare type name."""
+    text = str(value).strip().removeprefix(":")
+    if text.startswith("`") and text.endswith("`"):
+        text = text[1:-1]
+    return text
+
+
 def property_type(value: object) -> str | None:
     """Render a source-reported property type union without inferring a type."""
     if not isinstance(value, Iterable) or isinstance(value, (bytes, str)):
@@ -280,7 +288,7 @@ def build_schema_map(
         if str(row["relationshipType"])
     }
     relationship_types.update(
-        str(row["relType"]).removeprefix(":")
+        normalize_relationship_type(row["relType"])
         for row in metadata["relationship_properties"]
         if str(row["relType"])
     )
@@ -323,7 +331,7 @@ def build_schema_map(
         properties.append(property_row)
         edges.add((owner_id, "HAS_PROPERTY", property_id))
     for row in metadata["relationship_properties"]:
-        relationship_type = str(row["relType"]).removeprefix(":")
+        relationship_type = normalize_relationship_type(row["relType"])
         owner_id = relationship_ids[relationship_type]
         property_name = str(row["propertyName"])
         property_id = scoped_id(scope, "relationship-property", owner_id, property_name)

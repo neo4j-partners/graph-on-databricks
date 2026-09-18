@@ -9,14 +9,19 @@ description = "Local Neocarta prototype for the Finance Genie semantic investiga
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "neo4j-viz>=1.8.0",
     "neocarta[cli,databricks,mcp]",
+    "openai>=2.54.0",
+    "streamlit>=1.64.0",
 ]
 
 [project.scripts]
+finance-semantic-embeddings = "embeddings:main"
 finance-semantic-ingest = "ingest:main"
 finance-semantic-mcp = "mcp_server:main"
 finance-semantic-neo4j-schema-context = "neo4j_schema_map:context_main"
 finance-semantic-neo4j-schema-ingest = "neo4j_schema_map:main"
+finance-semantic-query = "query_semantic_map:main"
 finance-semantic-validate-embeddings = "validate_embeddings:main"
 finance-semantic-validate-mcp = "validate_mcp:main"
 finance-semantic-validate-neo4j-schema = "validate_neo4j_schema:main"
@@ -29,16 +34,27 @@ dev = [
 ]
 
 [tool.uv.sources]
-neocarta = { git = "https://github.com/neo4j-labs/neocarta.git", rev = "ba6bf7945bf9c60640c664a03ccc26d0013996bf" }
+neocarta = { git = "https://github.com/neo4j-labs/neocarta.git", rev = "62c32d78be3c2dffb4cd3617b57f5534d550a9b9" }
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 py-modules = [
+    "app",
+    "app_connections",
     "config",
+    "embeddings",
+    "grounding",
     "ingest",
+    "mcp_retrieval",
     "mcp_server",
     "neo4j_schema_map",
+    "page_ask",
+    "page_lakehouse",
+    "page_operational_graph",
+    "query_generation",
+    "query_semantic_map",
     "runtime_contract",
+    "semantic_map",
     "validate_embeddings",
     "validate_mcp",
     "validate_neo4j_schema",

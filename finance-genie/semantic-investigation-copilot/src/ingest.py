@@ -19,6 +19,7 @@ from config import (
     optional_bool_env,
     require_env,
 )
+from embeddings import create_embeddings
 
 
 def databricks_access_token() -> str:
@@ -96,10 +97,14 @@ def main() -> None:
             database_name=neo4j_database,
             access_token=access_token,
         )
+        create_embeddings(driver, neo4j_database)
     finally:
         driver.close()
 
-    print(f"Ingested metadata for {catalog}.{schema} with value sampling disabled.")
+    print(
+        f"Ingested metadata and stored semantic embeddings for {catalog}.{schema} "
+        "with value sampling disabled."
+    )
     if tag_definitions_ingested:
         print("Ingested Databricks governed-tag definitions.")
 

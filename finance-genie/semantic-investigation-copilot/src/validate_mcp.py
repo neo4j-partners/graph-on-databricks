@@ -14,6 +14,34 @@ from mcp.client.stdio import stdio_client
 from config import DEMO_DIR, load_demo_env, require_env, source_neo4j_connection
 from runtime_contract import EXPECTED_TABLES, KNOWN_COLUMN, KNOWN_TABLE
 
+SEARCH_TOOL_PRIORITIES = {
+    "table": (
+        "get_context_by_table_business_term_hybrid_search",
+        "get_context_by_table_hybrid_search",
+        "get_context_by_table_vector_search",
+        "get_context_by_table_full_text_search",
+    ),
+    "column": (
+        "get_context_by_column_business_term_hybrid_search",
+        "get_context_by_column_hybrid_search",
+        "get_context_by_column_vector_search",
+        "get_context_by_column_full_text_search",
+    ),
+}
+
+
+def select_search_tool(tool_names: set[str], entity: str) -> str:
+    """Select the strongest NeoCarta search tool registered for an entity."""
+    try:
+        candidates = SEARCH_TOOL_PRIORITIES[entity]
+    except KeyError as error:
+        raise ValueError(f"Unsupported semantic search entity: {entity}") from error
+
+    for candidate in candidates:
+        if candidate in tool_names:
+            return candidate
+    raise RuntimeError(f"NeoCarta did not register a {entity} semantic-search tool")
+
 
 def parse_tool_payload(result: Any) -> Any:
     """Parse the first JSON text payload returned by an MCP tool."""
@@ -46,7 +74,7 @@ def records_for_source(
 
 
 async def validate() -> dict[str, Any]:
-    """Launch the stdio server and validate catalog and full-text retrieval."""
+    """Launch the stdio server and validate catalog and hybrid retrieval."""
     load_demo_env()
     catalog_name = require_env("DATABRICKS_CATALOG")
     schema_name = require_env("DATABRICKS_SCHEMA")
@@ -65,10 +93,11 @@ async def validate() -> dict[str, Any]:
         await session.initialize()
         listed_tools = await session.list_tools()
         tool_names = sorted(tool.name for tool in listed_tools.tools)
+        tool_name_set = set(tool_names)
+        table_search_tool = select_search_tool(tool_name_set, "table")
+        column_search_tool = select_search_tool(tool_name_set, "column")
 
         expected_tools = {
-            "get_context_by_column_full_text_search",
-            "get_context_by_table_full_text_search",
             "get_full_metadata_schema",
             "get_neo4j_schema_context",
             "list_schemas",
@@ -79,6 +108,15 @@ async def validate() -> dict[str, Any]:
             raise RuntimeError(f"Required MCP tools were not registered: {sorted(missing_tools)}")
         if "get_business_concept_context" in tool_names:
             raise RuntimeError("Custom business-context retrieval must not be registered")
+        expected_hybrid_tools = {
+            "get_context_by_column_hybrid_search",
+            "get_context_by_table_hybrid_search",
+        }
+        if {column_search_tool, table_search_tool} != expected_hybrid_tools:
+            raise RuntimeError(
+                "NeoCarta did not select hybrid search for both tables and columns: "
+                f"{table_search_tool}, {column_search_tool}"
+            )
 
         schema_context = parse_tool_payload(await session.call_tool("get_neo4j_schema_context", {}))
         if not isinstance(schema_context, dict) or not schema_context.get("nodes"):
@@ -116,7 +154,7 @@ async def validate() -> dict[str, Any]:
 
         table_context = parse_tool_result(
             await session.call_tool(
-                "get_context_by_table_full_text_search",
+                table_search_tool,
                 {"text_content": KNOWN_TABLE, "max_tables": 5},
             )
         )
@@ -124,12 +162,12 @@ async def validate() -> dict[str, Any]:
         table_hits = {record["table_name"] for record in qualified_table_context}
         if KNOWN_TABLE not in table_hits:
             raise RuntimeError(
-                f"MCP table full-text lookup did not find catalog-qualified {KNOWN_TABLE}"
+                f"MCP table semantic lookup did not find catalog-qualified {KNOWN_TABLE}"
             )
 
         column_context = parse_tool_result(
             await session.call_tool(
-                "get_context_by_column_full_text_search",
+                column_search_tool,
                 {"text_content": KNOWN_COLUMN, "max_tables": 5},
             )
         )
@@ -141,7 +179,7 @@ async def validate() -> dict[str, Any]:
         }
         if KNOWN_COLUMN not in column_hits:
             raise RuntimeError(
-                f"MCP column full-text lookup did not find catalog-qualified {KNOWN_COLUMN}"
+                f"MCP column semantic lookup did not find catalog-qualified {KNOWN_COLUMN}"
             )
 
     return {
@@ -154,8 +192,10 @@ async def validate() -> dict[str, Any]:
         "catalog_table_count": len(table_names),
         "full_schema_table_count": len(qualified_schema),
         "neo4j_schema_node_count": len(schema_context["nodes"]),
-        "table_full_text_hit": KNOWN_TABLE,
-        "column_full_text_hit": KNOWN_COLUMN,
+        "table_search_tool": table_search_tool,
+        "column_search_tool": column_search_tool,
+        "table_search_hit": KNOWN_TABLE,
+        "column_search_hit": KNOWN_COLUMN,
     }
 
 
