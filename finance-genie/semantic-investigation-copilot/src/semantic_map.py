@@ -13,10 +13,10 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
-import streamlit.components.v1 as components
 from neo4j import Driver, RoutingControl
 from neo4j_viz import Relationship
 from neo4j_viz.neo4j import from_neo4j
+from neo4j_viz.streamlit import display_widget
 
 TRACED_SIZE = 42
 DIMMED_SIZE = 14
@@ -24,10 +24,10 @@ DIMMED_COLOR = "#C7C7C7"
 DEFAULT_HEIGHT = 480
 
 LAKEHOUSE_MAP_QUERY = """
-MATCH (d:Database {name: $catalog})-[:HAS_SCHEMA]->(s:Schema {name: $schema})-[:HAS_TABLE]->(t:Table)
-OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
+MATCH (d:Database {name: $catalog})-[hs:HAS_SCHEMA]->(s:Schema {name: $schema})-[ht:HAS_TABLE]->(t:Table)
+OPTIONAL MATCH (t)-[hc:HAS_COLUMN]->(c:Column)
 OPTIONAL MATCH (c)-[ref:REFERENCES]->(c2:Column)
-RETURN d, s, t, c, ref, c2
+RETURN d, s, t, c, ref, c2, hs, ht, hc
 """
 
 LAKEHOUSE_TABLE_REFERENCES_QUERY = """
@@ -47,14 +47,14 @@ RETURN count(DISTINCT c) AS column_count,
 """
 
 GRAPH_MAP_QUERY = """
-MATCH (d:Database {source_scope: $scope})-[:HAS_SCHEMA]->(s:Schema {source_scope: $scope})
-OPTIONAL MATCH (s)-[:HAS_NODE]->(n:Node)
-OPTIONAL MATCH (n)-[:HAS_PROPERTY]->(p:Property)
-OPTIONAL MATCH (s)-[:HAS_RELATIONSHIP]->(rel:Relationship)
-OPTIONAL MATCH (rel)-[:HAS_PROPERTY]->(rp:Property)
-OPTIONAL MATCH (rel)-[:HAS_SOURCE_NODE]->(src:Node)
-OPTIONAL MATCH (rel)-[:HAS_TARGET_NODE]->(tgt:Node)
-RETURN d, s, n, p, rel, rp, src, tgt
+MATCH (d:Database {source_scope: $scope})-[hs:HAS_SCHEMA]->(s:Schema {source_scope: $scope})
+OPTIONAL MATCH (s)-[hn:HAS_NODE]->(n:Node)
+OPTIONAL MATCH (n)-[hp:HAS_PROPERTY]->(p:Property)
+OPTIONAL MATCH (s)-[hr:HAS_RELATIONSHIP]->(rel:Relationship)
+OPTIONAL MATCH (rel)-[hrp:HAS_PROPERTY]->(rp:Property)
+OPTIONAL MATCH (rel)-[hsn:HAS_SOURCE_NODE]->(src:Node)
+OPTIONAL MATCH (rel)-[htn:HAS_TARGET_NODE]->(tgt:Node)
+RETURN d, s, n, p, rel, rp, src, tgt, hs, hn, hp, hr, hrp, hsn, htn
 """
 
 GRAPH_TRACE_STATS_QUERY = """
