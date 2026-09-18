@@ -138,8 +138,15 @@ def render_map(
     vg.relationships = kept_relationships
     vg.color_nodes(field="caption")
 
+    # Database/Schema are the map's singleton root context, not part of the
+    # traced-vs-everything-else distinction; dimming them made the catalog
+    # and schema indistinguishable from the grey background.
+    always_traced_labels = {"Database", "Schema"}
     traced_ids: set[str] = {
-        node.id for node in vg.nodes if is_traced_node(node.properties)
+        node.id
+        for node in vg.nodes
+        if is_traced_node(node.properties)
+        or always_traced_labels.intersection(node.properties.get("labels", ()))
     }
     for rel in vg.relationships:
         if rel.source in traced_ids or rel.target in traced_ids:

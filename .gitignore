@@ -143,3 +143,7 @@ finance-genie/graph-fraud-analyst/src/graph_fraud_analyst/__dist__/
 .agents/*
 !.agents/skills/
 !.agents/skills/**
+
+# Streamlit agent skills (environment-specific symlinks)
+.agents/skills/developing-with-streamlit
+.claude/skills/developing-with-streamlit
