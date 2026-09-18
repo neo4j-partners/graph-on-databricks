@@ -66,6 +66,11 @@ RETURN count(DISTINCT p) AS property_count,
 """
 
 
+def _node_caption(properties: Mapping[str, Any], fallback: str) -> str:
+    """Prefer `name`, then `label`, then `type`; fall back to neo4j_viz's own caption."""
+    return properties.get("name") or properties.get("label") or properties.get("type") or fallback
+
+
 def render_map(
     driver: Driver,
     database: str,
@@ -142,12 +147,7 @@ def render_map(
             traced_ids.add(rel.target)
 
     for node in vg.nodes:
-        node.caption = (
-            node.properties.get("name")
-            or node.properties.get("label")
-            or node.properties.get("type")
-            or node.caption
-        )
+        node.caption = _node_caption(node.properties, node.caption)
         if node.id in traced_ids:
             node.size = TRACED_SIZE
         else:
