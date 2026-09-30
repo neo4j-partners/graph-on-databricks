@@ -97,6 +97,19 @@ const resources = [
       },
     ],
   },
+  {
+    label: "Workshop slides",
+    title: "Databricks + Neo4j Workshop Slide Decks",
+    description:
+      "Eight workshop decks follow the labs in presenting order, from the business case for GraphRAG to supervisor agents and agent memory. Eight background decks go deeper on knowledge graph construction, entity resolution, graph features, and connectors.",
+    tags: ["8 workshop decks", "8 background decks", "GraphRAG", "Agents"],
+    actions: [
+      {
+        text: "Open slide decks",
+        href: "https://neo4j-partners.github.io/databricks-neo4j-workshop/databricks-neo4j-workshop/1.0/slides.html",
+      },
+    ],
+  },
 ];
 
 if (!existsSync(join(FINANCE_BUILD, "index.html"))) {
