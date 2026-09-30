@@ -41,6 +41,22 @@ const featured = {
   ],
 };
 
+const decks = [
+  {
+    label: "Slide deck",
+    title: "Databricks Main Services",
+    description:
+      "The main Databricks products behind each layer of the data and AI stack, from Delta, Iceberg, and Lakebase to Genie Ontology, Genie One, Agent Bricks, and Unity Gateway. The deck ends with the four Neo4j connectors and where Neo4j plugs into each Databricks agent surface.",
+    tags: ["Databricks", "Genie", "Unity Catalog", "Neo4j connectors"],
+    actions: [
+      {
+        text: "Open slide deck",
+        href: `./${FINANCE_PATH}/databricks-overview.html`,
+      },
+    ],
+  },
+];
+
 const projects = [
   {
     title: "Agentic Commerce",
@@ -107,6 +123,22 @@ const resources = [
       {
         text: "Open slide decks",
         href: "https://neo4j-partners.github.io/databricks-neo4j-workshop/databricks-neo4j-workshop/1.0/slides.html",
+      },
+    ],
+  },
+];
+
+const related = [
+  {
+    label: "Sister site",
+    title: "AWS + Neo4j",
+    description:
+      "Presentations, starter code, and a workshop for grounded enterprise AI with Neo4j on AWS. The decks cover fraud investigation, semantics, and agent memory. The starter kit deploys the Neo4j MCP server to Amazon Bedrock AgentCore.",
+    tags: ["Presentations", "Bedrock AgentCore", "MCP", "Workshop"],
+    actions: [
+      {
+        text: "Open the AWS site",
+        href: "https://neo4j-partners.github.io/aws-starter/",
       },
     ],
   },
@@ -396,6 +428,9 @@ function renderIndex() {
       <section aria-labelledby="featured">
         <h2 id="featured">Slides and demo</h2>
 ${renderFeatured(featured)}
+        <div class="resources">
+${renderResources(decks)}
+        </div>
       </section>
 
       <section aria-labelledby="projects">
@@ -411,6 +446,13 @@ ${renderProjects(projects)}
         <p class="section-intro">A hands-on workshop for building production AI agents with Neo4j and Databricks.</p>
         <div class="resources">
 ${renderResources(resources)}
+        </div>
+      </section>
+
+      <section aria-labelledby="related">
+        <h2 id="related">The Neo4j + AWS Story</h2>
+        <div class="resources">
+${renderResources(related)}
         </div>
       </section>
     </main>

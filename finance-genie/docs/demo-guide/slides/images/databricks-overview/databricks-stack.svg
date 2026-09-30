@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">Databricks on the cloud data and AI stack</title>
+  <desc id="description">The six stack layers with the main Databricks product in each. Apps: Genie One, Genie Agents, Genie Code, Genie App Builder. Agents: Agent Bricks, Model Serving, Databricks Apps, managed memory. Context: Genie Ontology, Unity Catalog semantics, metric views. Operational data: Lakebase, Lakebase Search, Zerobus Ingest, Lakehouse//RT. Lakehouse: Delta Lake, Apache Iceberg, Unity Catalog, and no native graph engine. Infrastructure: AWS, Azure, Google Cloud, and no custom chips. Agent governance: Unity Gateway, Unity Catalog permissions, service policies, inference tables.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .canvas { fill: #ffffff; }
+      .eyebrow { font-size: 18px; font-weight: 800; letter-spacing: 2.5px; fill: #64748b; }
+      .title { font-size: 40px; font-weight: 750; fill: #0f172a; }
+      .subtitle { font-size: 21px; fill: #475569; }
+      .layer { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .layer-name { font-size: 24px; font-weight: 750; fill: #0f172a; }
+      .ai-chip { fill: #eef2ff; stroke: #6366f1; stroke-width: 2; }
+      .data-chip { fill: #f0f9ff; stroke: #0ea5e9; stroke-width: 2; }
+      .gov { fill: #f8fafc; stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 8 6; }
+      .gov-chip { fill: #ffffff; stroke: #64748b; stroke-width: 2; }
+      .chip-text { font-size: 20px; font-weight: 620; fill: #1e293b; }
+      .dim-text { font-size: 20px; font-style: italic; fill: #94a3b8; }
+    </style>
+  </defs>
+  <rect class="canvas" width="1600" height="900"/>
+  <text class="title" x="60" y="92">Databricks Covers Every Layer Above the Cloud</text>
+  <text class="subtitle" x="60" y="130">The same six layers, with the main Databricks product behind each one.</text>
+  <text class="eyebrow" x="60" y="200">AI LAYERS</text>
+  <rect class="layer" x="60" y="216" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="267.4">Apps</tspan></text>
+  <rect class="ai-chip" x="340" y="236" width="132" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="406.0" y="266.0">Genie One</tspan></text>
+  <rect class="ai-chip" x="488" y="236" width="165" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="570.5" y="266.0">Genie Agents</tspan></text>
+  <rect class="ai-chip" x="669" y="236" width="143" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="740.5" y="266.0">Genie Code</tspan></text>
+  <rect class="ai-chip" x="828" y="236" width="220" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="938.0" y="266.0">Genie App Builder</tspan></text>
+  <rect class="layer" x="60" y="312" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="363.4">Agents</tspan></text>
+  <rect class="ai-chip" x="340" y="332" width="165" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="422.5" y="362.0">Agent Bricks</tspan></text>
+  <rect class="ai-chip" x="521" y="332" width="176" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="609.0" y="362.0">Model Serving</tspan></text>
+  <rect class="ai-chip" x="713" y="332" width="198" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="812.0" y="362.0">Databricks Apps</tspan></text>
+  <rect class="ai-chip" x="927" y="332" width="187" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1020.5" y="362.0">Managed memory</tspan></text>
+  <rect class="layer" x="60" y="408" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="459.4">Context</tspan></text>
+  <rect class="ai-chip" x="340" y="428" width="187" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="433.5" y="458.0">Genie Ontology</tspan></text>
+  <rect class="ai-chip" x="543" y="428" width="286" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="686.0" y="458.0">Unity Catalog semantics</tspan></text>
+  <rect class="ai-chip" x="845" y="428" width="165" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="927.5" y="458.0">Metric views</tspan></text>
+  <text class="eyebrow" x="60" y="540">DATA LAYERS</text>
+  <rect class="layer" x="60" y="556" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="607.4">Operational data</tspan></text>
+  <rect class="data-chip" x="340" y="576" width="121" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="400.5" y="606.0">Lakebase</tspan></text>
+  <rect class="data-chip" x="477" y="576" width="198" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="576.0" y="606.0">Lakebase Search</tspan></text>
+  <rect class="data-chip" x="691" y="576" width="187" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="784.5" y="606.0">Zerobus Ingest</tspan></text>
+  <rect class="data-chip" x="894" y="576" width="176" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="982.0" y="606.0">Lakehouse//RT</tspan></text>
+  <rect class="layer" x="60" y="652" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="703.4">Lakehouse</tspan></text>
+  <rect class="data-chip" x="340" y="672" width="143" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="411.5" y="702.0">Delta Lake</tspan></text>
+  <rect class="data-chip" x="499" y="672" width="187" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="592.5" y="702.0">Apache Iceberg</tspan></text>
+  <rect class="data-chip" x="702" y="672" width="176" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="790.0" y="702.0">Unity Catalog</tspan></text>
+  <text class="dim-text" x="910" y="702">No native graph engine</text>
+  <rect class="layer" x="60" y="748" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="799.4">Infrastructure</tspan></text>
+  <rect class="data-chip" x="340" y="768" width="80" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="380.0" y="798.0">AWS</tspan></text>
+  <rect class="data-chip" x="436" y="768" width="92" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="482.0" y="798.0">Azure</tspan></text>
+  <rect class="data-chip" x="544" y="768" width="165" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="626.5" y="798.0">Google Cloud</tspan></text>
+  <text class="dim-text" x="741" y="798">No custom chips</text>
+  <text class="eyebrow" x="1284" y="200">ACROSS EVERY LAYER</text>
+  <rect class="gov" x="1284" y="216" width="256" height="618" rx="16"/>
+  <text class="layer-name" text-anchor="middle"><tspan x="1412" y="259.4">Agent</tspan><tspan x="1412" y="289.4">governance</tspan></text>
+  <rect class="gov-chip" x="1316" y="340" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="375">Unity</tspan><tspan x="1412" y="401">Gateway</tspan></text>
+  <rect class="gov-chip" x="1316" y="460" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="495">Unity Catalog</tspan><tspan x="1412" y="521">permissions</tspan></text>
+  <rect class="gov-chip" x="1316" y="580" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="615">Service</tspan><tspan x="1412" y="641">policies</tspan></text>
+  <rect class="gov-chip" x="1316" y="700" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="735">Inference</tspan><tspan x="1412" y="761">tables</tspan></text>
+</svg>

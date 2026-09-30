@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#1a1a1a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A82C4"/>
+    </marker>
+  </defs>
+
+  <!-- White card -->
+  <rect x="40" y="30" width="880" height="360" rx="16" fill="#FFFFFF" stroke="#E7E4DB" filter="url(#sh)"/>
+
+  <!-- ===================== GENIE ONE (Databricks) ===================== -->
+  <rect x="72" y="60" width="816" height="72" rx="12" fill="#16233A"/>
+  <text x="92" y="92" fill="#FFFFFF" font-size="12.5" font-weight="700" letter-spacing="0.5">DATABRICKS</text>
+  <text x="92" y="110" fill="#9FB0C8" font-size="11">business users ask in plain English</text>
+  <rect x="330" y="77" width="300" height="38" rx="8" fill="#33465C" stroke="#4A5A70"/>
+  <text x="480" y="101" fill="#FFFFFF" font-size="14" font-weight="600" text-anchor="middle">Genie One</text>
+
+  <!-- Genie One -> MCP Server -->
+  <line x1="480" y1="134" x2="480" y2="182" stroke="#4A82C4" stroke-width="2.2" marker-end="url(#arrowBlue)"/>
+  <text x="494" y="163" fill="#3E4C63" font-size="11" font-style="italic">calls as a tool</text>
+
+  <!-- ===================== NEO4J MCP SERVER ===================== -->
+  <rect x="280" y="184" width="400" height="72" rx="12" fill="#EAF2FB" stroke="#4A82C4"/>
+  <text x="480" y="215" fill="#16406B" font-size="15" font-weight="700" text-anchor="middle">Neo4j MCP Server</text>
+  <text x="480" y="237" fill="#3E4C63" font-size="11.5" text-anchor="middle">graph query tools for AI agents</text>
+
+  <!-- MCP Server -> Neo4j -->
+  <line x1="480" y1="258" x2="480" y2="298" stroke="#4A82C4" stroke-width="2.2" marker-end="url(#arrowBlue)"/>
+  <text x="494" y="283" fill="#3E4C63" font-size="11" font-style="italic">live query</text>
+
+  <!-- ===================== NEO4J GRAPH ===================== -->
+  <rect x="180" y="300" width="600" height="64" rx="12" fill="#EAF2FB" stroke="#4A82C4"/>
+  <text x="480" y="328" fill="#16406B" font-size="15" font-weight="700" text-anchor="middle">Neo4j graph data</text>
+  <text x="480" y="349" fill="#3E4C63" font-size="11.5" text-anchor="middle">relationships, dependencies, and connected-data answers</text>
+</svg>

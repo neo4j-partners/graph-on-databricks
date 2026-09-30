@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   rmSync,
@@ -54,6 +56,15 @@ const decks = {
   },
 };
 
+// These decks set their own theme in front matter, so each builds once.
+const standaloneDecks = [
+  {
+    title: "Databricks Main Services",
+    source: "databricks-overview.md",
+    output: "databricks-overview.html",
+  },
+];
+
 const requested = process.argv[2] ?? "all";
 const selected =
   requested === "all"
@@ -90,10 +101,20 @@ for (const [deckKey, deck] of Object.entries(decks)) {
   }
 }
 
+for (const deck of standaloneDecks) {
+  execFileSync("marp", [deck.source, "-o", join("build", deck.output), "--html"], {
+    stdio: "inherit",
+  });
+}
+
 for (const asset of readdirSync(".")) {
   if (/\.(png|jpe?g|gif|webp|svg)$/i.test(asset)) {
     copyFileSync(asset, join("build", asset));
   }
+}
+
+if (existsSync("images")) {
+  cpSync("images", join("build", "images"), { recursive: true });
 }
 
 writeFileSync(join("build", ".nojekyll"), "");
