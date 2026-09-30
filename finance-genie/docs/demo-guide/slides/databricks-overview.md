@@ -62,8 +62,8 @@ Databricks has a product on every layer above the cloud.
   Lakehouse//RT handle streams.
 - Context: Genie Ontology combines Unity Catalog semantics with context Genie
   mines on its own.
-- Agents and models: Agent Bricks builds agents. Model Serving and Databricks
-  Apps host them.
+- Agents and models: Agent Bricks is the platform for building and governing
+  agents. Databricks Apps and Model Serving host them.
 - Apps: Genie One serves business users. Genie Agents serve one team's domain.
   Genie Code serves data teams. Genie App Builder builds governed apps.
 
@@ -146,29 +146,6 @@ Lakebase also stores managed agent sessions and memory.
 
 ---
 
-## Databricks Ships No Graph Engine
-
-- **No native engine:** Databricks has no graph database of its own.
-- **GraphFrames:** The GraphFrames library runs graph algorithms on Spark in Databricks Runtime ML.
-- **Genie Ontology:** Databricks calls it a "living context graph." The docs name no graph store.
-- **OntoBricks:** OntoBricks is a Databricks Labs project that builds an ontology-backed graph.
-- **Neo4j backend:** OntoBricks can store its graph in Neo4j.
-
-<!--
-The hyperscaler comparison counts native graph engines only. AWS has Neptune.
-Google has Spanner Graph and BigQuery Graph. Databricks has neither.
-
-OntoBricks is not part of the official Databricks product. It maps Unity
-Catalog tables onto an ontology and turns the rows into a queryable graph. It
-uses OWL for the ontology, R2RML for the table mappings, and SPARQL run as
-Spark SQL. It deploys as a Databricks App.
-
-Each OntoBricks domain picks its own backend: Lakebase, Lakehouse, Neo4j, or
-no backend. With Neo4j, OntoBricks stores the RDF triples as a native graph.
--->
-
----
-
 ## Unity Catalog Semantics Defines Each Business Term Once
 
 - **Metric views:** A metric view defines each KPI once as a reusable SQL object.
@@ -195,12 +172,12 @@ Interchange spec, now Apache Ossie. Power BI and Tableau can query them.
 
 ## Genie Ontology Grounds Every Genie Answer
 
+- **Context layer:** Genie Ontology is the automatic context layer behind Genie One and Genie Agents.
 - **Two sources:** Teams author context in Unity Catalog semantics. Genie mines the rest.
 - **Mined assets:** Genie reads metric views, dashboards, SQL queries, and Genie Agents.
 - **OntoRank:** OntoRank scores each snippet by origin, usage, and freshness.
 - **Priority:** A Page's definition wins over mined context.
 - **Cited answers:** Each answer cites its snippets and follows Unity Catalog permissions.
-- **Accuracy:** Genie scored 84.5% on a 28-question test. The best coding agent scored 52.4%.
 
 <!--
 Genie Ontology is in Public Preview. It has been on by default since August 6,
@@ -218,8 +195,9 @@ Databricks describes OntoRank as similar to PageRank. The launch blog lists
 five factors: source origin, author authority, usage frequency, ties to
 certified assets, and freshness. The docs list three.
 
-The benchmark is Databricks' own. The weakest general-purpose agent scored
-25%. Genie ran at about half the latency.
+The launch blog describes a unified context layer. It extracts snippets from
+tables, queries, dashboards, pipelines, and connected apps, and organizes them
+into a living graph of how the company works.
 -->
 
 ---
@@ -288,7 +266,7 @@ Renames: Databricks One became Genie on April 27, 2026, then Genie One on June
 
 ---
 
-## Genie Agents Answer for One Team's Domain
+## Genie Agents Turn a Domain Expert's Rules into a Shared Agent
 
 - **Setup:** A domain expert picks up to 50 tables, views, or metric views.
 - **Tuning:** The expert adds instructions, example queries, and SQL for business terms.
@@ -340,16 +318,26 @@ Genie Code works only inside Databricks.
 
 ---
 
-## Agent Bricks Builds Agents on Company Data
+## Agent Bricks Is the Databricks Platform for Agents
 
-- **Knowledge Assistant:** Knowledge Assistant answers questions over company documents, with citations.
-- **Supervisor Agent:** Supervisor Agent routes each part of a question to the right subagent.
+- **One platform:** Agent Bricks covers building, deploying, and governing agents on Databricks.
+- **Knowledge Assistant:** Knowledge Assistant is a no-code builder that answers questions over company documents, with citations.
+- **Supervisor Agent:** Supervisor Agent is a no-code builder that routes each part of a question to the right subagent.
 - **Subagents:** Subagents can be Genie Agents, agent endpoints, Unity Catalog functions, or MCP servers.
-- **Feedback:** Subject matter experts improve quality with plain-language feedback.
-- **Endpoints:** Each agent becomes an endpoint that apps and other agents call.
-- **Access:** End users reach only the subagents and data they already have rights to.
+- **Custom agents:** Developers write agents in LangGraph, LangChain, or LlamaIndex and deploy them to Databricks Apps.
+- **Governance:** Unity Catalog permissions and Unity Gateway cover every agent, model, and tool.
 
 <!--
+The product page calls Agent Bricks "the unified control plane for your AI
+agents." It groups model access, the no-code builders, custom agents,
+MCP integration, Lakebase memory, governance, and Omnigent. Agent Bricks is
+billed at the prices of the underlying products.
+
+Knowledge Assistant and Supervisor Agent are the managed builders. Each one
+becomes an agent endpoint that apps and other agents call. Subject matter
+experts improve quality with plain-language feedback. End users reach only
+the subagents and data they already have rights to.
+
 Supervisor Agent, Knowledge Assistant, Document Intelligence, and Custom
 Agents on Apps reached GA on April 14, 2026.
 
@@ -359,20 +347,24 @@ call custom agents.
 
 ---
 
-## Three Places to Run an Agent on Databricks
+## Two Ways to Build and Run a Custom Agent
 
 <style scoped>
 table { font-size: 0.85em; }
 </style>
 
-| | **Agent Bricks** | **Databricks Apps** | **Model Serving** |
-|---|---|---|---|
-| **Approach** | Low code, tuned with feedback | Your own Python or Node.js | Deploy models and agents |
-| **Best for** | Document answers and routing | New custom agents and chat apps | Models and agents behind an API |
-| **Runs as** | An endpoint | A serverless app | A serverless CPU or GPU endpoint |
-| **Governance** | User's own permissions | App identity or the signed-in user | Permissions, rate limits, lineage |
+| | **Databricks Apps** | **Model Serving** |
+|---|---|---|
+| **Approach** | Your own Python or Node.js | An agent logged with MLflow and deployed as an endpoint |
+| **Best for** | New custom agents and chat apps | Models and agents behind an API |
+| **Runs as** | A serverless app | A serverless CPU or GPU endpoint |
+| **Governance** | App identity or the signed-in user | Permissions, rate limits, lineage |
+| **Guidance** | Recommended for new agents | A migration guide moves existing agents to Apps |
 
 <!--
+Both paths are part of Agent Bricks. Knowledge Assistant and Supervisor Agent
+skip this choice. Databricks deploys their endpoints on Model Serving for you.
+
 Databricks recommends Databricks Apps for new custom agents. Each agent
 template on Apps includes a chat interface and MLflow tracing. Apps also host
 custom MCP servers.
@@ -406,6 +398,64 @@ Service policies and agent services are in Beta.
 
 The Genie One MCP server runs on Unity Gateway. Managed MCP servers are in
 Public Preview.
+-->
+
+---
+
+## Unity Gateway Controls AI Spend Across Every Provider
+
+- **Any model:** Unity Gateway serves Claude, GPT, Gemini, Grok, Kimi, and GLM models from day zero.
+- **Smart Routing:** Smart Routing sends each task to the most efficient model and harness.
+- **Spend controls:** Budgets, spend limits, and rate limits apply per user, team, app, or agent.
+- **Asset registry:** The registry catalogs MCP servers, agents, models, and tools under one set of grants.
+- **Tracing:** A unified trace table records prompts, tool calls, tokens, and cost in the lakehouse.
+- **Security monitoring:** Lakewatch analyzes AI activity and policy violations.
+
+**Unity Gateway extends Unity Catalog governance from data to every AI call.**
+
+<!--
+The product page leads with cost: "Lower AI costs without losing
+productivity." Databricks says Unity Gateway governs more than 1 quadrillion
+coding agent and tool tokens per year.
+
+Databricks' own savings estimates:
+- About 50% from lower-cost and open models.
+- About 30% from Smart Routing.
+- About 10% from spend controls.
+- About 10% from context optimization, such as compaction, tool pruning, and
+  caching.
+
+The Smart Routing blog reports 35% cost savings on an internal coding
+benchmark.
+
+Source: databricks.com/product/artificial-intelligence/unity-gateway, updated
+September 28, 2026.
+-->
+
+---
+
+## The Unity Gateway CLI Rolls Out Coding Agents Under One Policy
+
+- **One command:** Developers launch an approved agent with `ug claude`, `ug codex`, or `ug gemini`.
+- **Central setup:** Admins set each agent's default model, MCP servers, skills, and Smart Routing in one place.
+- **One change:** A new default model reaches every developer the next time they run `ug`.
+- **Budget-aware defaults:** New sessions shift to a cheaper model as a user's budget runs down.
+- **Shared tools:** Approved MCP servers and skills in Unity Catalog reach every configured agent.
+- **Tracing:** Coding agent traces, including local tool calls, land in the lakehouse for Genie to analyze.
+
+<!--
+Databricks announced the Unity Gateway CLI on September 24, 2026. It supports
+Claude Code, Codex, Gemini CLI, OpenCode, GitHub Copilot, and Pi. Admins manage
+the settings under Unity Gateway, Govern, Agent Configuration.
+
+Organizations can push ug through device management, and admins can lock the
+settings. Developers check their spend with ug usage.
+
+Databricks used Unity Gateway tracing with Genie One to find seven MCP tool
+bugs. It estimates the fix saved $1.2 million per year.
+
+Our inference: a Neo4j MCP Server registered in Unity Catalog could reach every
+developer's coding agent through the same configuration.
 -->
 
 ---
@@ -462,8 +512,8 @@ The diagram shows two ways the platforms connect.
   the graph. It then writes graph results back to lakehouse tables.
 - Dashed arrows: Databricks users run federated SQL against the graph in
   Neo4j without copying it. Unity Catalog manages credentials and audit.
-- Right side: Genie, Agent Bricks, and Model Serving use the enriched tables
-  and the graph.
+- Right side: Genie and Agent Bricks agents use the enriched tables and the
+  graph. Those agents run on Databricks Apps or Model Serving.
 -->
 
 ---
@@ -511,15 +561,6 @@ A business user asked Genie One to classify customer risk. This works today.
 The Neo4j MCP Server was also added to Genie One. It is not shown here.
 -->
 
----
-
-![bg contain](./images/databricks-overview/mcp-genie-one-neo4j.svg)
-
-<!--
-Genie One calls the Neo4j MCP Server as a tool and queries the graph live. The
-batch path writes graph results into tables. This path reads the graph at
-question time.
--->
 
 ---
 
@@ -527,8 +568,8 @@ question time.
 
 - **Genie One:** Genie One queries the graph live through the Neo4j MCP Server.
 - **Genie Agents:** Genie Agents answer multi-hop questions from graph-enriched tables.
-- **Agent Bricks:** Supervisor Agent sends relationship questions to the Neo4j MCP Server.
-- **Apps and Model Serving:** Custom agents use the Neo4j libraries and the MCP Server.
+- **Supervisor Agent:** A Supervisor Agent sends relationship questions to the Neo4j MCP Server.
+- **Custom agents:** Custom agents on Databricks Apps or Model Serving use the Neo4j libraries and the MCP Server.
 - **Unity Gateway:** Unity Gateway monitors calls to the Neo4j MCP Server like any other tool.
 - **Open relationships:** The business owns its relationship model and queries it with Cypher.
 

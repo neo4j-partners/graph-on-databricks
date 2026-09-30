@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
   <title id="title">Databricks on the cloud data and AI stack</title>
-  <desc id="description">The six stack layers with the main Databricks product in each. Apps: Genie One, Genie Agents, Genie Code, Genie App Builder. Agents: Agent Bricks, Model Serving, Databricks Apps, managed memory. Context: Genie Ontology, Unity Catalog semantics, metric views. Operational data: Lakebase, Lakebase Search, Zerobus Ingest, Lakehouse//RT. Lakehouse: Delta Lake, Apache Iceberg, Unity Catalog, and no native graph engine. Infrastructure: AWS, Azure, Google Cloud, and no custom chips. Agent governance: Unity Gateway, Unity Catalog permissions, service policies, inference tables.</desc>
+  <desc id="description">The six stack layers with the main Databricks product in each. Apps: Genie One, Genie Agents, Genie Code, Genie App Builder. Agents: Agent Bricks, which covers the no-code builders, Databricks Apps, Model Serving, and managed memory. Context: Genie Ontology, Unity Catalog semantics, metric views. Operational data: Lakebase, Lakebase Search, Zerobus Ingest, Lakehouse//RT. Lakehouse: Delta Lake, Apache Iceberg, Unity Catalog, and no native graph engine. Infrastructure: AWS, Azure, Google Cloud, and no custom chips. Agent governance: Unity Gateway, Unity Catalog permissions, service policies, inference tables.</desc>
   <defs>
     <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
       <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
@@ -19,6 +19,7 @@
       .gov { fill: #f8fafc; stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 8 6; }
       .gov-chip { fill: #ffffff; stroke: #64748b; stroke-width: 2; }
       .chip-text { font-size: 20px; font-weight: 620; fill: #1e293b; }
+      .layer-sub { font-size: 17px; font-weight: 650; fill: #4f46e5; }
       .dim-text { font-size: 20px; font-style: italic; fill: #94a3b8; }
     </style>
   </defs>
@@ -37,15 +38,16 @@
   <rect class="ai-chip" x="828" y="236" width="220" height="46" rx="12"/>
   <text class="chip-text" text-anchor="middle"><tspan x="938.0" y="266.0">Genie App Builder</tspan></text>
   <rect class="layer" x="60" y="312" width="1190" height="86" rx="16" filter="url(#shadow)"/>
-  <text class="layer-name" text-anchor="start"><tspan x="92" y="363.4">Agents</tspan></text>
-  <rect class="ai-chip" x="340" y="332" width="165" height="46" rx="12"/>
-  <text class="chip-text" text-anchor="middle"><tspan x="422.5" y="362.0">Agent Bricks</tspan></text>
-  <rect class="ai-chip" x="521" y="332" width="176" height="46" rx="12"/>
-  <text class="chip-text" text-anchor="middle"><tspan x="609.0" y="362.0">Model Serving</tspan></text>
-  <rect class="ai-chip" x="713" y="332" width="198" height="46" rx="12"/>
-  <text class="chip-text" text-anchor="middle"><tspan x="812.0" y="362.0">Databricks Apps</tspan></text>
-  <rect class="ai-chip" x="927" y="332" width="187" height="46" rx="12"/>
-  <text class="chip-text" text-anchor="middle"><tspan x="1020.5" y="362.0">Managed memory</tspan></text>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="351.4">Agents</tspan></text>
+  <text class="layer-sub" text-anchor="start"><tspan x="92" y="378.4">on Agent Bricks</tspan></text>
+  <rect class="ai-chip" x="340" y="332" width="208" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="444.0" y="362.0">No-code builders</tspan></text>
+  <rect class="ai-chip" x="564" y="332" width="198" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="663.0" y="362.0">Databricks Apps</tspan></text>
+  <rect class="ai-chip" x="778" y="332" width="176" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="866.0" y="362.0">Model Serving</tspan></text>
+  <rect class="ai-chip" x="970" y="332" width="187" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1063.5" y="362.0">Managed memory</tspan></text>
   <rect class="layer" x="60" y="408" width="1190" height="86" rx="16" filter="url(#shadow)"/>
   <text class="layer-name" text-anchor="start"><tspan x="92" y="459.4">Context</tspan></text>
   <rect class="ai-chip" x="340" y="428" width="187" height="46" rx="12"/>

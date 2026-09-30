@@ -87,12 +87,14 @@
 
 <g filter="url(#card-shadow)"><rect x="772" y="333.00" width="146" height="50" rx="6" fill="white"/></g>
 <text x="845.0" y="362.5" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1B3139" text-anchor="middle"><tspan x="845.0" dy="-7.5">Genie One /</tspan><tspan x="845.0" dy="15">Genie Agents</tspan></text>
-<g filter="url(#card-shadow)"><rect x="772" y="393.75" width="146" height="50" rx="6" fill="white"/></g>
-<text x="845.0" y="423.25" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1B3139" text-anchor="middle">Agent Bricks</text>
-<g filter="url(#card-shadow)"><rect x="772" y="454.50" width="146" height="50" rx="6" fill="white"/></g>
-<text x="845.0" y="484.0" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1B3139" text-anchor="middle">Unity Gateway</text>
+<g filter="url(#card-shadow)"><rect x="772" y="393.75" width="146" height="110.75" rx="6" fill="white"/></g>
+<text x="845.0" y="413.5" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1B3139" text-anchor="middle">Agent Bricks</text>
+<rect x="780" y="422" width="130" height="36" rx="5" fill="#FAFAFA"/>
+<text x="845.0" y="444" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#4D5157" text-anchor="middle">Supervisor Agent</text>
+<rect x="780" y="462" width="130" height="36" rx="5" fill="#FAFAFA"/>
+<text x="845.0" y="484" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#4D5157" text-anchor="middle">Apps · Model Serving</text>
 <g filter="url(#card-shadow)"><rect x="772" y="515.25" width="146" height="50" rx="6" fill="white"/></g>
-<text x="845.0" y="544.75" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1B3139" text-anchor="middle">Model Serving</text>
+<text x="845.0" y="544.75" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1B3139" text-anchor="middle">Unity Gateway</text>
 <g filter="url(#card-shadow)"><rect x="772" y="576.00" width="146" height="50" rx="6" fill="white"/></g>
 <text x="845.0" y="605.5" font-family="DM Sans, Inter, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1B3139" text-anchor="middle">Managed MLflow</text>
 
