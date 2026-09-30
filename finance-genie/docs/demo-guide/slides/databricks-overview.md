@@ -170,6 +170,20 @@ Interchange spec, now Apache Ossie. Power BI and Tableau can query them.
 
 ---
 
+![bg contain](./images/databricks-overview/semantic-map-spine.svg)
+
+<!--
+Unity Catalog semantics stays the governed source. The Neo4j Semantic Map
+adds a layer above it.
+
+- Source mapping: The map names the real tables, files, and columns.
+- Concepts: Each source maps to a business concept such as Customer or
+  Purchase.
+- Attributes: Mapping works at the column level, not only the table level.
+-->
+
+---
+
 ## Genie Ontology Grounds Every Genie Answer
 
 - **Context layer:** Genie Ontology is the automatic context layer behind Genie One and Genie Agents.
@@ -564,6 +578,41 @@ The Neo4j MCP Server was also added to Genie One. It is not shown here.
 
 ---
 
+![bg contain](./images/databricks-overview/agentic-services-layer-v2.svg)
+
+<!--
+Neo4j complements Genie Ontology. It does not replace it.
+
+- Databricks-native: Genie Ontology mines context automatically. Genie
+  Agents chat over an authored, governed slice.
+- Neo4j knowledge layer: The Semantic Map and Knowledge Graph hold authored
+  concepts, rules, and paths. Agents query them at runtime through MCP.
+- Control surface: Unity Catalog domains and metric views govern both sides.
+- Agent Memory: Neo4j Agent Memory with Genie One is untested.
+-->
+
+---
+
+![bg contain](./images/databricks-overview/high-level-a-supervisor-topology.svg)
+
+<!--
+A Supervisor Agent in Agent Bricks routes each question to where the answer
+lives.
+
+- Genie Agent: Genie handles measurement questions with governed SQL over
+  Delta tables.
+- Neo4j Semantic Map: The map holds the domain model and business rules
+  across the lakehouse and the graph.
+- GraphRAG: GraphRAG runs vector search on document chunks, then a graph
+  traversal.
+- Loop: Every tool returns to the supervisor. The supervisor can call again
+  until the question is covered.
+- Agent Memory: The supervisor reads Neo4j Agent Memory before routing and
+  writes to it after the answer. The dashed line is the only write path.
+-->
+
+---
+
 ## Neo4j Reaches Each Databricks Agent Surface
 
 - **Genie One:** Genie One queries the graph live through the Neo4j MCP Server.
@@ -587,4 +636,20 @@ Open items:
 - Timing for Databricks to accept Neo4j as an official federation source.
 - Neo4j Agent Memory with Genie One is untested. It would connect through the
   Agent Memory MCP server.
+-->
+
+---
+
+![bg contain](./images/databricks-overview/enterprise-agentic-reference-architecture-v2.svg)
+
+<!--
+This reference architecture shows where Neo4j sits in the Databricks stack.
+
+- Agentic services: The Neo4j knowledge layer sits beside Genie Ontology,
+  under Genie One, Genie Agents, and Agent Bricks.
+- Neo4j integration: The MCP Server, Spark Connector, and Data Import connect
+  the graph to the platform.
+- Agentic data: Virtual Graph and Neo4j AuraDB sit beside Lakeflow,
+  Lakehouse, and Lakebase.
+- Governance: Unity Catalog and Unity Gateway govern both sides.
 -->

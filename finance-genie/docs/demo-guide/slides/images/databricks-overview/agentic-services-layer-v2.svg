@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 580" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#1a1a1a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <!-- CARD -->
+  <rect x="40" y="40" width="880" height="500" rx="16" fill="#FFFFFF" stroke="#E7E4DB" filter="url(#sh)"/>
+
+  <!-- Band 1: CONSUMPTION (Databricks red) -->
+  <rect x="56" y="56" width="848" height="56" rx="12" fill="#FCF2EF" stroke="#F1CDC4"/>
+  <text x="72" y="87" font-size="10.5" font-weight="700" letter-spacing="1.2" fill="#B23A26">CONSUMPTION</text>
+
+  <rect x="176" y="68" width="340" height="30" rx="8" fill="#FFFFFF" stroke="#F1CDC4"/>
+  <text x="346" y="88" font-size="14" font-weight="700" fill="#16233A" text-anchor="middle" xml:space="preserve">Genie One<tspan font-weight="400" font-size="12.5" fill="#6B7280"> · enterprise chat</tspan></text>
+
+  <rect x="548" y="68" width="340" height="30" rx="8" fill="#FFFFFF" stroke="#F1CDC4"/>
+  <text x="718" y="88" font-size="14" font-weight="700" fill="#16233A" text-anchor="middle" xml:space="preserve">Agent Bricks<tspan font-weight="400" font-size="12.5" fill="#6B7280"> · agent builder</tspan></text>
+
+  <text x="480" y="108" font-size="11" fill="#6B7280" text-anchor="middle">Every response grounded in the layers below, scoped by the control surface.</text>
+
+  <!-- Band 1b: Neo4j Agent Memory (Neo4j blue) -->
+  <rect x="56" y="120" width="848" height="64" rx="12" fill="#EAF0FB" stroke="#2E6DB4"/>
+  <text x="480" y="148" text-anchor="middle" xml:space="preserve"><tspan x="480" font-size="15" font-weight="700" fill="#1F4E86">Neo4j Agent Memory</tspan><tspan font-size="12.5" fill="#6B7280"> · persistent context for the agents above</tspan><tspan x="480" dy="18.4" font-size="11.5" fill="#34519B">long-term · short-term · reasoning memory · decision traces</tspan></text>
+  <text x="824" y="156" font-size="10" font-style="italic" fill="#5A729A" text-anchor="end">exposed via</text>
+  <rect x="832" y="142" width="56" height="19" rx="9.5" fill="#2E6DB4"/>
+  <text x="860" y="155" font-size="10" font-weight="700" letter-spacing="0.6" fill="#FFFFFF" text-anchor="middle">MCP</text>
+
+  <!-- Band 2: CONTROL SURFACE · Unity Catalog (Databricks red) -->
+  <rect x="56" y="192" width="848" height="136" rx="12" fill="#FCF2EF" stroke="#F1CDC4"/>
+  <text x="72" y="222" font-size="15" font-weight="700" fill="#B23A26" xml:space="preserve">CONTROL SURFACE<tspan font-weight="400" font-size="12.5" fill="#6B7280"> · Unity Catalog · authored by the business</tspan></text>
+
+  <rect x="72" y="240" width="400" height="76" rx="9" fill="#FFFFFF" stroke="#F1CDC4"/>
+  <text x="88" y="262" xml:space="preserve"><tspan x="88" font-size="13" font-weight="700" fill="#B23A26">Domains · governed tags</tspan><tspan x="88" dy="17.6" font-size="11" font-style="italic" fill="#5C6470">a governed label that groups assets so people find them</tspan><tspan x="88" dy="18.4" font-size="11.5" fill="#6B7280">description, owner, icon · certification, stewardship</tspan></text>
+
+  <rect x="488" y="240" width="400" height="76" rx="9" fill="#FFFFFF" stroke="#F1CDC4"/>
+  <text x="504" y="262" xml:space="preserve"><tspan x="504" font-size="13" font-weight="700" fill="#B23A26">Metric views · governed measure</tspan><tspan x="504" dy="17.6" font-size="11" font-style="italic" fill="#5C6470">one governed number, defined once for reuse</tspan><tspan x="504" dy="18.4" font-size="11.5" fill="#6B7280" font-family="'SF Mono',Menlo,monospace">net_revenue = SUM(amount) − SUM(refunds)</tspan></text>
+
+  <!-- Band 3: four boxes — two Databricks (red), two Neo4j (blue) -->
+  <rect x="56"  y="336" width="200" height="172" rx="12" fill="#FCF2EF" stroke="#F1CDC4"/>
+  <rect x="272" y="336" width="200" height="172" rx="12" fill="#FCF2EF" stroke="#F1CDC4"/>
+  <rect x="488" y="336" width="200" height="172" rx="12" fill="#EAF0FB" stroke="#2E6DB4"/>
+  <rect x="704" y="336" width="200" height="172" rx="12" fill="#EAF0FB" stroke="#2E6DB4"/>
+
+  <!-- Genie Ontology -->
+  <text x="72" y="364" font-size="13.5" font-weight="700" fill="#16233A">Genie Ontology</text>
+  <text x="72" y="415" font-size="11" fill="#6B7280" xml:space="preserve"><tspan x="72">• auto-mined usage graph</tspan><tspan x="72" dy="17.6">• </tspan><tspan font-weight="700" fill="#B23A26">OntoRank</tspan> authority score<tspan x="72" dy="17.6">• a living graph of context</tspan></text>
+  <text x="72" y="477" font-size="10" font-style="italic" fill="#8A8579" xml:space="preserve"><tspan x="72">trust by source ·</tspan><tspan x="72" dy="16">usage · freshness</tspan></text>
+
+  <!-- Genie Agents -->
+  <text x="288" y="364" font-size="13.5" font-weight="700" fill="#16233A">Genie Agents</text>
+  <text x="288" y="415" font-size="11" fill="#6B7280" xml:space="preserve"><tspan x="288">• chat over a governed slice</tspan><tspan x="288" dy="17.6">• example SQL and metrics</tspan><tspan x="288" dy="17.6">• scoped to one domain</tspan></text>
+  <text x="288" y="477" font-size="10" font-style="italic" fill="#8A8579">authored slices, not auto-mined</text>
+
+  <!-- Neo4j Semantic Map (exposed via MCP) -->
+  <text x="504" y="364" font-size="13.5" font-weight="700" fill="#1F4E86">Neo4j Semantic Map</text>
+  <text x="504" y="388" font-size="10" font-style="italic" fill="#5A729A">exposed via</text>
+  <rect x="566" y="374" width="56" height="19" rx="9.5" fill="#2E6DB4"/>
+  <text x="594" y="387" font-size="10" font-weight="700" letter-spacing="0.6" fill="#FFFFFF" text-anchor="middle">MCP</text>
+  <text x="504" y="415" font-size="11" fill="#34519B" xml:space="preserve"><tspan x="504">• data assets → concepts</tspan><tspan x="504" dy="17.6">• entities · relationships</tspan><tspan x="504" dy="17.6">• a shared vocabulary</tspan></text>
+  <text x="504" y="477" font-size="10" font-style="italic" fill="#5A729A">authored &amp; governed · portable</text>
+
+  <!-- Neo4j Knowledge Graph (exposed via MCP) -->
+  <text x="720" y="364" font-size="13.5" font-weight="700" fill="#1F4E86">Neo4j Knowledge Graph</text>
+  <text x="720" y="388" font-size="10" font-style="italic" fill="#5A729A">exposed via</text>
+  <rect x="782" y="374" width="56" height="19" rx="9.5" fill="#2E6DB4"/>
+  <text x="810" y="387" font-size="10" font-weight="700" letter-spacing="0.6" fill="#FFFFFF" text-anchor="middle">MCP</text>
+  <text x="720" y="415" font-size="11" fill="#34519B" xml:space="preserve"><tspan x="720">• business rules, inherited</tspan><tspan x="720" dy="17.6">• traversal + paths</tspan><tspan x="720" dy="17.6">• grounded, citable answers</tspan></text>
+  <text x="720" y="477" font-size="10" font-style="italic" fill="#5A729A">queried by agents at runtime</text>
+
+  <!-- Provenance footer -->
+  <line x1="56" y1="520" x2="472" y2="520" stroke="#F1CDC4" stroke-width="1.5"/>
+  <text x="264" y="534" font-size="10" font-weight="700" letter-spacing="1" fill="#B23A26" text-anchor="middle">DATABRICKS-NATIVE</text>
+  <line x1="488" y1="520" x2="904" y2="520" stroke="#2E6DB4" stroke-width="1.5"/>
+  <text x="696" y="534" font-size="10" font-weight="700" letter-spacing="1" fill="#1F4E86" text-anchor="middle">NEO4J KNOWLEDGE LAYER</text>
+</svg>

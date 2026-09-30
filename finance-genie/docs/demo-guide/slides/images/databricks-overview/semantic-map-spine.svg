@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#A87E0D"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3D82C4"/>
+    </marker>
+    <marker id="arrow-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4B5563"/>
+    </marker>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <!-- ===================================================================== -->
+  <!-- BAND 1 : DATABRICKS. What Unity Catalog already governs.              -->
+  <!-- Stated first, deliberately. This is the customer's entry point.       -->
+  <!-- ===================================================================== -->
+  <rect x="22" y="14" width="956" height="112" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M22,52 V28 a14,14 0 0 1 14,-14 H964 a14,14 0 0 1 14,14 V52 Z" fill="#E1503A"/>
+  <path d="M44,28 L49,33 L44,38 L39,33 Z" fill="#FFFFFF"/>
+  <text x="60" y="38" font-size="13" font-weight="bold" letter-spacing="0.4" fill="#FFFFFF">UNITY CATALOG SEMANTICS</text>
+  <rect x="676" y="19" width="282" height="24" rx="12" fill="#FFFFFF" fill-opacity="0.18"/>
+  <text x="817" y="35" text-anchor="middle" font-size="10.5" font-weight="bold" letter-spacing="0.6" fill="#FFFFFF">WHAT DATABRICKS ALREADY GOVERNS</text>
+
+  <rect x="42"  y="62" width="298" height="50" rx="10" fill="#FCF2EF" stroke="#F1CDC4" stroke-width="1"/>
+  <text x="58"  y="82" font-size="12.5" font-weight="bold" fill="#B23A26">Domains</text>
+  <text x="58"  y="99" font-size="10" font-style="italic" fill="#8A8579">governed tags group the assets</text>
+
+  <rect x="351" y="62" width="298" height="50" rx="10" fill="#FCF2EF" stroke="#F1CDC4" stroke-width="1"/>
+  <text x="367" y="82" font-size="12.5" font-weight="bold" fill="#B23A26">Metric views</text>
+  <text x="367" y="99" font-size="10" font-style="italic" fill="#8A8579">one governed number per table</text>
+
+  <rect x="660" y="62" width="298" height="50" rx="10" fill="#FCF2EF" stroke="#F1CDC4" stroke-width="1"/>
+  <text x="676" y="82" font-size="12.5" font-weight="bold" fill="#B23A26">Lineage + tags</text>
+  <text x="676" y="99" font-size="10" font-style="italic" fill="#8A8579">column-level provenance</text>
+
+  <!-- ===================== Connector between the two bands ===================== -->
+  <line x1="500" y1="126" x2="500" y2="156" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+  <text x="516" y="146" font-size="10.5" fill="#4B5563">Neo4j adds the layer above it. Unity Catalog stays the control surface.</text>
+
+  <!-- ===================================================================== -->
+  <!-- BAND 2 : NEO4J. The semantic map, unchanged, shifted down by 148.     -->
+  <!-- ===================================================================== -->
+  <rect x="22" y="162" width="956" height="408" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M22,206 V176 a14,14 0 0 1 14,-14 H964 a14,14 0 0 1 14,14 V206 Z" fill="#018BFF"/>
+  <path d="M44,179 L49,184 L44,189 L39,184 Z" fill="#FFFFFF"/>
+  <text x="60" y="189" font-size="14.5" font-weight="bold" fill="#FFFFFF" xml:space="preserve">NEO4J SEMANTIC MAP<tspan font-weight="400" font-size="11.5" fill="#CFE8FF"> &#183; Layer 2</tspan></text>
+  <text x="960" y="189" text-anchor="end" font-size="10" font-style="italic" fill="#CFE8FF">holds exactly two things</text>
+
+  <!-- ===================== Column headings ===================== -->
+  <text x="60" y="232" font-size="11.5" font-weight="bold" letter-spacing="0.6" fill="#4B5563">SOURCE MAPPING</text>
+  <text x="60" y="248" font-size="10" font-style="italic" fill="#8A8579">system-aware &#183; names real tables,</text>
+  <text x="60" y="261" font-size="10" font-style="italic" fill="#8A8579">files and columns</text>
+
+  <text x="718" y="232" font-size="11.5" font-weight="bold" letter-spacing="0.6" fill="#0166BC">ENTITY STRUCTURE</text>
+  <text x="718" y="248" font-size="10" font-style="italic" fill="#8A8579">technology-agnostic &#183; nodes,</text>
+  <text x="718" y="261" font-size="10" font-style="italic" fill="#8A8579">relationships and properties</text>
+
+  <!-- ===================== Panels: sources (left) and entity structure (right) ===================== -->
+  <!-- Panels are sized tight to their text so every connector runs in the clear channel outside them. -->
+  <rect x="42" y="282" width="198" height="200" rx="10" fill="#F4F6F8" stroke="#DDE2E8" stroke-width="1"/>
+  <rect x="700" y="282" width="258" height="200" rx="10" fill="#E5F1FF" stroke="#66AEE8" stroke-width="1.2"/>
+  <!-- faint separators between the CUSTOMER group and the PURCHASE group -->
+  <line x1="58" y1="382" x2="224" y2="382" stroke="#C9CFD6" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="718" y1="382" x2="940" y2="382" stroke="#9FC8EC" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- ===================== Group 1: CUSTOMER ===================== -->
+  <!-- source assets, three lines converging into one -->
+  <g font-family="Menlo, monospace" font-size="12" fill="#2E3540">
+    <text x="60" y="308">tbl_cust_v2</text>
+    <text x="60" y="338">Salesforce.Account</text>
+    <text x="60" y="368">loyalty_members.csv</text>
+  </g>
+  <g stroke="#C7A44A" stroke-width="1.2" fill="none">
+    <path d="M248,304 C289,304 289,334 330,334"/>
+    <path d="M248,334 H330"/>
+    <path d="M248,364 C289,364 289,334 330,334"/>
+  </g>
+  <circle cx="330" cy="334" r="2.6" fill="#A87E0D"/>
+  <line x1="330" y1="334" x2="407" y2="334" stroke="#A87E0D" stroke-width="2" marker-end="url(#arrow-gold)"/>
+  <text x="368" y="327" text-anchor="middle" font-size="9" fill="#A87E0D">maps_to</text>
+
+  <!-- the business concept that joins the two halves -->
+  <rect x="409" y="317" width="150" height="34" rx="17" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.3"/>
+  <text x="484" y="339" text-anchor="middle" font-size="12.5" letter-spacing="0.8" fill="#6B4E07">CUSTOMER</text>
+
+  <!-- entity structure, one line splitting into three -->
+  <line x1="561" y1="334" x2="600" y2="334" stroke="#3D82C4" stroke-width="2"/>
+  <circle cx="600" cy="334" r="2.6" fill="#3D82C4"/>
+  <g stroke="#3D82C4" stroke-width="1.2" fill="none">
+    <path d="M600,334 C646,334 646,304 692,304" marker-end="url(#arrow-blue)"/>
+    <path d="M600,334 H692" marker-end="url(#arrow-blue)"/>
+    <path d="M600,334 C646,334 646,364 692,364" marker-end="url(#arrow-blue)"/>
+  </g>
+  <text x="718" y="308" font-family="Menlo, monospace" font-size="12" fill="#0B4C7F">customer_id</text>
+  <text x="807" y="308" font-size="10" font-style="italic" fill="#5E97C9">(unique)</text>
+  <text x="718" y="338" font-family="Menlo, monospace" font-size="12" fill="#0B4C7F">first_name &#183; last_name</text>
+  <text x="718" y="368" font-family="Menlo, monospace" font-size="12" fill="#0B4C7F">email</text>
+
+  <!-- ===================== Group 2: PURCHASE ===================== -->
+  <g font-family="Menlo, monospace" font-size="12" fill="#2E3540">
+    <text x="60" y="404">Salesforce.Opportunity</text>
+    <text x="60" y="434">tbl_orders</text>
+    <text x="60" y="464">pos_transactions</text>
+  </g>
+  <g stroke="#C7A44A" stroke-width="1.2" fill="none">
+    <path d="M248,400 C289,400 289,430 330,430"/>
+    <path d="M248,430 H330"/>
+    <path d="M248,460 C289,460 289,430 330,430"/>
+  </g>
+  <circle cx="330" cy="430" r="2.6" fill="#A87E0D"/>
+  <line x1="330" y1="430" x2="407" y2="430" stroke="#A87E0D" stroke-width="2" marker-end="url(#arrow-gold)"/>
+  <text x="368" y="423" text-anchor="middle" font-size="9" fill="#A87E0D">maps_to</text>
+
+  <rect x="409" y="413" width="150" height="34" rx="17" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.3"/>
+  <text x="484" y="435" text-anchor="middle" font-size="12.5" letter-spacing="0.8" fill="#6B4E07">PURCHASE</text>
+
+  <line x1="561" y1="430" x2="600" y2="430" stroke="#3D82C4" stroke-width="2"/>
+  <circle cx="600" cy="430" r="2.6" fill="#3D82C4"/>
+  <g stroke="#3D82C4" stroke-width="1.2" fill="none">
+    <path d="M600,430 C646,430 646,400 692,400" marker-end="url(#arrow-blue)"/>
+    <path d="M600,430 H692" marker-end="url(#arrow-blue)"/>
+    <path d="M600,430 C646,430 646,460 692,460" marker-end="url(#arrow-blue)"/>
+  </g>
+  <text x="718" y="404" font-family="Menlo, monospace" font-size="12" fill="#0B4C7F">purchase_id</text>
+  <text x="807" y="404" font-size="10" font-style="italic" fill="#5E97C9">(unique)</text>
+  <text x="718" y="434" font-family="Menlo, monospace" font-size="12" fill="#0B4C7F">date &#183; quantity</text>
+  <text x="718" y="464" font-size="11" font-style="italic" fill="#3D82C4">links CUSTOMER to PRODUCT</text>
+
+  <!-- ===================== Attribute-level mapping row ===================== -->
+  <rect x="42" y="494" width="916" height="56" rx="10" fill="#FBFAF7" stroke="#E7E4DB" stroke-width="1"/>
+  <text x="60" y="526" font-family="Menlo, monospace" font-size="12" fill="#2E3540">tbl_cust_v2.cid</text>
+  <line x1="248" y1="522" x2="407" y2="522" stroke="#A87E0D" stroke-width="2" marker-end="url(#arrow-gold)"/>
+  <text x="327" y="515" text-anchor="middle" font-size="9" fill="#A87E0D">maps_to</text>
+  <rect x="409" y="507" width="150" height="30" rx="15" fill="#FFEFC2" stroke="#D4A017" stroke-width="1.3"/>
+  <text x="484" y="527" text-anchor="middle" font-size="12" fill="#6B4E07">Customer ID</text>
+  <text x="610" y="526" font-size="11" font-style="italic" fill="#8A8579">attribute-level mapping, not just table-level</text>
+
+  <!-- ===================== Annotations below the card ===================== -->
+  <line x1="180" y1="588" x2="180" y2="574" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+  <text x="180" y="600" text-anchor="middle" font-size="10.5" fill="#4B5563">real systems, named explicitly</text>
+
+  <line x1="484" y1="588" x2="484" y2="574" stroke="#4B5563" stroke-width="1.6" marker-end="url(#arrow-slate)"/>
+  <text x="560" y="600" text-anchor="middle" font-size="10.5" fill="#4B5563">concepts come from the Conceptual Map (Layer 1).</text>
+  <text x="560" y="613" text-anchor="middle" font-size="10.5" font-style="italic" fill="#8A8579">Nothing in this box defines meaning.</text>
+</svg>
