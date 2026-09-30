@@ -227,24 +227,10 @@ function renderIndex() {
       .button.tertiary {
         background: var(--accent-2);
       }
-
-      .home-link {
-        color: var(--accent);
-        display: inline-block;
-        font-size: 15px;
-        font-weight: 700;
-        margin-bottom: 28px;
-        text-decoration: none;
-      }
-
-      .home-link:hover {
-        text-decoration: underline;
-      }
     </style>
   </head>
   <body>
     <main>
-      <a class="home-link" href="../">&larr; Back to Neo4j + Databricks</a>
       <div class="eyebrow">Finance Genie</div>
       <h1>Graph-enriched analytics for Databricks Genie</h1>
       <p>Finance Genie demonstrates how Neo4j Graph Data Science can enrich Databricks Lakehouse tables with network features, so Genie can answer questions about fraud-ring structure, risk communities, and relationship-driven patterns using ordinary Delta columns.</p>
