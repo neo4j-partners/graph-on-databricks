@@ -27,10 +27,17 @@ const featured = {
     "Neo4j Graph Data Science enriches Databricks Lakehouse tables with network features. PageRank, Louvain communities, and node similarity land in Gold Delta tables as plain columns. Genie can then answer questions about fraud-ring structure and risk communities.",
   tags: ["Fraud", "Graph Data Science", "Genie", "Delta"],
   actions: [
-    { text: "Open Finance Genie", href: `./${FINANCE_PATH}/`, primary: true },
-    { text: "Full slide deck", href: `./${FINANCE_PATH}/slides.html` },
-    { text: "15-minute deck", href: `./${FINANCE_PATH}/slides-15min.html` },
-    { text: "View on GitHub", href: `${REPO_URL}/tree/main/finance-genie` },
+    { text: "Open full slide deck", href: `./${FINANCE_PATH}/slides.html` },
+    {
+      text: "Open 15-minute deck",
+      href: `./${FINANCE_PATH}/slides-15min.html`,
+      variant: "secondary",
+    },
+    {
+      text: "View project on GitHub",
+      href: `${REPO_URL}/tree/main/finance-genie`,
+      variant: "tertiary",
+    },
   ],
 };
 
@@ -104,6 +111,9 @@ rmSync(BUILD_DIR, { force: true, recursive: true });
 mkdirSync(BUILD_DIR, { recursive: true });
 
 cpSync(FINANCE_BUILD, join(BUILD_DIR, FINANCE_PATH), { recursive: true });
+
+// The home page carries the Finance Genie links, so its gallery page is not published.
+writeFileSync(join(BUILD_DIR, FINANCE_PATH, "index.html"), renderRedirect("../"));
 
 // Finance Genie used to publish at the site root. Keep its old deck URLs working.
 for (const file of readdirSync(FINANCE_BUILD)) {
@@ -247,9 +257,9 @@ function renderIndex() {
 
       .button {
         align-items: center;
-        border: 1px solid var(--line);
+        background: var(--accent);
         border-radius: 6px;
-        color: var(--ink);
+        color: white;
         display: inline-flex;
         font-weight: 700;
         min-height: 44px;
@@ -257,13 +267,9 @@ function renderIndex() {
         text-decoration: none;
       }
 
-      .button:hover { border-color: var(--accent-2); }
+      .button.secondary { background: var(--ink); }
 
-      .button.primary {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: white;
-      }
+      .button.tertiary { background: var(--accent-2); }
 
       .projects {
         display: grid;
@@ -404,7 +410,7 @@ function renderFeatured(item) {
   const actions = item.actions
     .map(
       (action) =>
-        `            <a class="button${action.primary ? " primary" : ""}" href="${escapeHtml(action.href)}">${escapeHtml(action.text)}</a>`,
+        `            <a class="button${action.variant ? ` ${action.variant}` : ""}" href="${escapeHtml(action.href)}">${escapeHtml(action.text)}</a>`,
     )
     .join("\n");
 
