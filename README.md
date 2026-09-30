@@ -1,6 +1,12 @@
-# Graph-Enriched Lakehouse
+## Home Page
 
-**Home page:** [neo4j-partners.github.io/graph-on-databricks](https://neo4j-partners.github.io/graph-on-databricks/) has the slides, project overviews, and the Databricks + Neo4j workshop.
+**[neo4j-partners.github.io/graph-on-databricks](https://neo4j-partners.github.io/graph-on-databricks/)**
+
+The home page has the slides, project overviews, and the Databricks + Neo4j workshop.
+
+---
+
+# Graph-Enriched Lakehouse
 
 Graph enrichment connects Neo4j Graph Data Science to a Databricks Lakehouse as a silver-to-gold pipeline stage. The pipeline reads Silver tables from Unity Catalog, loads the records into Neo4j as a property graph, runs graph algorithms against the network, and writes the results back to the Gold layer as plain Delta columns. Genie, SQL warehouses, dashboards, and downstream ML read those columns without modification. The analytics stack stays unchanged. The catalog gains dimensions it could not carry before.
 
