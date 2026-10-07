@@ -10,6 +10,7 @@ from agents.items import MessageOutputItem, ToolCallItem, ToolCallOutputItem
 from openai.types.responses import ResponseTextDeltaEvent
 
 from agent.agent import run_agent
+from agent.nams import TurnRecorder, recall_instructions, safe_scope_id
 from databricks_agentkit import InvocationContext
 
 MAX_TURNS_MESSAGE = (
@@ -35,28 +36,71 @@ def _session_id(context: InvocationContext) -> str:
     return value
 
 
+def _user_id(value: Any, session_id: str) -> str:
+    """Memory identity: an optional top-level ``user_id`` in the input object, else the session."""
+    raw = value.get("user_id") if isinstance(value, dict) else None
+    return safe_scope_id(raw) or safe_scope_id(session_id) or "anonymous"
+
+
+def _last_user_text(messages: list[Any]) -> str:
+    for message in reversed(messages):
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return " ".join(
+                part["text"] for part in content if isinstance(part, dict) and "text" in part
+            )
+    return ""
+
+
 async def invoke(value: Any, context: InvocationContext) -> dict:
-    return await _invoke_agent(_messages(value), context)
+    session_id = _session_id(context)
+    return await _invoke_agent(_messages(value), context, _user_id(value, session_id))
 
 
 async def recover(value: Any, context: InvocationContext) -> dict:
+    session_id = _session_id(context)
     messages = [{"role": "developer", "content": _RECOVERY_INSTRUCTION}, *_messages(value)]
-    return await _invoke_agent(messages, context)
+    return await _invoke_agent(messages, context, _user_id(value, session_id))
 
 
-async def _invoke_agent(messages: list[Any], context: InvocationContext) -> dict:
+async def _invoke_agent(messages: list[Any], context: InvocationContext, user_id: str) -> dict:
+    session_id = _session_id(context)
     outputs: list[dict] = []
-    try:
-        async with run_agent(messages, session_id=_session_id(context)) as result:
-            async for event in _serialize_events(result):
-                await context.emit(event)
-                if event["type"] == "message":
-                    outputs.append(event["message"])
-    except MaxTurnsExceeded:
-        message = {"role": "assistant", "content": MAX_TURNS_MESSAGE}
-        await context.emit({"type": "message", "message": message})
-        outputs.append(message)
+    # A recovery attempt replays a turn that may already be recorded, so it recalls but does not write.
+    async with TurnRecorder(
+        user_id=user_id,
+        session_id=session_id,
+        prompt=_last_user_text(messages),
+        write=not context.is_recovery,
+    ) as turn:
+        memory_context = recall_instructions(await turn.recall())
+        try:
+            async with run_agent(
+                messages, session_id=session_id, memory_context=memory_context
+            ) as result:
+                async for event in _serialize_events(result):
+                    await context.emit(event)
+                    if event["type"] == "message":
+                        outputs.append(event["message"])
+                        _record(turn, event["message"])
+        except MaxTurnsExceeded:
+            message = {"role": "assistant", "content": MAX_TURNS_MESSAGE}
+            await context.emit({"type": "message", "message": message})
+            outputs.append(message)
+            _record(turn, message)
     return {"output": outputs, "status": "completed"}
+
+
+def _record(turn: TurnRecorder, message: dict) -> None:
+    """Feed one streamed message to memory: tool calls as they happen, the last text as the answer."""
+    for call in message.get("tool_calls") or []:
+        turn.add_tool_call(call["name"], call["args"])
+    if message.get("role") == "assistant" and message.get("content"):
+        turn.set_answer(message["content"])
 
 
 async def _serialize_events(result: RunResultStreaming) -> AsyncGenerator[dict, None]:

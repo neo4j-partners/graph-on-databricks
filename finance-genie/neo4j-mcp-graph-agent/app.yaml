@@ -9,6 +9,10 @@ env:
   value: '2180908208794102'
 - name: AGENT_SESSION_STORE
   value: neo4j-mcp-graph-agent-sessions
+- name: MEMORY_API_KEY
+  valueFrom: nams-api-key
+- name: LLM_MODEL
+  value: system.ai.claude-sonnet-4-5
 - name: PIP_INDEX_URL
   value: https://pypi.org/simple/
 - name: UV_INDEX_URL
@@ -18,8 +22,8 @@ env:
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_LAKEBASE_BRANCH
   value: projects/databricks-internal-custom-agents/branches/production
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_DATABASE
-  value: runtime-agent-bricks-neo4j-1ec8cd95-43b5-4ff3-a476-f5a62f719a1a
+  value: runtime-agent-bricks-neo4j-d0676e5e-777f-44e6-8a2d-8ac8c1794bd6
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_USERNAME
-  value: 60b2b70f-5df7-41e8-9824-c2ab115b803b
+  value: 6b994233-caaf-4a04-9855-87170fb6097c
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_SCHEMA
   value: databricks_agentkit_runtime

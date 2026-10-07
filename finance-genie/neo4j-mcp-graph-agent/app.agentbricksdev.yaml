@@ -3,6 +3,8 @@ command:
 - run
 - start-server
 env:
+- name: MEMORY_API_KEY
+  valueFrom: nams-api-key
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_LAKEBASE_BRANCH
   value: projects/databricks-internal-custom-agents/branches/production
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_DATABASE
@@ -12,7 +14,7 @@ env:
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_SCHEMA
   value: databricks_agentkit_runtime
 - name: MLFLOW_TRACKING_URI
-  value: http://127.0.0.1:60769
+  value: http://127.0.0.1:50169
 - name: MLFLOW_EXPERIMENT_NAME
   value: neo4j-mcp-graph-agent
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_LOCAL

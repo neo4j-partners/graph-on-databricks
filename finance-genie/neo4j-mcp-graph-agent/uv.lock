@@ -2548,6 +2548,38 @@ wheels = [
 ]
 
 [[package]]
+name = "neo4j"
+version = "6.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytz" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/db/024bd576bde5d97436d0acb71b41cf928c036ed8fec95ea1122eb05e47d1/neo4j-6.4.0.tar.gz", hash = "sha256:056676698f080b5af5b24b0fc5abb485b8db1b95edf366d01dcfd63bcff9b71d", size = 287786, upload-time = "2026-10-05T15:37:45.216Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c9/5d/519aefe3b38a490924641e980a16ea6c70f6c96c08d84cf661d32c4a08c2/neo4j-6.4.0-py3-none-any.whl", hash = "sha256:fdd048ba827be138063b045cf59e40056fbf0405ac02dadc24f64e369fbd9d3d", size = 390611, upload-time = "2026-10-05T15:37:43.491Z" },
+]
+
+[[package]]
+name = "neo4j-agent-memory"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "neo4j" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/31/c3/72c5ff2205171bc7bf71d3a5bb9ae3d2f4880d5f97d45da3c5c54edd01ae/neo4j_agent_memory-0.6.0.tar.gz", hash = "sha256:430b78188171e10140d7ddbdadb9acf716ca6853db95aa3f576105608c64054d", size = 395860, upload-time = "2026-09-14T18:05:00.301Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/47/9ba0af8cca3c6b23c7c6278e6c70597770045fcdfc8152a889df62344d2c/neo4j_agent_memory-0.6.0-py3-none-any.whl", hash = "sha256:759664a5a95c4dcca4e932b2107fbcbecbb6cff56abc94b510e735b06d630ccb", size = 481415, upload-time = "2026-09-14T18:04:58.549Z" },
+]
+
+[package.optional-dependencies]
+nams = [
+    { name = "httpx" },
+]
+
+[[package]]
 name = "neo4j-mcp-graph-agent"
 version = "0.1.0"
 source = { editable = "." }
@@ -2555,6 +2587,7 @@ dependencies = [
     { name = "databricks-agentbricks", extra = ["openai"] },
     { name = "databricks-sdk" },
     { name = "mlflow" },
+    { name = "neo4j-agent-memory", extra = ["nams"] },
     { name = "python-dotenv" },
     { name = "uvicorn" },
 ]
@@ -2571,6 +2604,7 @@ requires-dist = [
     { name = "databricks-agentbricks", extras = ["openai"], specifier = ">=0.4.0" },
     { name = "databricks-sdk", specifier = ">=0.124.0" },
     { name = "mlflow", specifier = ">=3.10.0" },
+    { name = "neo4j-agent-memory", extras = ["nams"], specifier = ">=0.5.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "uvicorn", specifier = ">=0.41.0" },
 ]
@@ -3598,6 +3632,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz", hash = "sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e", size = 46881, upload-time = "2026-06-04T16:18:58.647Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl", hash = "sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23", size = 30042, upload-time = "2026-06-04T16:18:57.319Z" },
+]
+
+[[package]]
+name = "pytz"
+version = "2026.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/14/21/d83d6ef28c4c912c4bb4d1dcf591f7b8c6bde87b9c66f9f454677314e16d/pytz-2026.5.tar.gz", hash = "sha256:fa23724b9c486543b9ff54a327ee7569ac83ade54bb9afd0fc18676620401c86", size = 318572, upload-time = "2026-10-04T02:37:58.719Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4f/ef/c66110d46fb800dda0bf33164182dfadabe26a90e4476844d502a23dca8e/pytz-2026.5-py2.py3-none-any.whl", hash = "sha256:e658af3757f9e26a9d25dd2aff38335acd92bc9104f890a894b2c1ba28311b03", size = 506342, upload-time = "2026-10-04T02:37:56.814Z" },
 ]
 
 [[package]]

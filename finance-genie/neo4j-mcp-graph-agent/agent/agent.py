@@ -39,10 +39,10 @@ def configure() -> None:
     configure_tracing()
 
 
-def create_agent(servers: list[Any]) -> Agent:
+def create_agent(servers: list[Any], memory_context: str = "") -> Agent:
     return Agent(
         name="neo4j-mcp-graph-agent",
-        instructions=SYSTEM_PROMPT,
+        instructions=SYSTEM_PROMPT + memory_context,
         model=MODEL,
         mcp_servers=servers,
     )
@@ -50,7 +50,7 @@ def create_agent(servers: list[Any]) -> Agent:
 
 @asynccontextmanager
 async def run_agent(
-    agent_input: list[Any], *, session_id: str
+    agent_input: list[Any], *, session_id: str, memory_context: str = ""
 ) -> AsyncIterator[RunResultStreaming]:
     """Run the agent and expose its native streaming result.
 
@@ -62,7 +62,7 @@ async def run_agent(
     async with MCPServerManager(servers) as manager:
         if not manager.active_servers:
             raise RuntimeError(f"No MCP server connected: {dict(manager.errors)}")
-        agent = create_agent(list(manager.active_servers))
+        agent = create_agent(list(manager.active_servers), memory_context)
         with start_trace(name="invoke", inputs=agent_input, session_id=session_id) as span:
             result = Runner.run_streamed(
                 agent,

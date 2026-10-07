@@ -1,0 +1,74 @@
+# Synthetic analyst traffic for the neo4j-mcp-graph-agent app.
+#
+# Deploy with an explicit profile:  databricks bundle deploy -p <profile> --var app_url=<url>
+# Run once:                          databricks bundle run nams_traffic -p <profile>
+#
+# The app itself is deployed with `agentbricks deploy`, not from this bundle.
+bundle:
+  name: nams-traffic
+
+variables:
+  app_url:
+    description: URL of the deployed app (`agentbricks deployments get agent-bricks-neo4j-graph-agent`)
+
+artifacts:
+  nams_traffic_wheel:
+    type: whl
+    build: uv build --wheel
+    path: .
+
+resources:
+  jobs:
+    nams_traffic:
+      name: nams-traffic
+      max_concurrent_runs: 1
+      # Runs as whoever deploys the bundle, who needs READ on the credentials scope. The job calls the
+      # app as the service principal in that scope, which needs CAN_USE on the app.
+      parameters:
+        - name: app_url
+          default: ${var.app_url}
+        - name: credentials_scope
+          default: nams-traffic
+        - name: users
+          default: "20"
+        - name: sessions_per_user
+          default: "3"
+        - name: turns_per_session
+          default: "4"
+        - name: concurrency
+          default: "4"
+        - name: timeout
+          default: "300"
+      # Declared but paused. Unpause in the Jobs UI or set UNPAUSED for always-on traffic.
+      schedule:
+        quartz_cron_expression: "0 0 * * * ?"
+        timezone_id: UTC
+        pause_status: PAUSED
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
+            dependencies:
+              - ./dist/*.whl
+      tasks:
+        - task_key: traffic
+          environment_key: default
+          python_wheel_task:
+            package_name: nams_traffic
+            entry_point: agent-traffic
+            parameters:
+              - --app-url
+              - "{{job.parameters.app_url}}"
+              - --credentials-scope
+              - "{{job.parameters.credentials_scope}}"
+              - --users
+              - "{{job.parameters.users}}"
+              - --sessions-per-user
+              - "{{job.parameters.sessions_per_user}}"
+              - --turns-per-session
+              - "{{job.parameters.turns_per_session}}"
+              - --concurrency
+              - "{{job.parameters.concurrency}}"
+              - --timeout
+              - "{{job.parameters.timeout}}"
+              - --continue-after-error

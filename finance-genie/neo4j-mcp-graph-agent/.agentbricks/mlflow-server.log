@@ -1,29 +1,61 @@
+2026/10/07 08:15:20 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
 Registry store URI not provided. Using backend store URI.
 [MLflow] Security middleware enabled with default settings (localhost-only). To allow connections from other hosts, use --host 0.0.0.0 and configure --allowed-hosts and --cors-allowed-origins.
-2026/10/06 22:25:24 INFO:     Uvicorn running on http://127.0.0.1:60769 (Press CTRL+C to quit)
-2026/10/06 22:25:24 INFO:     Started parent process [67068]
-/Users/ryanknight/.cache/uv/archive-v0/10e3HoctqdJX_YJl/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
+2026/10/07 08:15:21 INFO mlflow.server.jobs.executor_registry: Available backends after discovery: local
+2026/10/07 08:15:21 INFO mlflow.server.jobs.executor_registry: Job executor backend 'local' passed requirements check
+2026/10/07 08:15:21 INFO:     Uvicorn running on http://127.0.0.1:50169 (Press CTRL+C to quit)
+2026/10/07 08:15:21 INFO:     Started parent process [78396]
+2026/10/07 08:15:22 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:22 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:22 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:22 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:22 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+/Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
   from starlette.middleware.wsgi import WSGIResponder, build_environ
-/Users/ryanknight/.cache/uv/archive-v0/10e3HoctqdJX_YJl/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
+/Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
   from starlette.middleware.wsgi import WSGIResponder, build_environ
-/Users/ryanknight/.cache/uv/archive-v0/10e3HoctqdJX_YJl/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
+/Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
   from starlette.middleware.wsgi import WSGIResponder, build_environ
-/Users/ryanknight/.cache/uv/archive-v0/10e3HoctqdJX_YJl/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
+/Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
   from starlette.middleware.wsgi import WSGIResponder, build_environ
-2026/10/06 22:25:26 INFO:     Started server process [67073]
-2026/10/06 22:25:26 INFO:     Waiting for application startup.
-2026/10/06 22:25:26 INFO:     Started server process [67074]
-2026/10/06 22:25:26 INFO:     Waiting for application startup.
-2026/10/06 22:25:26 INFO:     Started server process [67076]
-2026/10/06 22:25:26 INFO:     Waiting for application startup.
-2026/10/06 22:25:26 INFO:     Application startup complete.
-2026/10/06 22:25:26 INFO:     Application startup complete.
-2026/10/06 22:25:26 INFO:     Started server process [67075]
-2026/10/06 22:25:26 INFO:     Waiting for application startup.
-2026/10/06 22:25:26 INFO:     Application startup complete.
-2026/10/06 22:25:26 INFO:     Application startup complete.
-2026/10/06 22:25:28 INFO mlflow.server.jobs.utils: Registered online_scoring_scheduler periodic task (runs every 1 minute)
-2026/10/06 22:25:28 INFO mlflow.server.jobs.utils: Registered trace_archival_scheduler periodic task (polls every 1 minute and no-ops when trace archival is disabled or unconfigured)
-2026/10/06 22:25:32 INFO:     127.0.0.1:60801 - "GET /api/2.0/mlflow/experiments/get-by-name?experiment_name=neo4j-mcp-graph-agent HTTP/1.1" 200 OK
-2026/10/06 22:25:34 INFO:     127.0.0.1:60804 - "GET /version HTTP/1.1" 200 OK
-2026/10/06 22:25:34 INFO:     127.0.0.1:60801 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:15:24 INFO:     Started server process [78402]
+2026/10/07 08:15:24 INFO:     Waiting for application startup.
+2026/10/07 08:15:24 INFO:     Started server process [78399]
+2026/10/07 08:15:24 INFO:     Waiting for application startup.
+2026/10/07 08:15:24 INFO:     Started server process [78401]
+2026/10/07 08:15:24 INFO:     Waiting for application startup.
+2026/10/07 08:15:24 INFO:     Started server process [78400]
+2026/10/07 08:15:24 INFO:     Waiting for application startup.
+2026/10/07 08:15:24 INFO:     Application startup complete.
+2026/10/07 08:15:24 INFO:     Application startup complete.
+2026/10/07 08:15:24 INFO:     Application startup complete.
+2026/10/07 08:15:24 INFO:     Application startup complete.
+2026/10/07 08:15:24 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:24 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:24 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:24 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:24 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:24 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:25 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ryanknight/.cache/uv/archive-v0/Eq8ohCKnz3pY8pwJ/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+2026/10/07 08:15:25 INFO mlflow.server.jobs.utils: Registered online_scoring_scheduler periodic task (runs every 1 minute)
+2026/10/07 08:15:25 INFO mlflow.server.jobs.utils: Registered trace_archival_scheduler periodic task (polls every 1 minute and no-ops when trace archival is disabled or unconfigured)
+2026/10/07 08:15:25 INFO mlflow.server.jobs.utils: SQL trace rollup scheduler was not registered because rollups are disabled
+2026/10/07 08:15:33 INFO:     127.0.0.1:50190 - "GET /api/3.0/mlflow/server-info HTTP/1.1" 200 OK
+2026/10/07 08:15:55 INFO:     127.0.0.1:50203 - "GET /api/2.0/mlflow/experiments/get-by-name?experiment_name=neo4j-mcp-graph-agent HTTP/1.1" 200 OK
+2026/10/07 08:15:59 INFO:     127.0.0.1:50207 - "GET /version HTTP/1.1" 200 OK
+2026/10/07 08:15:59 INFO:     127.0.0.1:50203 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:03 INFO:     127.0.0.1:50203 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:08 INFO:     127.0.0.1:50203 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:13 INFO:     127.0.0.1:50203 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:18 INFO:     127.0.0.1:50203 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:18 INFO:     127.0.0.1:50213 - "POST /api/3.0/mlflow/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:45 INFO:     127.0.0.1:50236 - "GET /api/2.0/mlflow/experiments/get-by-name?experiment_name=neo4j-mcp-graph-agent HTTP/1.1" 200 OK
+2026/10/07 08:16:48 INFO:     127.0.0.1:50236 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:53 INFO:     127.0.0.1:50236 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:58 INFO:     127.0.0.1:50236 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:16:58 INFO:     127.0.0.1:50256 - "POST /api/3.0/mlflow/traces HTTP/1.1" 200 OK
+2026/10/07 08:17:05 INFO:     127.0.0.1:50268 - "GET /api/2.0/mlflow/experiments/get-by-name?experiment_name=neo4j-mcp-graph-agent HTTP/1.1" 200 OK
+2026/10/07 08:17:08 INFO:     127.0.0.1:50268 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:17:11 INFO:     127.0.0.1:50268 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:17:16 INFO:     127.0.0.1:50268 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/07 08:17:16 INFO:     127.0.0.1:50272 - "POST /api/3.0/mlflow/traces HTTP/1.1" 200 OK

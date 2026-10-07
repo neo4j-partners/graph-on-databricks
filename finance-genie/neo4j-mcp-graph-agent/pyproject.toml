@@ -10,6 +10,7 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "databricks-sdk>=0.124.0",
     "mlflow>=3.10.0",
+    "neo4j-agent-memory[nams]>=0.5.0",
 ]
 
 [build-system]
