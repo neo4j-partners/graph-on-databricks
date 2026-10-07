@@ -62,7 +62,7 @@ Choose the demo that matches your goal.
 | Demo | Purpose | Start here |
 |---|---|---|
 | **Graph-Enriched Lakehouse** | Shows how graph results become reusable Gold table columns for Genie, SQL, dashboards, and models. | [Enrichment Pipeline](./enrichment-pipeline/README.md) or [Workshop](./workshop/README.md) |
-| **Neo4j MCP Graph Agent** | Deploys a graph-only agent that retrieves live Neo4j evidence through MCP. Pair it with a Databricks Supervisor Agent and Genie when needed. | [Neo4j MCP Graph Agent](./neo4j-mcp-graph-agent/README.md) |
+| **Neo4j MCP Graph Agent** | Deploys a Databricks App agent that retrieves live Neo4j evidence through a Unity Catalog MCP service. Pair it with a Databricks Supervisor Agent and Genie when needed. | [Neo4j MCP Graph Agent](./neo4j-mcp-graph-agent/README.md) |
 | **Fraud Signal Workbench** | Provides a guided web application for fraud investigators. Users search, load selected graph evidence into Delta tables, and analyze it with Genie. | [Fraud Signal Workbench](./fraud-signal-workbench/README.md) |
 | **Semantic Investigation Copilot** | Builds a local metadata graph for one Databricks schema and the Finance Genie graph. The Streamlit app uses that map to create grounded SQL and graph queries. | [Semantic Investigation Copilot](./semantic-investigation-copilot/README.md) |
 | **Virtual Graph Demo** | Queries Finance Genie Silver tables from Neo4j without copying them. It shows Cypher and Graph Data Science behavior over a Databricks Virtual Graph. | [Virtual Graph Demo](./virtual-graph-demo/README.md) |
@@ -72,7 +72,7 @@ Choose the demo that matches your goal.
 - **Enrichment Pipeline:** Admin and CI commands for the shared setup. It loads data, creates tables and secrets, runs graph enrichment, creates Genie Spaces, and validates results. See [enrichment-pipeline/](./enrichment-pipeline/README.md).
 - **Workshop:** Databricks notebooks for running the graph-enrichment demo step by step. See [workshop/](./workshop/README.md).
 - **Demo guide:** Presenter story, questions, speaker notes, and slides. See [docs/demo-guide/](./docs/demo-guide/).
-- **Neo4j MCP Graph Agent:** MCP connection setup and graph-agent deployment. See [neo4j-mcp-graph-agent/](./neo4j-mcp-graph-agent/README.md).
+- **Neo4j MCP Graph Agent:** Databricks App agent over a Unity Catalog MCP service, deployed as a bundle. See [neo4j-mcp-graph-agent/](./neo4j-mcp-graph-agent/README.md).
 - **Fraud Signal Workbench:** React and FastAPI investigation application. See [fraud-signal-workbench/](./fraud-signal-workbench/README.md).
 - **Semantic Investigation Copilot:** Metadata graph, MCP server, command-line query tool, and Streamlit app. See [semantic-investigation-copilot/](./semantic-investigation-copilot/README.md).
 - **Virtual Graph Demo:** Cypher and Graph Data Science examples over a Databricks Virtual Graph. See [virtual-graph-demo/](./virtual-graph-demo/README.md).

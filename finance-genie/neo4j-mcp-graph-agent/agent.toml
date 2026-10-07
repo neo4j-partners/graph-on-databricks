@@ -1,0 +1,19 @@
+schema_version = 1
+
+[agent]
+framework = "openai"
+server = "agentbricks"
+deployment_name = "neo4j-graph-agent"
+
+[session_store]
+name = "neo4j-mcp-graph-agent-sessions"
+
+[tracing]
+experiment_name = "/Shared/agentbricks_traces/neo4j-mcp-graph-agent"
+
+# Unity Catalog MCP service, called as the app service principal. `agentbricks deploy` grants
+# that principal EXECUTE on the service plus USE_SCHEMA and USE_CATALOG on its parents.
+[[tools]]
+id = "finance_genie_mcp"
+auth = "app"
+source = { kind = "mcp", service = "graph-on-databricks.finance_genie.finance_genie_mcp" }

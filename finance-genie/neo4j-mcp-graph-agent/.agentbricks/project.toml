@@ -1,0 +1,3 @@
+schema_version = 1
+framework = "openai"
+template = "agent-openai"

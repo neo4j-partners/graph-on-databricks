@@ -17,7 +17,7 @@ columns.
 Two applications use the same graph data for different workflows:
 
 - **Fraud Signal Workbench:** [`fraud-signal-workbench/`](../fraud-signal-workbench/README.md) selects graph evidence and sends analysis questions to Genie.
-- **Graph agent:** [`neo4j-mcp-graph-agent/`](../neo4j-mcp-graph-agent/README.md) retrieves live graph evidence through an MCP connection.
+- **Graph agent:** [`neo4j-mcp-graph-agent/`](../neo4j-mcp-graph-agent/README.md) retrieves live graph evidence through a Unity Catalog MCP service.
 
 Each application README is the source of truth for deployment. This guide
 covers the enrichment pipeline.

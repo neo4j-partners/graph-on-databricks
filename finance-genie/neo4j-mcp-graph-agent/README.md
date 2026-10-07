@@ -1,255 +1,130 @@
-# Neo4j MCP Graph Agent
+# neo4j-mcp-graph-agent
 
-An end-to-end Databricks integration that provisions access to an externally hosted
-Neo4j MCP server and deploys a graph-only Model Serving agent that uses it.
+A Databricks App agent that answers questions about the finance-genie fraud graph. It calls the
+Unity Catalog MCP service `graph-on-databricks.finance_genie.finance_genie_mcp`, which fronts
+Neo4j, as the app's own service principal.
 
-This directory is the single owner of both responsibilities. Connection
-provisioning and agent deployment live together so their credentials, resource
-names, validation, and smoke tests cannot drift across separate projects.
+It is built on the Agent Bricks runtime: the OpenAI Agents SDK for the agent loop, and
+`DurableAgentServer` for sync, streaming, and background invocations with crash recovery.
 
-## What this builds
+## How it works
 
-- A Databricks secret scope containing AgentCore OAuth machine-to-machine credentials.
-- A Unity Catalog HTTP connection with MCP enabled.
-- A Unity Catalog catalog and schema for the registered agent model.
-- A LangGraph `ResponsesAgent` that discovers Neo4j MCP tools through the Databricks MCP proxy.
-- A Model Serving endpoint deployed with `databricks.agents.deploy`.
-
-The endpoint is intentionally graph-only: it uses the MCP tools for read-only
-Neo4j Cypher and has no Genie, Delta, or web-UI responsibilities. Add it to a
-Databricks Supervisor Agent when graph evidence should be combined with a
-separately configured Genie Space.
+- `agent.toml` declares the MCP service as an app-identity tool, a session store for
+  multi-turn history, and the MLflow tracing experiment.
+- `agent/agent.py` builds the agent, loads the MCP server from `agent.toml`, and applies the
+  guardrails in `agent/guardrails.py`: only `get_neo4j_schema` and `read_neo4j_cypher` are exposed, write
+  Cypher is rejected, results are truncated at 8000 characters, and runs stop after 20 steps.
+- `runtime/` serves the agent at `/api/invocations`.
+- `agentbricks deploy` creates the app, creates the declared stores, and grants the app service
+  principal `EXECUTE` on the MCP service plus `USE_SCHEMA` and `USE_CATALOG` on its parents.
+  No manual grant is needed for the MCP service.
 
 ## Prerequisites
 
-- `uv` installed locally.
-- Databricks CLI or SDK authentication configured through a profile, `DATABRICKS_HOST` plus `DATABRICKS_TOKEN`, or standard Databricks SDK auth.
-- Unity Catalog enabled in the target workspace.
-- External MCP server support enabled in the target workspace.
-- `CREATE CONNECTION` privilege on the Unity Catalog metastore.
-- Permission to create or use the configured secret scope, catalog, schema, model, and serving endpoint.
-- A Pro or Serverless SQL warehouse, or a DBR 15.4 LTS or later cluster using Standard or Dedicated access mode.
-- A Neo4j MCP server that supports Streamable HTTP transport.
-- `.mcp-credentials.finance.json` copied into this directory by the operator.
+- Python 3.11+, [uv](https://docs.astral.sh/uv/), and the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/install)
+- The Agent Bricks CLI (Beta): `pip install databricks-agentbricks`, or run it with
+  `uvx --from databricks-agentbricks agentbricks ...`
+- A workspace with Databricks Apps and Unity Catalog AI Gateway enabled
+- The MCP service `graph-on-databricks.finance_genie.finance_genie_mcp`, exposing the tools
+  `get_neo4j_schema` and `read_neo4j_cypher`. TODO: link the MCP service creation doc.
+- You need the right to grant `EXECUTE` on the MCP service (owner or `MANAGE`), since deploy
+  grants it on behalf of the app
 
 ## Quick start
 
-This is an optional product. Run the Finance Genie root `make demo` first when
-you want it to use the canonical graph-enrichment environment. That command
-does not create the MCP connection or deploy this endpoint.
+1. Install the Agent Bricks CLI with uv and confirm it runs:
 
-From the `finance-genie` repository root:
+   ```bash
+   uv tool install databricks-agentbricks
+   agentbricks --help
+   ```
 
-```bash
-cp .env.sample .env
-# Fill in the shared Databricks, Neo4j, and MCP values.
-cd neo4j-mcp-graph-agent
-```
+2. Authenticate with a profile of your choice:
 
-Copy the AgentCore-generated credentials file into this directory:
+   ```bash
+   databricks auth profiles
+   agentbricks login --profile <profile>
+   ```
 
-```bash
-cp /path/to/.mcp-credentials.finance.json .mcp-credentials.finance.json
-```
+3. Install and run the local checks:
 
-Edit `.env` and set at least:
+   ```bash
+   uv sync
+   MLFLOW_DISABLE_AGENT_HINT=1 uv run pytest
+   agentbricks doctor .
+   ```
 
-- `DATABRICKS_PROFILE` or standard Databricks SDK auth environment variables
-- `DATABRICKS_WAREHOUSE_ID` or `DATABRICKS_CLUSTER_ID`
-- `NEO4J_MCP_AGENT_DATABRICKS_WORKSPACE_DIR`, or the shared
-  `DATABRICKS_WORKSPACE_DIR` fallback
-- `MCP_SECRET_SCOPE`
-- `UC_CONNECTION_NAME`
-- `CATALOG`
-- `SCHEMA`
-- `LLM_ENDPOINT_NAME`, for example `databricks-claude-sonnet-5-5` if available in your region
-- `MODEL_SERVING_ENDPOINT_NAME`
+4. Run locally and ask a question:
 
-Validate the local credential file:
+   ```bash
+   cp .env.example .env        # set DATABRICKS_CONFIG_PROFILE
+   agentbricks dev             # serves http://localhost:8000
+   ```
 
-```bash
-uv run validation/validate_credentials.py
-```
+   ```bash
+   agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
+     --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":[{"role":"user","content":"Which communities look like fraud ring candidates?"}]}'
+   ```
 
-Deploy everything and run the endpoint smoke test:
+5. Deploy. Databricks app names cap at 30 characters including the `agent-bricks-` prefix, so the
+   deploy name must be 17 characters or fewer:
 
-```bash
-./deploy.sh
-```
+   ```bash
+   agentbricks deploy neo4j-graph-agent
+   agentbricks deployments get agent-bricks-neo4j-graph-agent   # URL and status
+   ```
 
-The deploy script runs the setup, Databricks-side validation jobs, agent
-deployment, endpoint readiness polling, and smoke test in order. It stops at
-the first failed step.
+6. Test the deployed app:
 
-If an existing connection has different settings, recreate it explicitly:
+   ```bash
+   SESSION_ID=$(uuidgen)
+   agentbricks --profile <profile> endpoint invoke agent-bricks-neo4j-graph-agent \
+     --path /api/invocations --routing-key "$SESSION_ID" \
+     --json '{"id":"'$(uuidgen)'","session_id":"'$SESSION_ID'","input":[{"role":"user","content":"What does the SIMILAR_TO relationship mean?"}]}'
+   agentbricks deployments logs agent-bricks-neo4j-graph-agent
+   ```
 
-```bash
-./deploy.sh --replace-connection
-```
+   Use a new `id` for every request and reuse `session_id` to continue a conversation.
 
-To choose Databricks job compute for the submitted validation and deploy jobs:
+## Configuration
 
-```bash
-./deploy.sh --compute serverless
-```
-
-The equivalent step-by-step sequence is:
-
-```bash
-./setup_secrets.sh
-uv run setup/provision_connection.py
-uv run validation/validate_connection.py
-uv run setup/provision_uc_resources.py
-```
-
-If an existing connection has different settings during the manual flow,
-recreate it explicitly:
-
-```bash
-uv run setup/provision_connection.py --replace
-```
-
-Upload job code and run the Databricks-side sequence:
-
-```bash
-uv run python -m cli upload --all
-uv run python -m cli submit 00_validate_mcp_gateway.py
-uv run python -m cli submit 01_deploy_agent.py
-uv run validation/validate_endpoint.py
-uv run python -m cli submit 02_validate_endpoint.py
-uv run python -m cli submit 03_evaluate_agent.py
-```
-
-The CLI reduces the shared root environment to the explicit non-secret
-`JOB_PARAMETER_KEYS` allowlist before creating Databricks task parameters. Add
-new remote job settings to that allowlist only when they are safe to expose in
-run metadata. Credentials must stay in a Databricks secret scope or Unity
-Catalog connection, never in task parameters.
-
-## Connect it to a Supervisor Agent
-
-The deployed endpoint is one specialist, not a complete multi-agent system.
-Configure the Supervisor Agent in Databricks:
-
-1. Add this Model Serving endpoint as the graph-evidence specialist.
-2. Add the canonical BEFORE Genie Space as the structured-data specialist.
-3. Route graph schema, relationship, neighborhood, community, and read-only
-   Cypher questions to this endpoint.
-4. Route account, merchant, transaction, balance, and other Silver-table
-   business questions to Genie.
-5. Instruct the Supervisor to combine graph rationale with the business context
-   returned by Genie.
-
-Supervisor and Genie configuration remain outside this project so the endpoint
-can also be used independently.
-
-## Stop the serving endpoint
-
-Delete the Model Serving endpoint when it is no longer needed to stop its remote
-serving cost. With the default endpoint name:
-
-```bash
-databricks serving-endpoints delete neo4j-mcp-agent \
-  --profile <your-databricks-profile>
-```
-
-This removes only the serving endpoint. It does not delete the registered Unity
-Catalog model, MCP connection, secret scope, or external AgentCore gateway.
-
-## Validation and troubleshooting
-
-Use these checks when you want to isolate where MCP connectivity is failing.
-Run commands from `finance-genie/neo4j-mcp-graph-agent`. The validation clients load
-Databricks auth and object names from `.env`, including `DATABRICKS_PROFILE`
-when you use profile-based auth.
-
-Validate the local AgentCore credential file without calling Databricks or the
-MCP gateway:
-
-```bash
-uv run validation/validate_credentials.py
-```
-
-Test the AgentCore MCP gateway directly from your laptop. This performs the
-OAuth client credentials flow, sends a JSON-RPC `tools/list` request to the
-gateway, and prints the discovered tool names without printing secret values:
-
-```bash
-uv run validation/validate_mcp_gateway_local.py
-```
-
-Expected direct gateway tools include:
-
-- `neo4j-mcp-server-target___get-schema`
-- `neo4j-mcp-server-target___read-cypher`
-- `neo4j-mcp-server-target___list-gds-procedures`
-
-Validate the Databricks Unity Catalog HTTP connection and MCP flag from your
-local machine:
-
-```bash
-uv run validation/validate_connection.py
-```
-
-Run the Databricks-side MCP validation job. This verifies that Databricks can
-read the stored OAuth secrets, reach the AgentCore gateway, list direct gateway
-tools, and list tools through the UC MCP proxy:
-
-```bash
-uv run python -m cli submit --compute serverless 00_validate_mcp_gateway.py
-```
-
-After the agent is deployed, validate serving endpoint readiness and then run a
-tool-backed smoke test:
-
-```bash
-uv run validation/validate_endpoint.py
-uv run python -m cli submit --compute serverless 02_validate_endpoint.py
-```
-
-Evaluate the deployed agent with MLflow GenAI scorers (safety, relevance,
-correctness, plus checks that a tool was called and no write query ran). The job
-fails if any safety or no-write score is below 1.0. The judge scorers need access
-to a Databricks-hosted judge model from the job's workspace:
-
-```bash
-uv run python -m cli submit --compute serverless 03_evaluate_agent.py
-```
-
-### Optional settings
-
-These are forwarded to the jobs through `JOB_PARAMETER_KEYS`; defaults apply when unset.
-
-| Setting | Default | Used by |
+| Setting | Where | Default |
 | --- | --- | --- |
-| `MODEL_ALIAS` | `champion` | `01_deploy_agent.py` sets this Unity Catalog alias on the registered version |
-| `ENDPOINT_READY_TIMEOUT_SECONDS` | `1500` | `01_deploy_agent.py` wait for the endpoint to become ready |
-| `SMOKE_TEST_TIMEOUT_SECONDS` | `120` | `02_validate_endpoint.py` request timeout |
-| `EVAL_TIMEOUT_SECONDS` | `180` | `03_evaluate_agent.py` per-request timeout |
-| `MAX_AGENT_STEPS` | `20` | agent model-call limit per request |
-| `TOOL_RESULT_MAX_CHARS` | `8000` | agent truncation of tool results |
+| MCP service | `agent.toml` `[[tools]]` | `graph-on-databricks.finance_genie.finance_genie_mcp` |
+| Model | `LLM_MODEL` env var (`app.yaml` `env` when deployed) | `system.ai.claude-sonnet-4-5` |
+| Session store | `agent.toml` `[session_store]` | `neo4j-mcp-graph-agent-sessions` |
+| Tracing experiment | `agent.toml` `[tracing]` | `/Shared/agentbricks_traces/neo4j-mcp-graph-agent` |
 
-### Operational notes
+To point at a different MCP service, edit the `service` value in `agent.toml` (or run
+`agentbricks tools add mcp <service> --auth app`) and redeploy.
 
-- `.mcp-credentials.finance.json` and `.env` are local operator inputs and must not be committed.
-- The MCP flag is set with the preview HTTP connection option `is_mcp_connection 'true'`. The setup validates the resulting metadata and the Databricks MCP proxy instead of relying only on SQL success.
-- Re-test connection provisioning when upgrading Databricks SDK packages or moving to a new workspace because external MCP availability can vary by workspace and region.
-- The deploy job logs MCP resource dependencies with `DatabricksMCPClient.get_databricks_resources()` so Model Serving can authenticate to the Unity Catalog connection.
-- Confirm the configured `LLM_ENDPOINT_NAME` is available in the target region before deployment.
-- This project uses Model Serving because its deployable artifact is a reusable agent endpoint rather than an interactive web application.
+## Evaluate
 
-### Failure guide
+```bash
+uv run agent-evaluate
+```
 
-- `validate_credentials.py` fails: confirm the local `.mcp-credentials.finance.json` contains `gateway_url`, `client_id`, `client_secret`, `token_url`, and `scope`.
-- `provision_connection.py` fails with drift: rerun with `--replace` after confirming the existing connection can be recreated.
-- `00_validate_mcp_gateway.py` fails: check AgentCore gateway reachability, OAuth credentials, and whether the Databricks workspace can reach the gateway host.
-- `validate_endpoint.py` fails: wait for the serving endpoint deployment to finish, then rerun validation.
+Runs the agent against the questions in `agent/evaluate.py` with MLflow scorers. The LLM judges
+use a Databricks-hosted model (`JUDGE_MODEL`, default `databricks:/databricks-claude-sonnet-4-5`),
+so no external API key is needed. The run fails
+unless every case passes the safety and no-write checks.
 
-## Databricks references
+## Layout
 
-- [External MCP servers](https://docs.databricks.com/aws/en/generative-ai/mcp/external-mcp)
-- [HTTP connections](https://docs.databricks.com/aws/en/query-federation/http)
-- [Connect agents to external services](https://docs.databricks.com/aws/en/generative-ai/agent-framework/external-connection-tools)
-- [Deploy agents on Model Serving](https://docs.databricks.com/gcp/en/generative-ai/agent-framework/deploy-agent)
-- [Model Context Protocol overview](https://docs.databricks.com/aws/en/generative-ai/mcp)
-- [Databricks-hosted foundation models](https://docs.databricks.com/aws/en/machine-learning/foundation-model-apis/supported-models)
+```
+agent.toml          MCP binding, session store, tracing
+app.yaml            App start command
+agent/              agent, system prompt, guardrails, evaluation
+runtime/            DurableAgentServer entrypoint and adapter
+tests/              guardrail and adapter tests
+AGENTKIT_CONTRACT.md  Agent Bricks integration contract (reference)
+```
+
+## Notes
+
+- The Agent Bricks CLI is Beta and the grant behavior is documented in its README. If deploy
+  reports that it cannot grant on the MCP service, grant manually in Catalog Explorer
+  (Permissions on the MCP service) to the app's service principal: `EXECUTE`, plus `USE_CATALOG`
+  and `USE_SCHEMA` on its parents.
+- The MCP service must be allowed to reach whatever backs it. Agent Bricks does not grant access
+  to resources an MCP service wraps.

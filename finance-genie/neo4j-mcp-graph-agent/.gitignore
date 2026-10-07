@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.databricks/
+mlruns/
+
+.agentbricks/dev/
+
+# Local credentials from the previous Model Serving agent
+.mcp-credentials*.json

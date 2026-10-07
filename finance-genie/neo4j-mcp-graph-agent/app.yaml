@@ -1,0 +1,25 @@
+command:
+- uv
+- run
+- start-server
+env:
+- name: MLFLOW_TRACKING_URI
+  value: databricks
+- name: MLFLOW_EXPERIMENT_ID
+  value: '2180908208794102'
+- name: AGENT_SESSION_STORE
+  value: neo4j-mcp-graph-agent-sessions
+- name: PIP_INDEX_URL
+  value: https://pypi.org/simple/
+- name: UV_INDEX_URL
+  value: https://pypi.org/simple/
+- name: UV_DEFAULT_INDEX
+  value: https://pypi.org/simple/
+- name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_LAKEBASE_BRANCH
+  value: projects/databricks-internal-custom-agents/branches/production
+- name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_DATABASE
+  value: runtime-agent-bricks-neo4j-6e1c76ef-9f6a-41fd-81a1-d9616b679a79
+- name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_USERNAME
+  value: bc9995f7-1726-4a33-a716-0566e129d9dd
+- name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_SCHEMA
+  value: databricks_agentkit_runtime
