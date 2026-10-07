@@ -39,11 +39,13 @@ It is built on the Agent Bricks runtime: the OpenAI Agents SDK for the agent loo
    agentbricks --help
    ```
 
-2. Authenticate with a profile of your choice:
+2. Create the profile environment variable first, then authenticate. Every command below that
+   takes a profile uses this variable:
 
    ```bash
-   databricks auth profiles
-   agentbricks login --profile <profile>
+   databricks auth profiles                      # list your profiles
+   export DATABRICKS_CONFIG_PROFILE=<your-profile>
+   agentbricks login --profile "$DATABRICKS_CONFIG_PROFILE"
    ```
 
 3. Install and run the local checks:
@@ -54,12 +56,16 @@ It is built on the Agent Bricks runtime: the OpenAI Agents SDK for the agent loo
    agentbricks doctor .
    ```
 
-4. Run locally and ask a question:
+4. Run locally and ask a question. Use two terminal windows, because the server keeps running.
+
+   In window 1, start the server:
 
    ```bash
-   cp .env.example .env        # set DATABRICKS_CONFIG_PROFILE
+   cp .env.example .env        # set DATABRICKS_CONFIG_PROFILE to the same value
    agentbricks dev             # serves http://localhost:8000
    ```
+
+   In window 2, from this directory with `DATABRICKS_CONFIG_PROFILE` exported, ask a question:
 
    ```bash
    agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
@@ -78,7 +84,7 @@ It is built on the Agent Bricks runtime: the OpenAI Agents SDK for the agent loo
 
    ```bash
    SESSION_ID=$(uuidgen)
-   agentbricks --profile <profile> endpoint invoke agent-bricks-neo4j-graph-agent \
+   agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" endpoint invoke agent-bricks-neo4j-graph-agent \
      --path /api/invocations --routing-key "$SESSION_ID" \
      --json '{"id":"'$(uuidgen)'","session_id":"'$SESSION_ID'","input":[{"role":"user","content":"What does the SIMILAR_TO relationship mean?"}]}'
    agentbricks deployments logs agent-bricks-neo4j-graph-agent
@@ -91,7 +97,7 @@ It is built on the Agent Bricks runtime: the OpenAI Agents SDK for the agent loo
 | Setting | Where | Default |
 | --- | --- | --- |
 | MCP service | `agent.toml` `[[tools]]` | `graph-on-databricks.finance_genie.finance_genie_mcp` |
-| Model | `LLM_MODEL` env var (`app.yaml` `env` when deployed) | `system.ai.claude-sonnet-4-5` |
+| Model | `LLM_MODEL` env var (`app.yaml` `env` when deployed) | `system.ai.claude-sonnet-5-5` |
 | Session store | `agent.toml` `[session_store]` | `neo4j-mcp-graph-agent-sessions` |
 | Tracing experiment | `agent.toml` `[tracing]` | `/Shared/agentbricks_traces/neo4j-mcp-graph-agent` |
 
@@ -105,9 +111,19 @@ uv run agent-evaluate
 ```
 
 Runs the agent against the questions in `agent/evaluate.py` with MLflow scorers. The LLM judges
-use a Databricks-hosted model (`JUDGE_MODEL`, default `databricks:/databricks-claude-sonnet-4-5`),
+use a Databricks-hosted model (`JUDGE_MODEL`, default `databricks:/databricks-claude-sonnet-5-5`),
 so no external API key is needed. The run fails
 unless every case passes the safety and no-write checks.
+
+## Delete the agent
+
+```bash
+agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deployments delete agent-bricks-neo4j-graph-agent
+```
+
+This deletes the app and, when managed provisioning is enabled, its runtime store. Use
+`agentbricks deployments stop agent-bricks-neo4j-graph-agent` to stop it without deleting.
+Grants on the MCP service and the MLflow tracing experiment are not removed by this command.
 
 ## Layout
 
@@ -117,7 +133,6 @@ app.yaml            App start command
 agent/              agent, system prompt, guardrails, evaluation
 runtime/            DurableAgentServer entrypoint and adapter
 tests/              guardrail and adapter tests
-AGENTKIT_CONTRACT.md  Agent Bricks integration contract (reference)
 ```
 
 ## Notes

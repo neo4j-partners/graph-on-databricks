@@ -6,13 +6,13 @@ env:
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_LAKEBASE_BRANCH
   value: projects/databricks-internal-custom-agents/branches/production
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_DATABASE
-  value: runtime-agent-bricks-neo4j-6e1c76ef-9f6a-41fd-81a1-d9616b679a79
+  value: runtime-agent-bricks-neo4j-1ec8cd95-43b5-4ff3-a476-f5a62f719a1a
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_USERNAME
-  value: bc9995f7-1726-4a33-a716-0566e129d9dd
+  value: 60b2b70f-5df7-41e8-9824-c2ab115b803b
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_SCHEMA
   value: databricks_agentkit_runtime
 - name: MLFLOW_TRACKING_URI
-  value: http://127.0.0.1:59972
+  value: http://127.0.0.1:60769
 - name: MLFLOW_EXPERIMENT_NAME
   value: neo4j-mcp-graph-agent
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_LOCAL

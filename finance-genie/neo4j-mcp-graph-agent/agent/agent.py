@@ -21,7 +21,7 @@ from databricks_agentkit.openai import (
 logger = logging.getLogger(__name__)
 
 # A Unity Catalog AI Gateway model service from the `system.ai` schema. Override with LLM_MODEL.
-MODEL = os.environ.get("LLM_MODEL", "system.ai.claude-sonnet-4-5")
+MODEL = os.environ.get("LLM_MODEL", "system.ai.claude-sonnet-5-5")
 
 
 def configure() -> None:

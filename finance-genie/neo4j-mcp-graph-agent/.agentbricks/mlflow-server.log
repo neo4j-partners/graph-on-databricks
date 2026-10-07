@@ -1,7 +1,7 @@
 Registry store URI not provided. Using backend store URI.
 [MLflow] Security middleware enabled with default settings (localhost-only). To allow connections from other hosts, use --host 0.0.0.0 and configure --allowed-hosts and --cors-allowed-origins.
-2026/10/06 22:00:37 INFO:     Uvicorn running on http://127.0.0.1:59972 (Press CTRL+C to quit)
-2026/10/06 22:00:37 INFO:     Started parent process [61675]
+2026/10/06 22:25:24 INFO:     Uvicorn running on http://127.0.0.1:60769 (Press CTRL+C to quit)
+2026/10/06 22:25:24 INFO:     Started parent process [67068]
 /Users/ryanknight/.cache/uv/archive-v0/10e3HoctqdJX_YJl/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
   from starlette.middleware.wsgi import WSGIResponder, build_environ
 /Users/ryanknight/.cache/uv/archive-v0/10e3HoctqdJX_YJl/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
@@ -10,24 +10,20 @@ Registry store URI not provided. Using backend store URI.
   from starlette.middleware.wsgi import WSGIResponder, build_environ
 /Users/ryanknight/.cache/uv/archive-v0/10e3HoctqdJX_YJl/lib/python3.12/site-packages/mlflow/server/fastapi_app.py:23: StarletteDeprecationWarning: starlette.middleware.wsgi is deprecated and will be removed in a future release. Please refer to https://github.com/abersheeran/a2wsgi as a replacement.
   from starlette.middleware.wsgi import WSGIResponder, build_environ
-2026/10/06 22:00:39 INFO:     Started server process [61682]
-2026/10/06 22:00:39 INFO:     Waiting for application startup.
-2026/10/06 22:00:39 INFO:     Started server process [61683]
-2026/10/06 22:00:39 INFO:     Waiting for application startup.
-2026/10/06 22:00:39 INFO:     Started server process [61680]
-2026/10/06 22:00:39 INFO:     Waiting for application startup.
-2026/10/06 22:00:39 INFO:     Started server process [61681]
-2026/10/06 22:00:39 INFO:     Waiting for application startup.
-2026/10/06 22:00:39 INFO:     Application startup complete.
-2026/10/06 22:00:39 INFO:     Application startup complete.
-2026/10/06 22:00:39 INFO:     Application startup complete.
-2026/10/06 22:00:39 INFO:     Application startup complete.
-2026/10/06 22:00:41 INFO mlflow.server.jobs.utils: Registered online_scoring_scheduler periodic task (runs every 1 minute)
-2026/10/06 22:00:41 INFO mlflow.server.jobs.utils: Registered trace_archival_scheduler periodic task (polls every 1 minute and no-ops when trace archival is disabled or unconfigured)
-2026/10/06 22:00:48 INFO:     127.0.0.1:59998 - "GET /api/3.0/mlflow/server-info HTTP/1.1" 200 OK
-2026/10/06 22:01:06 INFO:     127.0.0.1:60009 - "GET /api/2.0/mlflow/experiments/get-by-name?experiment_name=neo4j-mcp-graph-agent HTTP/1.1" 200 OK
-2026/10/06 22:01:11 INFO:     127.0.0.1:60013 - "GET /version HTTP/1.1" 200 OK
-2026/10/06 22:01:11 INFO:     127.0.0.1:60009 - "POST /v1/traces HTTP/1.1" 200 OK
-2026/10/06 22:01:14 INFO:     127.0.0.1:60009 - "POST /v1/traces HTTP/1.1" 200 OK
-2026/10/06 22:01:19 INFO:     127.0.0.1:60009 - "POST /v1/traces HTTP/1.1" 200 OK
-2026/10/06 22:01:23 INFO:     127.0.0.1:60009 - "POST /v1/traces HTTP/1.1" 200 OK
+2026/10/06 22:25:26 INFO:     Started server process [67073]
+2026/10/06 22:25:26 INFO:     Waiting for application startup.
+2026/10/06 22:25:26 INFO:     Started server process [67074]
+2026/10/06 22:25:26 INFO:     Waiting for application startup.
+2026/10/06 22:25:26 INFO:     Started server process [67076]
+2026/10/06 22:25:26 INFO:     Waiting for application startup.
+2026/10/06 22:25:26 INFO:     Application startup complete.
+2026/10/06 22:25:26 INFO:     Application startup complete.
+2026/10/06 22:25:26 INFO:     Started server process [67075]
+2026/10/06 22:25:26 INFO:     Waiting for application startup.
+2026/10/06 22:25:26 INFO:     Application startup complete.
+2026/10/06 22:25:26 INFO:     Application startup complete.
+2026/10/06 22:25:28 INFO mlflow.server.jobs.utils: Registered online_scoring_scheduler periodic task (runs every 1 minute)
+2026/10/06 22:25:28 INFO mlflow.server.jobs.utils: Registered trace_archival_scheduler periodic task (polls every 1 minute and no-ops when trace archival is disabled or unconfigured)
+2026/10/06 22:25:32 INFO:     127.0.0.1:60801 - "GET /api/2.0/mlflow/experiments/get-by-name?experiment_name=neo4j-mcp-graph-agent HTTP/1.1" 200 OK
+2026/10/06 22:25:34 INFO:     127.0.0.1:60804 - "GET /version HTTP/1.1" 200 OK
+2026/10/06 22:25:34 INFO:     127.0.0.1:60801 - "POST /v1/traces HTTP/1.1" 200 OK

@@ -20,7 +20,7 @@ from agent.agent import configure, run_agent  # noqa: E402
 from agent.guardrails import is_read_only_cypher  # noqa: E402
 
 # Judges run on a Databricks-hosted foundation model, so no external API key is needed.
-JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "databricks:/databricks-claude-sonnet-4-5")
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "databricks:/databricks-claude-sonnet-5-5")
 
 EVAL_DATA = [
     {
