@@ -6,7 +6,7 @@ import pytest
 from agent.nams import (
     RECALL_CONVERSATIONS,
     RECALL_MAX_CHARS,
-    TurnRecorder,
+    TurnMemory,
     nams_enabled,
     recall_instructions,
     safe_scope_id,
@@ -84,8 +84,8 @@ def conversation(conv_id, age_minutes, user_id=None):
     return SimpleNamespace(id=conv_id, created_at=created, metadata=metadata)
 
 
-def recorder(memory, **kwargs):
-    return TurnRecorder(
+def turn_memory(memory, **kwargs):
+    return TurnMemory(
         user_id="u1",
         session_id="s1",
         prompt="which communities look like rings?",
@@ -122,7 +122,7 @@ def test_nams_enabled_follows_the_key(monkeypatch):
 async def test_disabled_without_a_key_makes_no_calls(monkeypatch):
     monkeypatch.delenv("MEMORY_API_KEY", raising=False)
     memory = FakeMemory()
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         assert await turn.recall() == ""
         turn.add_tool_call("read_neo4j_cypher", {"query": "x"})
         turn.set_answer("answer")
@@ -131,7 +131,7 @@ async def test_disabled_without_a_key_makes_no_calls(monkeypatch):
 
 async def test_writes_a_turn_in_order(nams_key):
     memory = FakeMemory()
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         turn.add_tool_call("get_neo4j_schema", {})
         turn.add_tool_call("read_neo4j_cypher", {"query": "MATCH (n) RETURN n"})
         turn.set_answer("two rings")
@@ -161,7 +161,7 @@ async def test_stored_user_message_is_the_prompt_not_recalled_context(nams_key):
     memory = FakeMemory(
         conversations=[conversation("c1", 5)], contexts={"c1": "earlier context"}
     )
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         assert await turn.recall() == "earlier context"
         turn.set_answer("ok")
     user_message = next(c for c in memory.calls if c[0] == "add_message")
@@ -178,7 +178,7 @@ async def test_recall_reads_newest_conversations_for_this_user_only(nams_key):
         ],
         contexts={"newest": "A", "middle": "B", "old": "C"},
     )
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         recalled = await turn.recall()
     assert RECALL_CONVERSATIONS == 2
     assert recalled == "A\n\nB"
@@ -190,13 +190,13 @@ async def test_recall_is_capped(nams_key):
     memory = FakeMemory(
         conversations=[conversation("c1", 1)], contexts={"c1": "x" * (RECALL_MAX_CHARS * 2)}
     )
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         assert len(await turn.recall()) == RECALL_MAX_CHARS
 
 
 async def test_recovery_recalls_but_does_not_write(nams_key):
     memory = FakeMemory(conversations=[conversation("c1", 1)], contexts={"c1": "ctx"})
-    async with recorder(memory, write=False) as turn:
+    async with turn_memory(memory, write=False) as turn:
         assert await turn.recall() == "ctx"
         turn.add_tool_call("read_neo4j_cypher", {})
         turn.set_answer("ok")
@@ -206,7 +206,7 @@ async def test_recovery_recalls_but_does_not_write(nams_key):
 
 async def test_connect_failure_disables_memory_without_raising(nams_key):
     memory = FakeMemory(fail_on="connect")
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         assert await turn.recall() == ""
         turn.set_answer("ok")
     assert memory.calls == []
@@ -214,13 +214,13 @@ async def test_connect_failure_disables_memory_without_raising(nams_key):
 
 async def test_recall_failure_returns_empty(nams_key):
     memory = FakeMemory(fail_on="list_conversations")
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         assert await turn.recall() == ""
 
 
 async def test_write_failure_does_not_raise_and_still_closes(nams_key):
     memory = FakeMemory(fail_on="create_conversation")
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         turn.set_answer("ok")
     assert names(memory)[-1] == "close"
 
@@ -228,7 +228,7 @@ async def test_write_failure_does_not_raise_and_still_closes(nams_key):
 async def test_agent_failure_still_records_the_turn_as_failed(nams_key):
     memory = FakeMemory()
     with pytest.raises(ValueError, match="boom"):
-        async with recorder(memory) as turn:
+        async with turn_memory(memory) as turn:
             turn.add_tool_call("read_neo4j_cypher", {"query": "x"})
             raise ValueError("boom")
     complete = next(c for c in memory.calls if c[0] == "complete_trace")
@@ -262,7 +262,7 @@ def test_last_user_text_handles_string_and_parts():
 
 async def test_record_feeds_tool_calls_and_the_last_answer(nams_key):
     memory = FakeMemory()
-    async with recorder(memory) as turn:
+    async with turn_memory(memory) as turn:
         _record(turn, {"role": "assistant", "content": "", "tool_calls": [{"name": "t", "args": {"a": 1}}]})
         _record(turn, {"role": "tool", "name": "t", "content": "rows"})
         _record(turn, {"role": "assistant", "content": "draft"})

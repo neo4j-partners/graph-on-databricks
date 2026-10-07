@@ -10,7 +10,7 @@ from agents.items import MessageOutputItem, ToolCallItem, ToolCallOutputItem
 from openai.types.responses import ResponseTextDeltaEvent
 
 from agent.agent import run_agent
-from agent.nams import TurnRecorder, recall_instructions, safe_scope_id
+from agent.nams import TurnMemory, recall_instructions, safe_scope_id
 from databricks_agentkit import InvocationContext
 
 MAX_TURNS_MESSAGE = (
@@ -71,7 +71,7 @@ async def _invoke_agent(messages: list[Any], context: InvocationContext, user_id
     session_id = _session_id(context)
     outputs: list[dict] = []
     # A recovery attempt replays a turn that may already be recorded, so it recalls but does not write.
-    async with TurnRecorder(
+    async with TurnMemory(
         user_id=user_id,
         session_id=session_id,
         prompt=_last_user_text(messages),
@@ -95,7 +95,7 @@ async def _invoke_agent(messages: list[Any], context: InvocationContext, user_id
     return {"output": outputs, "status": "completed"}
 
 
-def _record(turn: TurnRecorder, message: dict) -> None:
+def _record(turn: TurnMemory, message: dict) -> None:
     """Feed one streamed message to memory: tool calls as they happen, the last text as the answer."""
     for call in message.get("tool_calls") or []:
         turn.add_tool_call(call["name"], call["args"])

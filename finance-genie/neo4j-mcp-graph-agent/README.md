@@ -107,7 +107,7 @@ The parts:
 - **Caller:** The client that sends questions. It is the traffic CLI, the Databricks Job, or any other client.
 - **Databricks App:** The deployed agent. It runs the Agent Bricks `DurableAgentServer`.
 - **Agent:** The OpenAI Agents SDK loop. Guardrails allow only two read-only graph tools.
-- **TurnRecorder:** The class in `agent/nams.py` that handles one turn. A turn is one question and its answer. The class reads memory before the turn and writes the turn to NAMS after it.
+- **TurnMemory:** The class in `agent/nams.py` that handles one turn. A turn is one question and its answer. The class reads memory before the turn and writes the turn to NAMS after it.
 - **AI Gateway model:** The model that writes the answer. `app.yaml` pins `claude-sonnet-4-5`.
 - **MCP service:** The Unity Catalog service `finance_genie_mcp`. It runs read-only Cypher on Neo4j.
 - **NAMS:** The hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/). It stores conversations, messages, traces, and entities.
@@ -122,13 +122,13 @@ The app uses NAMS as long term memory. It saves every turn and reads recent turn
 How one turn uses NAMS:
 
 1. **Request:** The caller sends a question and a `user_id`.
-2. **Recall:** The app opens a `TurnRecorder` for the turn. The recorder lists the user's conversations in NAMS and reads the latest two.
+2. **Recall:** The app opens a `TurnMemory` for the turn. It lists the user's conversations in NAMS and reads the latest two.
 3. **Run:** The app runs the agent with the recalled text in its instructions.
-4. **Buffer:** The app hands each tool call and the final answer to the recorder. The recorder holds them in memory.
+4. **Buffer:** The app hands each tool call and the final answer to `TurnMemory`. It holds them in memory.
 5. **Reply:** The app sends the answer to the caller.
-6. **Write:** The recorder saves the turn to NAMS as one conversation with two messages and a reasoning trace.
+6. **Write:** `TurnMemory` saves the turn to NAMS as one conversation with two messages and a reasoning trace.
 
-**Turn:** One question and its answer. The recorder name comes from this unit. NAMS stores each turn as its own conversation, and the `user_id` links a user's turns together.
+**Turn:** One question and its answer. `TurnMemory` handles one turn. NAMS stores each turn as its own conversation, and the `user_id` links a user's turns together.
 
 - **Write:** After each turn, the app saves the user message and the answer as a conversation.
 - **Trace:** When the agent uses tools, the app saves one reasoning trace. The trace has one step and one tool call for each MCP call.

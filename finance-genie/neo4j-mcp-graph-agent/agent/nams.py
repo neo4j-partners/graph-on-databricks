@@ -57,10 +57,10 @@ class _ToolCall:
 
 
 @dataclass
-class TurnRecorder:
+class TurnMemory:
     """Recalls and records one agent invocation in NAMS.
 
-    Use as ``async with TurnRecorder(...) as turn``. Tool calls and the answer are buffered while
+    Use as ``async with TurnMemory(...) as turn``. Tool calls and the answer are buffered while
     the agent streams and written on exit, so memory adds no latency to streaming. Set
     ``write=False`` to recall without recording, as a recovery retry must not duplicate a turn.
     """
@@ -74,7 +74,7 @@ class TurnRecorder:
     _tool_calls: list[_ToolCall] = field(default_factory=list, init=False, repr=False)
     _answer: str = field(default="", init=False, repr=False)
 
-    async def __aenter__(self) -> TurnRecorder:
+    async def __aenter__(self) -> TurnMemory:
         if not nams_enabled():
             return self
         try:
