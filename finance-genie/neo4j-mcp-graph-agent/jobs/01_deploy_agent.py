@@ -1,8 +1,10 @@
 """Log, register, and deploy the Neo4j MCP graph agent."""
 
-from __future__ import annotations
-
+import os
+import time
 from importlib.metadata import PackageNotFoundError, version
+
+from databricks.sdk import WorkspaceClient
 
 from _job_bootstrap import inject_params, setting
 
@@ -14,6 +16,42 @@ def requirement(package: str) -> str:
         return f"{package}=={version(package)}"
     except PackageNotFoundError:
         return package
+
+
+OPTIONAL_AGENT_ENV_VARS = ("MAX_AGENT_STEPS", "TOOL_RESULT_MAX_CHARS")
+POLL_INTERVAL_SECONDS = 30
+
+
+def enum_text(value) -> str:
+    """Return the plain enum value whether the SDK gives an Enum or a string."""
+    return str(getattr(value, "value", value))
+
+
+def wait_for_endpoint_ready(
+    ws: WorkspaceClient, endpoint_name: str, timeout_seconds: float
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        state = ws.serving_endpoints.get(endpoint_name).state
+        ready = enum_text(state.ready) if state and state.ready else "UNKNOWN"
+        config_update = "UNKNOWN"
+        if state and state.config_update:
+            config_update = enum_text(state.config_update)
+        if config_update == "UPDATE_FAILED":
+            raise RuntimeError(
+                f"endpoint {endpoint_name} update failed "
+                f"(ready={ready}, config_update={config_update})"
+            )
+        if ready == "READY" and config_update == "NOT_UPDATING":
+            print(f"OK    endpoint {endpoint_name} is READY")
+            return
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                f"timed out after {timeout_seconds:.0f}s waiting for endpoint "
+                f"{endpoint_name} (ready={ready}, config_update={config_update})"
+            )
+        print(f"OK    waiting: ready={ready} config_update={config_update}")
+        time.sleep(POLL_INTERVAL_SECONDS)
 
 
 def get_mcp_resources(ws: WorkspaceClient, connection_name: str):
@@ -36,7 +74,7 @@ def get_mcp_resources(ws: WorkspaceClient, connection_name: str):
 def main() -> None:
     import mlflow
     import databricks.agents as agents
-    from databricks.sdk import WorkspaceClient
+    from mlflow import MlflowClient
     from mlflow.models.resources import DatabricksServingEndpoint
 
     catalog = setting("CATALOG")
@@ -47,6 +85,8 @@ def main() -> None:
     llm_endpoint_name = setting("LLM_ENDPOINT_NAME")
     connection_name = setting("UC_CONNECTION_NAME")
     workspace_dir = setting("DATABRICKS_WORKSPACE_DIR")
+    model_alias = setting("MODEL_ALIAS", "champion")
+    ready_timeout_seconds = float(setting("ENDPOINT_READY_TIMEOUT_SECONDS", "1500"))
     ws = WorkspaceClient()
 
     mlflow.set_registry_uri("databricks-uc")
@@ -60,6 +100,7 @@ def main() -> None:
         requirement("databricks-agents"),
         requirement("databricks-langchain"),
         requirement("databricks-mcp"),
+        requirement("langchain"),
         requirement("langchain-core"),
         requirement("langgraph"),
         requirement("langgraph-prebuilt"),
@@ -83,15 +124,30 @@ def main() -> None:
     )
     print(f"OK    registered UC model: {registered.name} v{registered.version}")
 
+    version_number = int(registered.version)
+    MlflowClient(registry_uri="databricks-uc").set_registered_model_alias(
+        uc_model_name, model_alias, version_number
+    )
+    print(f"OK    set alias '{model_alias}' on {uc_model_name} v{version_number}")
+
+    environment_vars = {
+        "LLM_ENDPOINT_NAME": llm_endpoint_name,
+        "UC_CONNECTION_NAME": connection_name,
+        "MCP_SECRET_SCOPE": setting("MCP_SECRET_SCOPE"),
+    }
+    environment_vars.update(
+        {
+            name: os.environ[name]
+            for name in OPTIONAL_AGENT_ENV_VARS
+            if os.environ.get(name)
+        }
+    )
+
     deployment = agents.deploy(
         uc_model_name,
-        int(registered.version),
+        version_number,
         endpoint_name=endpoint_name,
-        environment_vars={
-            "LLM_ENDPOINT_NAME": llm_endpoint_name,
-            "UC_CONNECTION_NAME": connection_name,
-            "MCP_SECRET_SCOPE": setting("MCP_SECRET_SCOPE"),
-        },
+        environment_vars=environment_vars,
         tags={
             "endpointSource": "neo4j-mcp-agentcore",
             "connection": connection_name,
@@ -99,6 +155,8 @@ def main() -> None:
         deploy_feedback_model=False,
     )
     print(f"OK    deployment submitted: {deployment}")
+
+    wait_for_endpoint_ready(ws, endpoint_name, ready_timeout_seconds)
 
 
 if __name__ == "__main__":

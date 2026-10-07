@@ -1,7 +1,5 @@
 """Databricks-side validation for AgentCore gateway and UC MCP proxy."""
 
-from __future__ import annotations
-
 import json
 from urllib.parse import urlparse
 
@@ -20,6 +18,8 @@ REQUIRED_SECRET_KEYS = (
     "token_endpoint",
     "oauth_scope",
 )
+AGENT_TOOL_SUFFIXES = ("get-schema", "read-cypher")
+
 
 def parse_mcp_response(response: requests.Response) -> dict:
     content_type = response.headers.get("Content-Type", "")
@@ -103,24 +103,28 @@ def main() -> None:
         )
     assert_tools(parse_mcp_response(direct_response), "direct gateway")
 
+    from databricks_mcp import DatabricksMCPClient
+
     host = ws.config.host.rstrip("/")
     proxy_url = f"{host}/api/2.0/mcp/external/{connection_name}"
-    proxy_headers = ws.config.authenticate()
-    proxy_headers["Content-Type"] = "application/json"
-    proxy_response = requests.post(
-        proxy_url,
-        json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
-        headers=proxy_headers,
-        timeout=30,
-    )
-    if proxy_response.status_code != 200:
+    proxy_tools = DatabricksMCPClient(
+        server_url=proxy_url, workspace_client=ws
+    ).list_tools()
+    if not proxy_tools:
+        raise RuntimeError(f"UC MCP proxy returned zero tools: {proxy_url}")
+    names = [tool.name for tool in proxy_tools]
+    print(f"OK    UC MCP proxy returned {len(names)} tools")
+    for name in names:
+        print(f"      - {name}")
+    missing = [
+        expected
+        for expected in AGENT_TOOL_SUFFIXES
+        if not any(name.endswith(expected) for name in names)
+    ]
+    if missing:
         raise RuntimeError(
-            "Databricks MCP proxy tools/list failed: "
-            f"HTTP {proxy_response.status_code} {proxy_response.text[:300]}"
+            f"UC MCP proxy is missing tools the agent requires {missing}: {names}"
         )
-    tools = assert_tools(parse_mcp_response(proxy_response), "UC MCP proxy")
-    if not tools:
-        raise RuntimeError(f"Databricks MCP proxy returned zero tools: {proxy_url}")
 
 
 if __name__ == "__main__":

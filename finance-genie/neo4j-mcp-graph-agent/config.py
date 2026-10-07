@@ -48,7 +48,7 @@ class Settings(BaseModel):
     )
 
     agentcore_credentials_path: Path = Field(
-        default=PROJECT_DIR / ".mcp-credentials.json",
+        default=PROJECT_DIR / ".mcp-credentials.finance.json",
         alias="AGENTCORE_CREDENTIALS_PATH",
     )
     mcp_secret_scope: str = Field(default="mcp-neo4j-secrets", alias="MCP_SECRET_SCOPE")
@@ -59,7 +59,7 @@ class Settings(BaseModel):
     schema_name: str = Field(default="agents", alias="SCHEMA")
     uc_model_name: str = Field(default="neo4j_mcp_agent", alias="UC_MODEL_NAME")
     llm_endpoint_name: str = Field(
-        default="databricks-claude-sonnet-4-6", alias="LLM_ENDPOINT_NAME"
+        default="databricks-claude-sonnet-5-5", alias="LLM_ENDPOINT_NAME"
     )
     model_serving_endpoint_name: str = Field(
         default="neo4j-mcp-agent", alias="MODEL_SERVING_ENDPOINT_NAME"
@@ -83,7 +83,7 @@ class Settings(BaseModel):
     @classmethod
     def resolve_credentials_path(cls, value: object) -> object:
         if value is None or value == "":
-            return PROJECT_DIR / ".mcp-credentials.json"
+            return PROJECT_DIR / ".mcp-credentials.finance.json"
         path = Path(str(value)).expanduser()
         if not path.is_absolute():
             root_relative = PROJECT_DIR.parent / path

@@ -4,6 +4,8 @@
 **/.env.local
 .mcp-credentials.json
 **/.mcp-credentials.json
+.mcp-credentials.finance.json
+**/.mcp-credentials.finance.json
 __pycache__/
 **/__pycache__/
 .pytest_cache/

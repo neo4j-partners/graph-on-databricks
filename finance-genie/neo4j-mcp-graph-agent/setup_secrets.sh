@@ -4,7 +4,7 @@
 # but delegates validation and SDK calls to setup/store_secrets.py.
 #
 # Secrets written:
-#   gateway_host    - scheme and host from .mcp-credentials.json gateway_url
+#   gateway_host    - scheme and host from .mcp-credentials.finance.json gateway_url
 #   client_id       - AgentCore OAuth client id
 #   client_secret   - AgentCore OAuth client secret
 #   token_endpoint  - AgentCore OAuth token URL
@@ -15,7 +15,7 @@
 #
 # Prerequisites:
 #   1. Copy .env.sample to .env and fill in Databricks settings.
-#   2. Copy the AgentCore-generated .mcp-credentials.json into this directory.
+#   2. Copy the AgentCore-generated .mcp-credentials.finance.json into this directory.
 #   3. Authenticate the Databricks CLI/SDK, or pass --profile NAME.
 
 set -euo pipefail
@@ -23,7 +23,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
 ROOT_ENV_FILE="${SCRIPT_DIR}/../.env"
-CREDENTIALS_FILE="${SCRIPT_DIR}/.mcp-credentials.json"
+CREDENTIALS_FILE="${SCRIPT_DIR}/.mcp-credentials.finance.json"
 PROFILE=""
 
 usage() {
@@ -70,7 +70,7 @@ fi
 
 if [[ ! -f "$CREDENTIALS_FILE" ]]; then
   echo "Error: ${CREDENTIALS_FILE} not found." >&2
-  echo "Copy the AgentCore-generated .mcp-credentials.json into this directory." >&2
+  echo "Copy the AgentCore-generated .mcp-credentials.finance.json into this directory." >&2
   exit 1
 fi
 

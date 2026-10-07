@@ -7,7 +7,7 @@
 #
 # Prerequisites:
 #   1. Copy ../.env.sample to ../.env and fill in Databricks settings.
-#   2. Copy the AgentCore-generated .mcp-credentials.json into this directory.
+#   2. Copy the AgentCore-generated .mcp-credentials.finance.json into this directory.
 #   3. Authenticate the Databricks CLI/SDK, or pass --profile NAME.
 
 set -euo pipefail
@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
 ROOT_ENV_FILE="${SCRIPT_DIR}/../.env"
-CREDENTIALS_FILE="${SCRIPT_DIR}/.mcp-credentials.json"
+CREDENTIALS_FILE="${SCRIPT_DIR}/.mcp-credentials.finance.json"
 
 PROFILE=""
 REPLACE_CONNECTION=0
@@ -100,7 +100,7 @@ if [[ -f "$ROOT_ENV_FILE" ]]; then
   ENV_FILE="$ROOT_ENV_FILE"
 fi
 [[ -f "$ENV_FILE" ]] || fail "${ROOT_ENV_FILE} not found. Copy ../.env.sample to ../.env first."
-[[ -f "$CREDENTIALS_FILE" ]] || fail "${CREDENTIALS_FILE} not found. Copy .mcp-credentials.json into this directory first."
+[[ -f "$CREDENTIALS_FILE" ]] || fail "${CREDENTIALS_FILE} not found. Copy .mcp-credentials.finance.json into this directory first."
 command -v uv >/dev/null 2>&1 || fail "uv not found. Install uv before running deploy."
 
 cd "$SCRIPT_DIR"

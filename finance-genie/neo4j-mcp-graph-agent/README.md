@@ -30,7 +30,7 @@ separately configured Genie Space.
 - Permission to create or use the configured secret scope, catalog, schema, model, and serving endpoint.
 - A Pro or Serverless SQL warehouse, or a DBR 15.4 LTS or later cluster using Standard or Dedicated access mode.
 - A Neo4j MCP server that supports Streamable HTTP transport.
-- `.mcp-credentials.json` copied into this directory by the operator.
+- `.mcp-credentials.finance.json` copied into this directory by the operator.
 
 ## Quick start
 
@@ -49,7 +49,7 @@ cd neo4j-mcp-graph-agent
 Copy the AgentCore-generated credentials file into this directory:
 
 ```bash
-cp /path/to/.mcp-credentials.json .mcp-credentials.json
+cp /path/to/.mcp-credentials.finance.json .mcp-credentials.finance.json
 ```
 
 Edit `.env` and set at least:
@@ -62,7 +62,7 @@ Edit `.env` and set at least:
 - `UC_CONNECTION_NAME`
 - `CATALOG`
 - `SCHEMA`
-- `LLM_ENDPOINT_NAME`, for example `databricks-claude-sonnet-4-6` if available in your region
+- `LLM_ENDPOINT_NAME`, for example `databricks-claude-sonnet-5-5` if available in your region
 - `MODEL_SERVING_ENDPOINT_NAME`
 
 Validate the local credential file:
@@ -117,6 +117,7 @@ uv run python -m cli submit 00_validate_mcp_gateway.py
 uv run python -m cli submit 01_deploy_agent.py
 uv run validation/validate_endpoint.py
 uv run python -m cli submit 02_validate_endpoint.py
+uv run python -m cli submit 03_evaluate_agent.py
 ```
 
 The CLI reduces the shared root environment to the explicit non-secret
@@ -206,9 +207,31 @@ uv run validation/validate_endpoint.py
 uv run python -m cli submit --compute serverless 02_validate_endpoint.py
 ```
 
+Evaluate the deployed agent with MLflow GenAI scorers (safety, relevance,
+correctness, plus checks that a tool was called and no write query ran). The job
+fails if any safety or no-write score is below 1.0. The judge scorers need access
+to a Databricks-hosted judge model from the job's workspace:
+
+```bash
+uv run python -m cli submit --compute serverless 03_evaluate_agent.py
+```
+
+### Optional settings
+
+These are forwarded to the jobs through `JOB_PARAMETER_KEYS`; defaults apply when unset.
+
+| Setting | Default | Used by |
+| --- | --- | --- |
+| `MODEL_ALIAS` | `champion` | `01_deploy_agent.py` sets this Unity Catalog alias on the registered version |
+| `ENDPOINT_READY_TIMEOUT_SECONDS` | `1500` | `01_deploy_agent.py` wait for the endpoint to become ready |
+| `SMOKE_TEST_TIMEOUT_SECONDS` | `120` | `02_validate_endpoint.py` request timeout |
+| `EVAL_TIMEOUT_SECONDS` | `180` | `03_evaluate_agent.py` per-request timeout |
+| `MAX_AGENT_STEPS` | `20` | agent model-call limit per request |
+| `TOOL_RESULT_MAX_CHARS` | `8000` | agent truncation of tool results |
+
 ### Operational notes
 
-- `.mcp-credentials.json` and `.env` are local operator inputs and must not be committed.
+- `.mcp-credentials.finance.json` and `.env` are local operator inputs and must not be committed.
 - The MCP flag is set with the preview HTTP connection option `is_mcp_connection 'true'`. The setup validates the resulting metadata and the Databricks MCP proxy instead of relying only on SQL success.
 - Re-test connection provisioning when upgrading Databricks SDK packages or moving to a new workspace because external MCP availability can vary by workspace and region.
 - The deploy job logs MCP resource dependencies with `DatabricksMCPClient.get_databricks_resources()` so Model Serving can authenticate to the Unity Catalog connection.
@@ -217,7 +240,7 @@ uv run python -m cli submit --compute serverless 02_validate_endpoint.py
 
 ### Failure guide
 
-- `validate_credentials.py` fails: confirm the local `.mcp-credentials.json` contains `gateway_url`, `client_id`, `client_secret`, `token_url`, and `scope`.
+- `validate_credentials.py` fails: confirm the local `.mcp-credentials.finance.json` contains `gateway_url`, `client_id`, `client_secret`, `token_url`, and `scope`.
 - `provision_connection.py` fails with drift: rerun with `--replace` after confirming the existing connection can be recreated.
 - `00_validate_mcp_gateway.py` fails: check AgentCore gateway reachability, OAuth credentials, and whether the Databricks workspace can reach the gateway host.
 - `validate_endpoint.py` fails: wait for the serving endpoint deployment to finish, then rerun validation.

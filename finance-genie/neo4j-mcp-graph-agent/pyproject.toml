@@ -9,6 +9,7 @@ dependencies = [
     "databricks-langchain",
     "databricks-mcp",
     "databricks-sdk>=0.110.0",
+    "langchain>=1.0",
     "langchain-core",
     "langgraph",
     "langgraph-prebuilt",
