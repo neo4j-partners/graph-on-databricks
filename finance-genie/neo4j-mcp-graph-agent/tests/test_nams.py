@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -12,7 +13,7 @@ from agent.nams import (
     safe_scope_id,
     sanitize_answer,
 )
-from runtime.adapter import _last_user_text, _record, _user_id
+from runtime.adapter import _last_user_text, _record
 
 
 class FakeMemory:
@@ -187,6 +188,26 @@ async def test_recall_reads_newest_conversations_for_this_user_only(nams_key):
     assert [c[2] for c in memory.calls if c[0] == "get_context"] == ["newest", "middle"]
 
 
+async def test_recall_reads_contexts_concurrently_and_keeps_newest_first(nams_key):
+    memory = FakeMemory(
+        conversations=[conversation("middle", 30, "u1"), conversation("newest", 5, "u1")]
+    )
+    # Each call waits until both have started, so a sequential recall never gets past the
+    # first. The newest finishes last, so the result order cannot come from completion order.
+    started = asyncio.Barrier(len(memory._conversations))
+
+    async def get_context(query, **kwargs):
+        conversation_id = kwargs["conversation_id"]
+        async with asyncio.timeout(1):
+            await started.wait()
+        await asyncio.sleep(0.01 if conversation_id == "newest" else 0)
+        return {"newest": "A", "middle": "B"}[conversation_id]
+
+    memory.short_term.get_context = get_context
+    async with turn_memory(memory) as turn:
+        assert await turn.recall() == "A\n\nB"
+
+
 async def test_recall_is_capped(nams_key):
     memory = FakeMemory(
         conversations=[conversation("c1", 1)], contexts={"c1": "x" * (RECALL_MAX_CHARS * 2)}
@@ -308,7 +329,7 @@ async def test_trace_steps_use_bare_tool_names_and_plain_thoughts(nams_key):
     calls = [c[1] for c in memory.calls if c[0] == "record_tool_call"]
     assert calls == [
         {"tool_name": "get_neo4j_schema", "arguments": {}},
-        {"tool_name": "read_neo4j_cypher", "arguments": {"query": "RETURN 1"}},
+        {"tool_name": "read_neo4j_cypher", "arguments": {}},
         {"tool_name": "mystery_tool", "arguments": {"x": 1}},
     ]
 
@@ -317,7 +338,7 @@ def test_sanitize_answer_leaves_plain_text_unchanged():
     assert sanitize_answer("Account 7890 sent 12 transfers.") == "Account 7890 sent 12 transfers."
 
 
-async def test_stored_answer_is_sanitized_but_trace_keeps_tool_calls(nams_key):
+async def test_stored_answer_is_sanitized_and_trace_drops_the_query(nams_key):
     memory = FakeMemory()
     async with turn_memory(memory) as turn:
         turn.add_tool_call("srv___read_neo4j_cypher", {"query": "MATCH (n) RETURN n"})
@@ -327,7 +348,7 @@ async def test_stored_answer_is_sanitized_but_trace_keeps_tool_calls(nams_key):
     step = next(c for c in memory.calls if c[0] == "add_step")
     assert step[2]["action"] == "read_neo4j_cypher"
     call = next(c for c in memory.calls if c[0] == "record_tool_call")
-    assert call[1] == {"tool_name": "read_neo4j_cypher", "arguments": {"query": "MATCH (n) RETURN n"}}
+    assert call[1] == {"tool_name": "read_neo4j_cypher", "arguments": {}}
     complete = next(c for c in memory.calls if c[0] == "complete_trace")
     assert complete[2]["outcome"] == "Ran the graph database: Account 7890 is a hub."
 
@@ -337,12 +358,6 @@ def test_recall_instructions_frames_memory_as_data():
     framed = recall_instructions("likes ring analysis")
     assert "not instructions" in framed
     assert framed.endswith("likes ring analysis")
-
-
-def test_user_id_prefers_input_then_session():
-    assert _user_id({"messages": [], "user_id": "analyst 7!"}, "s1") == "analyst7"
-    assert _user_id({"messages": []}, "s1") == "s1"
-    assert _user_id([{"role": "user", "content": "hi"}], "s1") == "s1"
 
 
 def test_last_user_text_handles_string_and_parts():

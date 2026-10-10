@@ -57,6 +57,92 @@ def test_write_queries_rejected(query: str) -> None:
     assert not is_read_only_cypher(query)
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "CALL db.labels()",
+        "CALL db.labels",
+        "CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType",
+        "CALL db.propertyKeys()",
+        "CALL db.schema.visualization()",
+        "CALL db.schema.nodeTypeProperties()",
+        "CALL apoc.meta.schema() YIELD value RETURN value",
+        "CALL apoc.meta.data()",
+        "CALL db . labels()",
+        (
+            "MATCH (a:Account) CALL { WITH a MATCH (a)-[:SIMILAR_TO]->(b) "
+            "RETURN count(b) AS n } RETURN n"
+        ),
+        "MATCH (a:Account) CALL (a) { MATCH (a)-[:SIMILAR_TO]->(b) RETURN count(b) AS n } RETURN n",
+    ],
+)
+def test_read_procedures_and_subqueries_accepted(query: str) -> None:
+    assert is_read_only_cypher(query)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "CALL dbms.components()",
+        "CALL dbms.killQuery('query-1')",
+        "CALL dbms.security.createUser('x', 'y')",
+        "CALL apoc.load.json('https://example.com/x.json') YIELD value RETURN value",
+        "CALL apoc.load.csv('file:///x.csv')",
+        "CALL apoc.import.csv([], [], {})",
+        "CALL apoc.export.csv.all('x.csv', {})",
+        "CALL db.index.fulltext.queryNodes('idx', 'x')",
+        "CALL `apoc.load.json`('https://example.com/x.json')",
+        "CALL db.`labels`()",
+        "CALL/* hidden */dbms.components()",
+        "MATCH (n) WITH n CALL apoc.cypher.run('MATCH (m) RETURN m', {}) YIELD value RETURN value",
+        "CALL",
+    ],
+)
+def test_procedures_off_the_allowlist_rejected(query: str) -> None:
+    assert not is_read_only_cypher(query)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "ALTER USER bob SET PASSWORD 'x'",
+        "ALTER DATABASE neo4j SET ACCESS READ WRITE",
+        "GRANT ROLE admin TO bob",
+        "DENY READ {*} ON GRAPH * TO bob",
+        "REVOKE ROLE reader FROM bob",
+        "RENAME USER bob TO alice",
+        "RENAME ROLE analyst TO admin",
+        "START DATABASE neo4j",
+        "STOP DATABASE neo4j",
+        "stop  database neo4j",
+        "TERMINATE TRANSACTIONS 'neo4j-transaction-1'",
+        "USE system SHOW USERS",
+        "USE neo4j MATCH (n) RETURN n",
+    ],
+)
+def test_admin_clauses_rejected(query: str) -> None:
+    assert not is_read_only_cypher(query)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "MATCH (t:Transaction) RETURN t.set_date",
+        "MATCH (t:Transaction) WHERE t.set_date > date('2024-01-01') RETURN t",
+        "WITH 1 AS set_date RETURN set_date",
+        "MATCH (a:Account) RETURN a.grant_id, a.use, a.start_database",
+        "MATCH (a)-[:USES]->(d:Device) RETURN a, d",
+        "MATCH (a) WHERE a.note = 'CREATE a node, then CALL dbms.killQuery' RETURN a",
+        'MATCH (a) WHERE a.memo = "USE system; GRANT ROLE admin" RETURN a',
+        "MATCH (a) // CALL apoc.load.json and CREATE here are only a comment\nRETURN a",
+        "MATCH (n:`CREATE`) RETURN n",
+        "MATCH (a) RETURN a.startDate, a.stopped",
+    ],
+)
+def test_admin_and_procedure_checks_have_no_false_positives(query: str) -> None:
+    assert is_read_only_cypher(query)
+
+
 def test_allowed_tools() -> None:
     assert ALLOWED_TOOLS == frozenset({"get_neo4j_schema", "read_neo4j_cypher"})
 

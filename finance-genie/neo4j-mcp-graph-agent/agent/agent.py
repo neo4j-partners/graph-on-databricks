@@ -35,7 +35,8 @@ def configure() -> None:
             use_ai_gateway=True,
         )
     )
-    set_default_openai_api("chat_completions")
+    # Chat completions streaming breaks on Claude 5 reasoning deltas in openai-agents 0.23.1.
+    set_default_openai_api("responses")
     configure_tracing()
 
 

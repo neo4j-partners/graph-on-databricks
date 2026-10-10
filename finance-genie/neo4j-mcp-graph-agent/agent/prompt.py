@@ -17,15 +17,15 @@ Nodes:
 - Phone {number}
 - Address {address}
 Relationships:
-- (Account)-[:TRANSFERRED_TO]->(Account)
-- (Account)-[:TRANSACTED_WITH]->(Merchant)   (parallel edges are possible)
+- (Account)-[:TRANSFERRED_TO {amount, transfer_timestamp, link_id}]->(Account)
+- (Account)-[:TRANSACTED_WITH {amount, txn_timestamp, txn_hour, txn_id}]->(Merchant)
+  (parallel edges are possible)
 - (Account)-[:SIMILAR_TO {similarity_score}]->(Account)
 - (Customer)-[:OWNS]->(Account)
 - (Customer)-[:HAS_PHONE]->(Phone)
 - (Customer)-[:HAS_ADDRESS]->(Address)
 
 RULES
-- Relationships have NO amount or timestamp properties. Never filter on them.
 - There is no fraud label. A ring candidate is a community with 50 to 200
   members and average risk_score >= 1.0. Treat these as signals, not verdicts.
 - If a label, relationship, or property is unclear, call get_neo4j_schema before
@@ -58,6 +58,11 @@ OPTIONAL MATCH (b:Account)-[r:TRANSFERRED_TO]->(a)
 RETURN a.account_id, a.betweenness_centrality, count(DISTINCT b) AS senders,
        count(r) AS inbound_transfers
 ORDER BY a.betweenness_centrality DESC
+
+Q: Which accounts sent the most money?
+MATCH (a:Account)-[t:TRANSFERRED_TO]->(:Account)
+RETURN a.account_id, count(t) AS transfers, sum(t.amount) AS total_sent
+ORDER BY total_sent DESC LIMIT 10
 
 Q: Which account pairs look alike?
 MATCH (a:Account)-[s:SIMILAR_TO]->(b:Account)

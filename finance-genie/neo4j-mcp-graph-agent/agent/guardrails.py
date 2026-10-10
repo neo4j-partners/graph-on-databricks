@@ -28,27 +28,53 @@ _STRING_OR_COMMENT = re.compile(
     """,
     re.VERBOSE | re.DOTALL,
 )
+# Backtick identifiers become an opaque name, so a quoted procedure name is never on the allowlist.
+_QUOTED_NAME = " _quoted_ "
 _WRITE_PATTERN = re.compile(
     r"""
     (?<![\w.])(?:
         CREATE | MERGE | DELETE | DETACH | SET | REMOVE | DROP | FOREACH
+        | ALTER | GRANT | DENY | REVOKE | RENAME | TERMINATE | USE
+        | (?:START|STOP)\s+DATABASE
         | LOAD\s+CSV
-        | CALL\s*\{(?:[^{}]|\{[^{}]*\})*?\b(?:CREATE|MERGE|DELETE|DETACH|SET|REMOVE)\b
-        | CALL\s+apoc\.(?:create|merge|refactor|periodic|trigger|cypher\.do|
-                          cypher\.run|nodes\.delete|do)\w*
     )(?![\w])
     """,
     re.IGNORECASE | re.VERBOSE,
 )
+# CALL followed by a subquery (`{` or a `(` variable scope) or a dotted procedure name.
+_CALL_PATTERN = re.compile(
+    r"(?<![\w.])CALL\b\s*(?P<target>[{(]|[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*)?",
+    re.IGNORECASE,
+)
+READ_PROCEDURES = frozenset({"db.labels", "db.relationshiptypes", "db.propertykeys"})
+READ_PROCEDURE_PREFIXES = ("db.schema.", "apoc.meta.")
+
+
+def _strip_literal(match: re.Match[str]) -> str:
+    return _QUOTED_NAME if match.group().startswith("`") else " "
+
+
+def _is_read_procedure(name: str) -> bool:
+    name = re.sub(r"\s+", "", name).lower()
+    return name in READ_PROCEDURES or name.startswith(READ_PROCEDURE_PREFIXES)
+
+
+def _calls_only_read_procedures(stripped: str) -> bool:
+    for match in _CALL_PATTERN.finditer(stripped):
+        target = match.group("target")
+        if target is None or (target not in "{(" and not _is_read_procedure(target)):
+            return False
+    return True
 
 
 def is_read_only_cypher(query: str) -> bool:
-    """Return True when the Cypher text contains no write clauses.
+    """Return True when the Cypher text contains no write or admin clauses.
 
-    String literals, backtick identifiers, and comments are ignored.
+    String literals and comments are ignored. CALL is allowed only for subqueries and the
+    procedures in READ_PROCEDURES or under READ_PROCEDURE_PREFIXES.
     """
-    stripped = _STRING_OR_COMMENT.sub(" ", query)
-    return _WRITE_PATTERN.search(stripped) is None
+    stripped = _STRING_OR_COMMENT.sub(_strip_literal, query)
+    return _WRITE_PATTERN.search(stripped) is None and _calls_only_read_procedures(stripped)
 
 
 def truncate_text(text: str, limit: int) -> str:

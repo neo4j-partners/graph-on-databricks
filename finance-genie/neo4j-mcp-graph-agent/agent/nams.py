@@ -168,6 +168,9 @@ class TurnMemory:
             return ""
         try:
             async with asyncio.timeout(RECALL_TIMEOUT_SECONDS):
+                # NAMS returns a user's conversations newest-first and applies the limit
+                # after ordering, so the lookback holds the newest turns. The SDK has no sort
+                # parameter; the sort below guards against an unordered response.
                 conversations = await self._memory.short_term.list_conversations(
                     user_identifier=self.user_id, limit=RECALL_LOOKBACK
                 )
@@ -176,12 +179,16 @@ class TurnMemory:
                     key=lambda c: c.created_at,
                     reverse=True,
                 )[:RECALL_CONVERSATIONS]
-                blocks = [
-                    await self._memory.short_term.get_context(
-                        self.prompt, conversation_id=str(c.id)
-                    )
-                    for c in recent
-                ]
+                async with asyncio.TaskGroup() as group:
+                    tasks = [
+                        group.create_task(
+                            self._memory.short_term.get_context(
+                                self.prompt, conversation_id=str(c.id)
+                            )
+                        )
+                        for c in recent
+                    ]
+                blocks = [task.result() for task in tasks]
         except Exception:  # noqa: BLE001 - NAMS must never break an answer
             logger.warning("NAMS recall failed", exc_info=True)
             return ""
@@ -215,8 +222,10 @@ class TurnMemory:
             step = await memory.reasoning.add_step(
                 trace.id, thought=_step_thought(call.name), action=tool_name
             )
+            # NAMS would extract entities from query text; MLflow traces keep the Cypher.
+            arguments = {} if tool_name == "read_neo4j_cypher" else call.arguments
             await memory.reasoning.record_tool_call(
-                step.id, tool_name=tool_name, arguments=call.arguments
+                step.id, tool_name=tool_name, arguments=arguments
             )
         if answer:
             await memory.short_term.add_message(conversation_id, "assistant", answer)

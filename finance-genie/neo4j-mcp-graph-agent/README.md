@@ -20,14 +20,16 @@ This is a Databricks App agent that answers questions about the finance-genie fr
 - [Delete the agent](#delete-the-agent)
 - [Layout](#layout)
 - [Notes](#notes)
-- [Known issue: Claude 5 models fail to stream](#known-issue-claude-5-models-fail-to-stream)
+- [Note: Responses API](#note-responses-api)
 
 ## How it works
 
 - Analysts ask questions about the fraud graph in plain language.
 - The agent reads the graph through a Unity Catalog MCP service, `graph-on-databricks.finance_genie.finance_genie_mcp`. The service fronts Neo4j, and the app calls it with its own service principal.
 - The agent has two read-only graph tools, `get_neo4j_schema` and `read_neo4j_cypher`. Guardrails reject write Cypher, cut results at 8000 characters, and stop a run after 20 steps.
+- The Cypher guardrail also rejects admin clauses such as `GRANT`, `ALTER`, `USE`, and `STOP DATABASE`. It allows `CALL` only for subqueries and a short list of schema procedures: `db.labels`, `db.relationshipTypes`, `db.propertyKeys`, `db.schema.*`, and `apoc.meta.*`. The guardrail is a text check, so it is defense in depth and not the read-only boundary.
 - The agent remembers each analyst. After every turn, the app saves the question and the answer to NAMS. Before every turn, it reads the analyst's two latest conversations back.
+- The app decides whose memory a turn uses. In a deployed app, that is the caller identity the Databricks Apps proxy forwards, so a caller cannot read another analyst's memory by sending their `user_id`.
 - Memory is best effort. If the key is missing or NAMS is slow or down, the agent still answers.
 - NAMS finds entities such as accounts, communities, and cases in the saved conversations. An optional ontology tells it what to look for.
 - The app runs on Agent Bricks. It uses the OpenAI Agents SDK for the agent loop and `DurableAgentServer` for sync, streaming, and background calls with crash recovery.
@@ -404,7 +406,14 @@ The Databricks Apps proxy returns a 401 for the token that a job gets from its o
      --json '{"access_control_list":[{"service_principal_name":"'"$SP_CLIENT_ID"'","permission_level":"CAN_USE"}]}'
    ```
 
-4. **Deploy the bundle and run the job:** The job runs as you, so you need `READ` on the scope `nams-traffic`.
+4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Set that entry in `app.yaml` to the principal's application id, then run `agentbricks deploy` again. The checked-in value is the `nams-traffic-runner` application id in this repo's workspace. If you created a new principal, replace it with `$SP_CLIENT_ID`. Separate several ids with commas. If the value is unset or wrong, the app ignores the synthetic users and saves every traffic turn under the principal itself.
+
+   ```yaml
+   - name: MEMORY_TRUSTED_CALLERS
+     value: <SP_CLIENT_ID>
+   ```
+
+5. **Deploy the bundle and run the job:** The job runs as you, so you need `READ` on the scope `nams-traffic`.
 
    ```bash
    cd traffic
@@ -427,12 +436,14 @@ To check a run:
 
 - **Job output:** Open the run URL that `bundle run` prints. The log ends with `done ok=N failed=0`.
 - **NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`. The run id is in the first log line.
+- **Bound identity:** After deploy, check the logs for the bound principal of a traffic turn. Open the app's Logs tab and find a line that starts with `memory identity bound:`. A traffic turn should show `user=nams-load-...` and a `trusted caller` source that names the header and the principal. If it shows `user=<the principal>` instead, the principal is missing from `MEMORY_TRUSTED_CALLERS`, or the proxy sends it in a different header.
 
 If something fails:
 
 - **401 from the app:** The principal lacks `CAN_USE` on the app, or the credentials in the scope are wrong.
 - **`no value assigned to required variable app_url`:** Add `--var app_url=...` to the command.
 - **No data in NAMS:** Check that the `nams-api-key` resource is still attached to the app.
+- **All turns under one user in NAMS:** The principal is not in `MEMORY_TRUSTED_CALLERS`. See step 4.
 
 The app is not part of this bundle. `agentbricks deploy` provisions its runtime store, session store, and MCP grants, and a bundle app resource would conflict with that.
 
@@ -457,7 +468,7 @@ The parts:
 - **Databricks App:** The app is the deployed agent. It runs the Agent Bricks `DurableAgentServer`.
 - **Agent:** The agent is the OpenAI Agents SDK loop. Guardrails allow only two read-only graph tools.
 - **TurnMemory:** This class in `agent/nams.py` handles one turn, which is one question and its answer. It reads memory before the turn and writes the turn to NAMS after it.
-- **AI Gateway model:** This model writes the answer. `app.yaml` pins `claude-sonnet-4-5`.
+- **AI Gateway model:** This model writes the answer. The default is `claude-sonnet-5-5`.
 - **MCP service:** The Unity Catalog service `finance_genie_mcp` runs read-only Cypher on Neo4j.
 - **NAMS:** The hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/) stores conversations, messages, traces, and entities.
 - **Secret scope `nams`:** This scope holds the NAMS key. The app resource `nams-api-key` hands it to the app as `MEMORY_API_KEY`.
@@ -483,14 +494,14 @@ How one turn uses NAMS:
 
 - **One conversation per turn:** Each turn is its own conversation in NAMS. Each one carries the `user_id` in its metadata, and recall filters on it.
 - **Clean answer:** The stored assistant answer has Cypher code fences and MCP tool names removed. `sanitize_answer` in `agent/nams.py` does this, because NAMS would otherwise extract Cypher and tool names as entities. Plain fences, such as result tables, keep their text. Ids, scores, and counts stay in the text.
-- **Trace:** When the agent uses tools, the app saves one reasoning trace. The trace has one step and one tool call for each MCP call. Steps use the bare tool name and a plain sentence, such as "The agent read the graph schema." NAMS keeps the steps and tool calls, but not the trace task or outcome.
+- **Trace:** When the agent uses tools, the app saves one reasoning trace. The trace has one step and one tool call for each MCP call. Steps use the bare tool name and a plain sentence, such as "The agent read the graph schema." A Cypher tool call is saved without its query, so NAMS does not extract the query as entities. The MLflow trace keeps the full Cypher for debugging. NAMS keeps the steps and tool calls, but not the trace task or outcome.
 - **Entities:** NAMS finds entities in the messages on its own servers, and the app does nothing for this. The system prompt asks the agent to write ids the same way each time, as "Account <id>" and "Community <id>". That keeps the extracted names consistent.
 
 ### What gets recalled
 
 - **Recall:** Before the agent runs, the app lists the user's latest conversations and reads the last two.
 - **Where recall goes:** The recalled text goes into the agent instructions as background. It stays out of the message input, because Agent Bricks saves input to the session store.
-- **User:** Send `user_id` next to `messages`. Without it, the app uses `session_id` as the user, and recall finds only turns from that session.
+- **User:** In a deployed app, the user is the caller's `X-Forwarded-Email` header, or `X-Forwarded-User` when the email is missing. The app ignores a `user_id` in the request body, unless the caller is listed in `MEMORY_TRUSTED_CALLERS`. A request without a forwarded identity gets a 401. Locally, send `user_id` next to `messages`. Without it, the app uses `session_id` as the user, and recall finds only turns from that session.
 - **Limits:** Recall waits at most 10 seconds and adds at most 2000 characters.
 
 ### When NAMS is not available
@@ -517,26 +528,25 @@ Send a second question with a new `session_id` and the same `user_id`. The answe
 | NAMS key | `MEMORY_API_KEY` env var, or the `nams-api-key` app resource when deployed | Unset, so memory is off |
 | NAMS endpoint and workspace | Optional `MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID` env vars | The NAMS defaults |
 | MCP service | `agent.toml` `[[tools]]` | `graph-on-databricks.finance_genie.finance_genie_mcp` |
-| Model | `LLM_MODEL` env var | Code default `system.ai.claude-sonnet-5-5`. `app.yaml` pins `system.ai.claude-sonnet-4-5`. |
+| Model | `LLM_MODEL` env var | `system.ai.claude-sonnet-5-5` |
 | Judge model | `JUDGE_MODEL` env var | `databricks:/databricks-claude-sonnet-5-5` |
 | Session store | `agent.toml` `[session_store]` | `neo4j-mcp-graph-agent-sessions` |
 | Tracing experiment | `agent.toml` `[tracing]` | `/Shared/agentbricks_traces/neo4j-mcp-graph-agent` |
 | Traffic credentials scope | `credentials_scope` job parameter | `nams-traffic` |
 
 - **Other MCP service:** Edit the `service` value in `agent.toml`, or run `agentbricks tools add mcp <service> --auth app`. Then deploy again.
-- **Model:** The Claude 5 models currently fail to stream in this agent, so keep the `claude-sonnet-4-5` pin in `app.yaml` until that is fixed.
 
 ## Evaluate
 
 ```bash
-LLM_MODEL=system.ai.claude-sonnet-4-5 uv run agent-evaluate
+uv run agent-evaluate
 ```
 
 - **What it runs:** The agent answers the questions in `agent/evaluate.py`. MLflow scorers grade the answers.
 - **Judges:** The judges use a Databricks-hosted model, set by `JUDGE_MODEL`. They use no external API key.
 - **Pass rule:** The run fails unless every case passes the safety and no-write checks.
-- **Model:** Set `LLM_MODEL` as shown, because the code default fails to stream.
 - **NAMS:** The run never writes to NAMS.
+- **Drift check:** Run `uv run python scripts/check_drift.py` after the graph is re-seeded. It compares the prompt's graph schema and the traffic scenarios' named accounts, communities, phones, and merchants with the live graph. It only reads, and it exits 1 on drift. It is not part of `pytest`.
 
 ## Delete the agent
 
@@ -560,6 +570,7 @@ runtime/            DurableAgentServer entrypoint and adapter
 tests/              guardrail, adapter, and memory tests
 traffic/            synthetic analyst traffic CLI and its Databricks Job bundle
 ontology/           NAMS ontology, loader, measurement, and transcript replay scripts
+scripts/            drift check of the prompt and scenarios against the live graph
 ```
 
 ## Notes
@@ -567,29 +578,12 @@ ontology/           NAMS ontology, loader, measurement, and transcript replay sc
 - **Beta CLI:** The Agent Bricks CLI is in Beta. Its README documents the grant behavior.
 - **Grant fails:** If deploy cannot grant on the MCP service, grant by hand in Catalog Explorer. Open Permissions on the MCP service. Give the app's service principal `EXECUTE`, plus `USE_CATALOG` and `USE_SCHEMA` on its parents.
 - **Backing resources:** The MCP service must be allowed to reach whatever backs it. Agent Bricks does not grant access to those resources.
+- **Invocation ids across callers:** The memory identity is part of the saved request. So when a second caller reuses an invocation id, the app returns 409. This is expected.
+- **Reading another caller's result:** The status and events routes, `GET /api/invocations/{id}` and `/events`, do not check who started the invocation. Any caller with `CAN_USE` on the app who knows another caller's invocation UUID can read that result. UUIDs are hard to guess. This is framework behavior in `databricks_agentkit`.
 
-## Known issue: Claude 5 models fail to stream
+## Note: Responses API
 
-The default in `agent/agent.py` is `system.ai.claude-sonnet-5-5`, and `app.yaml` overrides it with
-`LLM_MODEL=system.ai.claude-sonnet-4-5`. Every run on the default fails with the error below.
-`claude-sonnet-5` and `claude-opus-5-5` fail the same way, while `claude-sonnet-4-5` completes.
-
-```
-pydantic_core._pydantic_core.ValidationError: 1 validation error for ResponseTextDeltaEvent
-delta
-  Input should be a valid string [type=string_type, input_value=[{'type': 'reasoning', ...}]]
-```
-
-The OpenAI Agents SDK chat completions stream handler (`chatcmpl_stream_handler.py`, openai-agents
-0.23.1) builds `ResponseTextDeltaEvent` from the chunk delta. The Claude 5 models return a list of
-reasoning blocks in that field, and the event requires a string. The failure does not depend on NAMS,
-MCP, or the Agent Bricks runtime. Calling `run_question` from `agent/evaluate.py` with no
-`MEMORY_API_KEY` reproduces it.
-
-To investigate, check whether a newer `openai-agents` release handles reasoning deltas, whether
-the AI Gateway can return the reasoning in a separate field, or whether the Responses API works
-for these models. Run `agent-evaluate` with `LLM_MODEL` set to the Claude 5 model to retest, then
-remove the pin in `app.yaml`.
+The agent calls the model through the Responses API. Chat completions streaming breaks on Claude 5 reasoning deltas in openai-agents 0.23.1.
 
 ## Troubleshooting: Update the MCP connection
 

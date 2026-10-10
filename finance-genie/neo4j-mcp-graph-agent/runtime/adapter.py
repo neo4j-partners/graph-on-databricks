@@ -12,6 +12,7 @@ from openai.types.responses import ResponseTextDeltaEvent
 from agent.agent import run_agent
 from agent.nams import TurnMemory, recall_instructions, safe_scope_id
 from databricks_agentkit import InvocationContext
+from runtime.identity import MEMORY_USER_FIELD
 
 MAX_TURNS_MESSAGE = (
     "I reached the step limit before finishing. Try a narrower question or add more detail."
@@ -37,8 +38,11 @@ def _session_id(context: InvocationContext) -> str:
 
 
 def _user_id(value: Any, session_id: str) -> str:
-    """Memory identity: an optional top-level ``user_id`` in the input object, else the session."""
-    raw = value.get("user_id") if isinstance(value, dict) else None
+    """Memory identity: the ``memory_user_id`` bound by MemoryIdentityMiddleware, else the session.
+
+    The body ``user_id`` is never read here; the middleware decides whether to honor it.
+    """
+    raw = value.get(MEMORY_USER_FIELD) if isinstance(value, dict) else None
     return safe_scope_id(raw) or safe_scope_id(session_id) or "anonymous"
 
 
