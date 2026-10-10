@@ -37,6 +37,27 @@ make demo
 - **Later runs:** `make demo` updates the same Genie Spaces and reloads the configured Neo4j graph.
 - **Sample data:** The committed synthetic data is the default. Run `make data` only when you need a new dataset.
 
+### Populate the Graph
+
+Use this when a demo needs only the Neo4j graph and its Graph Data Science results, such as the [Neo4j MCP Graph Agent](./neo4j-mcp-graph-agent/README.md). It skips the Gold tables and the Genie Spaces.
+
+Be sure `.env` is set up with your Databricks and Neo4j Aura values. The Silver tables must already exist from an earlier `make demo`.
+
+Then run these two steps from `enrichment-pipeline`:
+
+```bash
+cd enrichment-pipeline
+
+# 1. Copy the Neo4j uri, username, and password from .env into the Databricks secret scope.
+PIPELINE_START_STEP=7 PIPELINE_STOP_STEP=7 uv run python run_existing_data_pipeline.py
+
+# 2. Load the Silver tables into Neo4j, run Graph Data Science, and verify the results.
+PIPELINE_START_STEP=10 PIPELINE_STOP_STEP=12 uv run python run_existing_data_pipeline.py
+```
+
+- **Secret scope:** The ingest job reads Neo4j credentials from the Databricks secret scope, not from `.env`. Run step 1 again whenever you change the Neo4j values in `.env`.
+- **Graph reload:** Step 2 clears and reloads the configured Neo4j graph.
+
 ### Check the setup
 
 Run this command to check Databricks access, Neo4j access, and source data. It does not change them.

@@ -1,10 +1,11 @@
+import re
 import threading
 
 import pytest
 
 from nams_traffic.client import TurnFailed
 from nams_traffic.cli import main, parse_args, run_traffic
-from nams_traffic.scenarios import FOCUSES, build_requests
+from nams_traffic.scenarios import ANALYSTS, CASES, FOCUSES, build_requests
 
 
 def test_build_requests_is_deterministic_and_complete():
@@ -26,16 +27,108 @@ def test_invocation_ids_are_unique_per_turn_and_stable_per_run():
 def test_only_a_users_first_turn_states_the_persona():
     requests = build_requests(1, 2, 2, "abc")
     first, later_turn, new_session, _ = requests
-    assert "synthetic analyst 0001" in first.prompt
-    assert "synthetic analyst" not in later_turn.prompt
-    assert "synthetic analyst" not in new_session.prompt
+    assert f"I am {ANALYSTS[0]} on the" in first.prompt
+    assert "Please remember that" in first.prompt
+    assert "synthetic analyst" not in first.prompt
+    assert "I am " not in later_turn.prompt
+    assert "I am " not in new_session.prompt
     assert new_session.prompt.startswith("Back again")
 
 
 def test_users_rotate_through_the_focuses():
     requests = build_requests(len(FOCUSES) + 1, 1, 1, "abc")
     focuses = {r.prompt.split("My focus is ")[1].split(".")[0] for r in requests}
-    assert focuses == {focus for focus, _ in FOCUSES}
+    assert focuses == {focus for focus, *_ in FOCUSES}
+
+
+def test_prompt_text_does_not_depend_on_the_run_id():
+    first = build_requests(6, 3, 4, "before")
+    second = build_requests(6, 3, 4, "after")
+    assert [r.prompt for r in first] == [r.prompt for r in second]
+    assert [r.user_id for r in first] != [r.user_id for r in second]
+    assert [r.session_id for r in first] != [r.session_id for r in second]
+    assert all("before" not in r.prompt and "after" not in r.prompt for r in first)
+
+
+def test_first_session_states_manager_and_owned_case():
+    first = build_requests(1, 1, 1, "abc")[0].prompt
+    assert "I report to " in first
+    assert re.search(r"I own case CASE-\d+, our investigation of Community \d+\.", first)
+
+
+def test_later_sessions_refer_to_the_analyst_by_aliases():
+    requests = build_requests(1, 4, 1, "abc")
+    openings = [r.prompt for r in requests[1:]]
+    assert "it is Maya." in openings[0]
+    assert "this is M. Okafor." in openings[1]
+    # User 1 is on Contoso, so the team alias appears instead of the full team name.
+    assert "from Contoso Risk." in openings[2]
+    assert all("Maya Okafor" not in prompt for prompt in openings)
+
+
+def _alias_kind(prompt: str) -> str:
+    if "Back again, it is " in prompt:
+        return "first_name"
+    if re.search(r"Back again, this is [A-Z]\. ", prompt):
+        return "initial_surname"
+    if "Back again from " in prompt:
+        return "team_abbreviation"
+    raise AssertionError(prompt)
+
+
+def test_two_sessions_per_user_still_use_every_alias_variant():
+    requests = build_requests(6, 2, 1, "abc")
+    openers = [r.prompt for r in requests if r.session_id.endswith("s002")]
+    assert len(openers) == 6
+    assert {_alias_kind(prompt) for prompt in openers} == {
+        "first_name",
+        "initial_surname",
+        "team_abbreviation",
+    }
+    assert openers == [
+        r.prompt for r in build_requests(6, 2, 1, "other") if r.session_id.endswith("s002")
+    ]
+
+
+def test_user_prompts_contain_no_schema_identifiers():
+    prompts = [r.prompt for r in build_requests(6, 2, 2, "abc")]
+    snake_case = re.compile(r"\b[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+\b")
+    relationships = ("TRANSACTED_WITH", "TRANSFERRED_TO", "SIMILAR_TO")
+    for prompt in prompts:
+        assert not snake_case.search(prompt), prompt
+        assert not any(name in prompt for name in relationships), prompt
+        for word in ("risk_score", "betweenness_centrality", "identity_cluster", "similarity_score"):
+            assert word not in prompt, prompt
+
+
+def test_analyst_names_are_realistic_and_cycle():
+    assert len(ANALYSTS) >= 8
+    assert all(" " in name and "synthetic" not in name for name in ANALYSTS)
+    requests = build_requests(len(ANALYSTS) + 1, 1, 1, "abc")
+    assert ANALYSTS[0] in requests[0].prompt
+    assert ANALYSTS[0] in requests[-1].prompt
+
+
+def test_instance_questions_name_real_graph_identifiers():
+    prompts = " ".join(r.prompt for r in build_requests(20, 3, 4, "abc"))
+    identifiers = ("Community 3040", "Account 7890", "Account 7321", "312-555-0142", "Serrano LLC")
+    for identifier in identifiers:
+        assert identifier in prompts
+
+
+def test_one_community_is_investigated_by_analysts_on_different_teams():
+    requests = build_requests(len(CASES) + 1, 1, 1, "abc")
+    owners: dict[str, set[str]] = {}
+    for request in requests:
+        team = re.search(r"on the (.+?) team", request.prompt).group(1)
+        community = re.search(r"investigation of Community (\d+)", request.prompt).group(1)
+        owners.setdefault(community, set()).add(team)
+    assert any(len(teams) >= 2 for teams in owners.values())
+    # The shared community is also asked about in later turns by each of its analysts.
+    shared = next(c for c, teams in owners.items() if len(teams) >= 2)
+    everything = build_requests(len(CASES) + 1, 1, 12, "abc")
+    asking_users = {r.user_id for r in everything if f"Community {shared}" in r.prompt}
+    assert len(asking_users) >= 2
 
 
 def test_run_traffic_runs_every_turn_in_session_order():

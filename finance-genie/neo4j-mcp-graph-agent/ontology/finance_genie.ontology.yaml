@@ -1,0 +1,186 @@
+# NAMS ontology for the finance-genie fraud-analyst agent.
+# It shapes how NAMS extracts entities from conversations between fraud
+# analysts and the Neo4j fraud-graph agent. Entity descriptions are fed to the
+# extractor, so each one says what the type is and what it is not.
+#
+# Load with: uv run ontology/apply_ontology.py   (local dry run by default)
+
+domain:
+  id: finance-genie-fraud-memory
+  name: Finance Genie Fraud Memory
+  description: >-
+    Entities and relationships mentioned in conversations between fraud
+    analysts and a Neo4j fraud-graph agent: who the analysts are, which teams
+    they belong to, what they investigate, and the accounts, customers,
+    merchants, communities, identity clusters, phone numbers and addresses
+    in the fraud graph.
+
+entity_types:
+  - label: Analyst
+    pole_type: PERSON
+    description: >-
+      A fraud analyst or manager at the bank, including someone an analyst
+      reports to. Not a customer or account holder in the graph.
+    properties: []
+
+  - label: Team
+    pole_type: ORGANIZATION
+    description: >-
+      The employer team an analyst works on, for example 'Northwind Bank Fraud
+      Operations'. Also referred to as 'Northwind Fraud Ops', 'Contoso Risk',
+      'Fabrikam FinCrimes' or 'Tailspin Card Investigations'. Not a graph
+      community, an identity cluster, or a merchant.
+    aliases:
+      "Northwind Bank Fraud Operations":
+        - "Northwind Fraud Ops"
+      "Contoso Payments Risk":
+        - "Contoso Risk"
+      "Fabrikam Financial Crimes":
+        - "Fabrikam FinCrimes"
+      "Tailspin Card Services Investigations":
+        - "Tailspin Card Investigations"
+    properties: []
+
+  - label: InvestigationFocus
+    pole_type: OBJECT
+    description: >-
+      The kind of investigation an analyst is running, for example fraud ring
+      candidate communities, broker and hub accounts, shared phone numbers and
+      addresses, or lookalike account pairs. Not a single case, a specific
+      account, or a community.
+    properties: []
+
+  - label: Account
+    pole_type: OBJECT
+    description: >-
+      A bank account identified by an account number, for example 'Account
+      7890'. Not a person, a customer, or an account holder.
+    properties: []
+
+  - label: Customer
+    pole_type: PERSON
+    description: >-
+      An account holder in the fraud graph, identified by name, for example
+      'Ethan Owen'. Not an analyst and not the bank's own staff.
+    properties: []
+
+  - label: Merchant
+    pole_type: ORGANIZATION
+    description: >-
+      A merchant that accounts transact with, for example 'Serrano LLC'. Not
+      a bank, an analyst team, or a customer.
+    properties: []
+
+  - label: Community
+    pole_type: OBJECT
+    description: >-
+      A Louvain community of accounts found by graph analysis, identified by a
+      numeric id such as 'Community 24683'. Not an organization, a team, or an
+      identity cluster.
+    properties: []
+
+  - label: IdentityCluster
+    pole_type: OBJECT
+    description: >-
+      A group of accounts linked by shared identity attributes such as the same
+      phone number or address, identified by a cluster id. Not a Louvain
+      community and not a team.
+    properties: []
+
+  - label: PhoneNumber
+    pole_type: OBJECT
+    description: >-
+      A telephone number attached to a customer, for example '312-555-0142'.
+      Not an account number or an address.
+    properties: []
+
+  - label: Address
+    pole_type: LOCATION
+    description: >-
+      A street or mailing address attached to a customer. Not a bank branch,
+      a merchant, or a phone number.
+    properties: []
+
+  - label: Case
+    pole_type: OBJECT
+    description: >-
+      An analyst-owned investigation case identified by an id like 'CASE-4001'.
+      Not an account, a community, or an investigation
+      focus.
+    properties: []
+
+relationships:
+  - type: MEMBER_OF
+    source: Analyst
+    target: Team
+    description: The analyst works on this team.
+
+  - type: REPORTS_TO
+    source: Analyst
+    target: Analyst
+    description: The first analyst reports to the second analyst.
+
+  - type: FOCUSES_ON
+    source: Analyst
+    target: InvestigationFocus
+    description: The analyst's usual investigation focus.
+
+  - type: OWNS
+    source: Analyst
+    target: Case
+    description: The analyst owns this investigation case.
+
+  - type: OWNS
+    source: Customer
+    target: Account
+    description: The customer is the holder of this account.
+
+  - type: INVESTIGATES
+    source: Analyst
+    target: Community
+    description: The analyst is investigating this community.
+
+  - type: INVESTIGATES
+    source: Analyst
+    target: Account
+    description: The analyst is investigating this account.
+
+  - type: INVESTIGATES
+    source: Case
+    target: Community
+    description: The case examines this community.
+
+  - type: PART_OF
+    source: Account
+    target: Community
+    description: The account belongs to this Louvain community.
+
+  - type: PART_OF
+    source: Account
+    target: IdentityCluster
+    description: The account belongs to this identity cluster.
+
+  - type: HAS_PHONE
+    source: Customer
+    target: PhoneNumber
+    description: The customer is associated with this phone number.
+
+  - type: HAS_ADDRESS
+    source: Customer
+    target: Address
+    description: The customer is associated with this address.
+
+  - type: TRANSACTED_WITH
+    source: Account
+    target: Merchant
+    description: The account made payments to this merchant.
+
+  - type: TRANSFERRED_TO
+    source: Account
+    target: Account
+    description: The first account sent a transfer to the second account.
+
+  - type: SIMILAR_TO
+    source: Account
+    target: Account
+    description: The two accounts look alike in the graph, a lookalike pair.

@@ -20,6 +20,8 @@ from typing import Any
 
 from neo4j_agent_memory import MemoryClient
 
+from agent.guardrails import ALLOWED_TOOLS
+
 logger = logging.getLogger(__name__)
 
 SOURCE = "neo4j-mcp-graph-agent"
@@ -37,6 +39,27 @@ OUTCOME_MAX_CHARS = 1000
 
 _SCOPE_ID_RE = re.compile(r"[^A-Za-z0-9._:@-]")
 
+# NAMS extracts entities from stored message text. Fenced Cypher and MCP tool names, bare or
+# with a server prefix such as ``neo4j-mcp-server-target___get_neo4j_schema``, are plumbing
+# that would be extracted as entities, so they are removed from the stored answer. Other fenced
+# blocks, typically result tables that hold account and community ids, keep their text.
+_CODE_FENCE_RE = re.compile(r"```(?:([A-Za-z0-9_+-]*)[ \t]*\n)?(.*?)```", re.DOTALL)
+_QUERY_FENCE_TAGS = frozenset({"cypher", "sql", "cql"})
+_CYPHER_BODY_RE = re.compile(
+    r"(?i:\bMATCH[ \t]*[(\[])|^[ \t]*RETURN[ \t]+\S", re.MULTILINE
+)
+_TOOL_NAME_RE = re.compile(
+    r"`?\b(?:[\w-]+___)?(?:" + "|".join(map(re.escape, sorted(ALLOWED_TOOLS))) + r")\b`?"
+)
+_BLANK_LINES_RE = re.compile(r"\n{3,}")
+
+# Reasoning steps are plain language so extraction has no tool identifier to turn into entities.
+_STEP_THOUGHTS = {
+    "get_neo4j_schema": "The agent read the graph schema.",
+    "read_neo4j_cypher": "The agent queried the graph database.",
+}
+_GENERIC_STEP_THOUGHT = "The agent used a graph database tool."
+
 
 def safe_scope_id(value: object) -> str | None:
     """Return an identifier that is safe to put in logs and NAMS metadata."""
@@ -44,6 +67,33 @@ def safe_scope_id(value: object) -> str | None:
         return None
     cleaned = _SCOPE_ID_RE.sub("", str(value).strip())[:128]
     return cleaned or None
+
+
+def _strip_query_fence(match: re.Match[str]) -> str:
+    tag, body = match.group(1) or "", match.group(2)
+    if tag.lower() in _QUERY_FENCE_TAGS or _CYPHER_BODY_RE.search(body):
+        return ""
+    return body
+
+
+def sanitize_answer(answer: str) -> str:
+    """Drop fenced Cypher/SQL and MCP tool names from an answer before it is stored in NAMS.
+
+    Other fenced blocks lose only their fence markers. Facts such as ids, scores, and counts
+    are untouched, so recalled turns stay useful.
+    """
+    answer = _CODE_FENCE_RE.sub(_strip_query_fence, answer)
+    answer = _TOOL_NAME_RE.sub("the graph database", answer)
+    return _BLANK_LINES_RE.sub("\n\n", answer).strip()
+
+
+def bare_tool_name(name: str) -> str:
+    """Strip a ``<server>___`` prefix; the bare tool name is stable across deployments."""
+    return name.rpartition("___")[2]
+
+
+def _step_thought(name: str) -> str:
+    return _STEP_THOUGHTS.get(bare_tool_name(name), _GENERIC_STEP_THOUGHT)
 
 
 def nams_enabled() -> bool:
@@ -157,23 +207,23 @@ class TurnMemory:
             },
         )
         conversation_id = str(conversation.id)
+        answer = sanitize_answer(self._answer)
         await memory.short_term.add_message(conversation_id, "user", self.prompt)
         trace = await memory.reasoning.start_trace(conversation_id, TRACE_TASK)
         for call in self._tool_calls:
+            tool_name = bare_tool_name(call.name)
             step = await memory.reasoning.add_step(
-                trace.id,
-                thought=f"The agent invoked MCP tool {call.name}.",
-                action=call.name,
+                trace.id, thought=_step_thought(call.name), action=tool_name
             )
             await memory.reasoning.record_tool_call(
-                step.id, tool_name=call.name, arguments=call.arguments
+                step.id, tool_name=tool_name, arguments=call.arguments
             )
-        if self._answer:
-            await memory.short_term.add_message(conversation_id, "assistant", self._answer)
+        if answer:
+            await memory.short_term.add_message(conversation_id, "assistant", answer)
         await memory.reasoning.complete_trace(
             trace.id,
-            outcome=self._answer[:OUTCOME_MAX_CHARS],
-            success=bool(self._answer) and not failed,
+            outcome=answer[:OUTCOME_MAX_CHARS],
+            success=bool(answer) and not failed,
         )
 
 

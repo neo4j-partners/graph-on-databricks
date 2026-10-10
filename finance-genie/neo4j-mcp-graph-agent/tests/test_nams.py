@@ -10,6 +10,7 @@ from agent.nams import (
     nams_enabled,
     recall_instructions,
     safe_scope_id,
+    sanitize_answer,
 )
 from runtime.adapter import _last_user_text, _record, _user_id
 
@@ -235,6 +236,100 @@ async def test_agent_failure_still_records_the_turn_as_failed(nams_key):
     assert complete[2] == {"outcome": "", "success": False}
     assert "add_step" in names(memory)
     assert ("add_message", "conv-new", "assistant", "") not in memory.calls
+
+
+def test_sanitize_answer_drops_tool_names_and_code_but_keeps_facts():
+    answer = (
+        "I called `neo4j-mcp-server-target___get_neo4j_schema` then read_neo4j_cypher.\n\n"
+        "```cypher\nMATCH (a:Account) RETURN a\n```\n\n"
+        "Account 7890 has risk_score 4.2 in Community 24683 with 61 members."
+    )
+    cleaned = sanitize_answer(answer)
+    assert "___" not in cleaned
+    assert "get_neo4j_schema" not in cleaned
+    assert "read_neo4j_cypher" not in cleaned
+    assert "MATCH" not in cleaned
+    assert "\n\n\n" not in cleaned
+    assert cleaned.startswith("I called the graph database then the graph database.")
+    assert "Account 7890 has risk_score 4.2 in Community 24683 with 61 members." in cleaned
+
+
+def test_sanitize_answer_keeps_a_plain_fenced_result_table():
+    answer = (
+        "Top accounts:\n\n```\naccount_id | risk_score\n7890       | 4.2\n"
+        "7891       | 3.9\n```\n\nCommunity 24683 holds both."
+    )
+    cleaned = sanitize_answer(answer)
+    assert "```" not in cleaned
+    assert "account_id | risk_score\n7890       | 4.2\n7891       | 3.9" in cleaned
+    assert "Community 24683 holds both." in cleaned
+
+
+def test_sanitize_answer_keeps_a_tagged_non_query_fence_body():
+    cleaned = sanitize_answer('```json\n{"account": 7890}\n```')
+    assert cleaned == '{"account": 7890}'
+
+
+@pytest.mark.parametrize(
+    "fence",
+    [
+        "```cypher\nMATCH (a:Account) RETURN a.id\n```",
+        "```CYPHER\nanything\n```",
+        "```sql\nSELECT 1\n```",
+        "```\nMATCH (a:Account)-[:SENT]->(b)\nRETURN a.id, b.id\n```",
+        "```\nRETURN 1\n```",
+        "```cypher MATCH (a) RETURN a```",
+    ],
+)
+def test_sanitize_answer_removes_query_fences(fence):
+    cleaned = sanitize_answer(f"Before.\n\n{fence}\n\nAccount 7890 stands out.")
+    assert cleaned == "Before.\n\nAccount 7890 stands out."
+
+
+def test_sanitize_answer_keeps_prose_fence_that_mentions_return():
+    cleaned = sanitize_answer("```\nReturn rate 0.2 for account 7890\n```")
+    assert cleaned == "Return rate 0.2 for account 7890"
+
+
+async def test_trace_steps_use_bare_tool_names_and_plain_thoughts(nams_key):
+    memory = FakeMemory()
+    async with turn_memory(memory) as turn:
+        turn.add_tool_call("neo4j-mcp-server-target___get_neo4j_schema", {})
+        turn.add_tool_call("neo4j-mcp-server-target___read_neo4j_cypher", {"query": "RETURN 1"})
+        turn.add_tool_call("other___mystery_tool", {"x": 1})
+        turn.set_answer("ok")
+    steps = [c[2] for c in memory.calls if c[0] == "add_step"]
+    assert steps == [
+        {"thought": "The agent read the graph schema.", "action": "get_neo4j_schema"},
+        {"thought": "The agent queried the graph database.", "action": "read_neo4j_cypher"},
+        {"thought": "The agent used a graph database tool.", "action": "mystery_tool"},
+    ]
+    assert not any("___" in str(c) for c in memory.calls if c[0] in ("add_step", "record_tool_call"))
+    calls = [c[1] for c in memory.calls if c[0] == "record_tool_call"]
+    assert calls == [
+        {"tool_name": "get_neo4j_schema", "arguments": {}},
+        {"tool_name": "read_neo4j_cypher", "arguments": {"query": "RETURN 1"}},
+        {"tool_name": "mystery_tool", "arguments": {"x": 1}},
+    ]
+
+
+def test_sanitize_answer_leaves_plain_text_unchanged():
+    assert sanitize_answer("Account 7890 sent 12 transfers.") == "Account 7890 sent 12 transfers."
+
+
+async def test_stored_answer_is_sanitized_but_trace_keeps_tool_calls(nams_key):
+    memory = FakeMemory()
+    async with turn_memory(memory) as turn:
+        turn.add_tool_call("srv___read_neo4j_cypher", {"query": "MATCH (n) RETURN n"})
+        turn.set_answer("Ran srv___read_neo4j_cypher: Account 7890 is a hub.")
+    stored = next(c for c in memory.calls if c[0] == "add_message" and c[2] == "assistant")
+    assert stored[3] == "Ran the graph database: Account 7890 is a hub."
+    step = next(c for c in memory.calls if c[0] == "add_step")
+    assert step[2]["action"] == "read_neo4j_cypher"
+    call = next(c for c in memory.calls if c[0] == "record_tool_call")
+    assert call[1] == {"tool_name": "read_neo4j_cypher", "arguments": {"query": "MATCH (n) RETURN n"}}
+    complete = next(c for c in memory.calls if c[0] == "complete_trace")
+    assert complete[2]["outcome"] == "Ran the graph database: Account 7890 is a hub."
 
 
 def test_recall_instructions_frames_memory_as_data():

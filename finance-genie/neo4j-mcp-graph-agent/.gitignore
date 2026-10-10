@@ -12,3 +12,6 @@ mlruns/
 
 # Local credentials from the previous Model Serving agent
 .mcp-credentials*.json
+
+# NAMS ontology rollback snapshots written by apply_ontology.py
+ontology/previous_active_*.json
