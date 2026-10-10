@@ -31,11 +31,13 @@ uv run agent-traffic --profile "$DATABRICKS_CONFIG_PROFILE" --app-url "$APP_URL"
   --users 6 --sessions-per-user 2 --turns-per-session 2
 ```
 
+Or run `make traffic` from `neo4j-mcp-graph-agent/`. It runs the same live run without the dry run. It looks up `APP_URL` when the variable is unset. Change the size with `USERS=`, `SESSIONS=`, and `TURNS=`.
+
 The dry run prints the plan and calls nothing. The second command signs in with your profile. This run is 24 turns. The setting `--users 6` is the smallest run that shows one community shared by two analysts.
 
 The run calls the app as you. Your user must be trusted before the deploy, as step 3 of [Deploy and try](../README.md#deploy-and-try) explains.
 
-**Check NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`. Then check the app logs. Open the app's Logs tab, or run `agentbricks deployments logs agent-bricks-neo4j-graph-agent`. Each line that starts with `memory identity bound:` should show `user=nams-load-...` and a `trusted caller` source. If it shows `user=<your email>` instead, your email is missing from `MEMORY_TRUSTED_CALLERS`. Fix it as step 3 of [Deploy and try](../README.md#deploy-and-try) explains, then deploy again.
+**Check NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`. Then check the app logs. Open the app's Logs tab, or run `agentbricks deployments logs agent-bricks-neo4j-graph-agent`. The shortcut is `make logs`. Each line that starts with `memory identity bound:` should show `user=nams-load-...` and a `trusted caller` source. If it shows `user=<your email>` instead, your email is missing from `MEMORY_TRUSTED_CALLERS`. Fix it as step 3 of [Deploy and try](../README.md#deploy-and-try) explains, then deploy again.
 
 | Option | What it sets | Default |
 | --- | --- | --- |
@@ -80,7 +82,7 @@ The Databricks Apps proxy returns a 401 for the token that a job gets from its o
      --json '{"access_control_list":[{"service_principal_name":"'"$SP_CLIENT_ID"'","permission_level":"CAN_USE"}]}'
    ```
 
-4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Add the principal's application id to that entry in `app.yaml`, then run `agentbricks deploy neo4j-graph-agent` again. The checked-in entry holds the `nams-traffic-runner` application id and a user from this repo's workspace. If you created a new principal, replace the id with `$SP_CLIENT_ID`. Separate the values with commas. Keep your own user email there for laptop runs, as step 3 of [Deploy and try](../README.md#deploy-and-try) explains. If the principal is missing, the app ignores the synthetic users and saves every traffic turn under the principal itself.
+4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Add the principal's application id to that entry in `app.yaml`, then run `agentbricks deploy neo4j-graph-agent` again. Or run `make deploy`. The checked-in entry holds the `nams-traffic-runner` application id and a user from this repo's workspace. If you created a new principal, replace the id with `$SP_CLIENT_ID`. Separate the values with commas. Keep your own user email there for laptop runs, as step 3 of [Deploy and try](../README.md#deploy-and-try) explains. If the principal is missing, the app ignores the synthetic users and saves every traffic turn under the principal itself.
 
    ```yaml
    - name: MEMORY_TRUSTED_CALLERS

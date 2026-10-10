@@ -54,7 +54,7 @@ The agent reads the NAMS key from the `MEMORY_API_KEY` environment variable. Run
 2. **Save the NAMS key locally:** Copy `.env.example` to `.env`. Put the key in `.env` as `MEMORY_API_KEY`, and set `DATABRICKS_CONFIG_PROFILE` there too.
 3. **Save the NAMS key in Databricks:** Run `./setup_secrets.sh`. The script reads `MEMORY_API_KEY` and `DATABRICKS_CONFIG_PROFILE` from `.env`. It creates the secret scope `nams` if needed and writes the key as `memory-api-key`. Pass `--profile <name>` to use another profile.
 4. **Attach the NAMS key to the app:** After the first deploy, add an app resource named `nams-api-key` to the app. Use type secret, scope `nams`, key `memory-api-key`, and `CAN_READ`. Add it in the app's Resources settings, or with `databricks apps update`.
-5. **Deploy again:** Run `agentbricks deploy neo4j-graph-agent` so the app picks up the NAMS key.
+5. **Deploy again:** Run `agentbricks deploy neo4j-graph-agent` so the app picks up the NAMS key. Or run `make deploy`.
 
 The resource stayed attached across later deploys in testing. Check it after each deploy anyway.
 
@@ -65,6 +65,16 @@ Where each command reads the NAMS key:
 - **From the app resource:** The deployed app reads the NAMS key from the `nams-api-key` resource.
 
 ## Deploy and try
+
+**Shortcuts:** The `Makefile` wraps the deploy, test, and traffic commands. Run `make` from `neo4j-mcp-graph-agent/` with `DATABRICKS_CONFIG_PROFILE` set. Each step below shows the raw command first and the shortcut after it.
+
+| Target | What it does |
+| --- | --- |
+| `make deploy` | Deploys the app, shows its status, and prints `APP_URL`. |
+| `make smoke` | Asks the deployed app one question in a new session. Set the question with `QUESTION=`. |
+| `make logs` | Streams the app logs until you press Ctrl-C. |
+| `make traffic` | Runs laptop traffic with 6 users, 2 sessions, and 2 turns. Change the size with `USERS=`, `SESSIONS=`, and `TURNS=`. |
+| `make export`, `replay`, `snapshot LABEL=`, `apply-ontology`, `compare` | These run the ontology steps. [Run the ontology example](docs/ontology-experiment.md) gives the order. |
 
 1. **Install and sign in:** Install the Agent Bricks CLI, pick your Databricks profile, and log in.
 
@@ -98,6 +108,7 @@ Where each command reads the NAMS key:
    echo "$APP_URL"
    ```
 
+   Or run `make deploy`. It prints the app URL but does not export `APP_URL`. `make traffic` looks the URL up on its own.
 5. **Attach the NAMS key:** On the first deploy, do steps 4 and 5 of [Set up the NAMS key](#set-up-the-nams-key).
 6. **Test the deployed app:** Use a new `id` for every request. Reuse `session_id` to continue a conversation.
 
@@ -109,11 +120,12 @@ Where each command reads the NAMS key:
    agentbricks deployments logs agent-bricks-neo4j-graph-agent
    ```
 
+   Or run `make smoke`, then `make logs`. `make smoke` starts a new session each time.
 7. **Fill NAMS with traffic:** This step is optional. [Generate traffic](docs/traffic.md) sends fake analyst conversations through the app, from your laptop or as a Databricks Job.
 
 ## Demo script
 
-Ask each question with the `invoke` command from step 6 of [Deploy and try](#deploy-and-try), and put the question in `content`. Keep the same `SESSION_ID` unless a step says to start a new one. The evidence is the ids and the spans in the MLflow trace, not the exact answer text.
+Ask each question with the `invoke` command from step 6 of [Deploy and try](#deploy-and-try), and put the question in `content`. Keep the same `SESSION_ID` unless a step says to start a new one. You can also run `make smoke QUESTION="..."`. It starts a new session for every question, so ask the step 1 extra beat with the raw command in the same session. The evidence is the ids and the spans in the MLflow trace, not the exact answer text.
 
 1. **Shared phone:** Ask "Which customers share phone 312-555-0142, and which accounts do they own?" Several customers share this phone. Look for Accounts 368, 927, 1033, and 1696 and a `read_neo4j_cypher` span. For an extra beat, ask which community those accounts are in. Look for Community 8174.
 2. **Hub:** Ask "I focus on hub accounts. Is Account 15940 a hub, and which community is it in?" Look for Community 19766 and a `read_neo4j_cypher` span.

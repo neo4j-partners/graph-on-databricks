@@ -33,6 +33,8 @@ uv run ontology/apply_ontology.py --update <ontology id>   # load the YAML as a 
 uv run ontology/apply_ontology.py --rollback <version id>
 ```
 
+Or run `make apply-ontology` for the `--create --activate` line.
+
 - **Dry run:** The default run makes no network calls. It prints the types and relationships and checks them locally.
 - **`--create`:** This flag loads the ontology with validation mode `permissive`. Afterward the script reads the version back and prints what the service dropped.
 - **`--update`:** This flag loads the YAML as a new revision. It never edits an existing version.
@@ -47,7 +49,7 @@ Entities in NAMS are not scoped by run, so each snapshot needs its own empty NAM
 
 So this comparison runs the agent once and replays the stored conversations into each workspace. Then the ontology and the extraction are the only things that change.
 
-1. **Smoke test:** Ask the deployed app one question, "Which community is Account 15940 in?". The answer should name Community 19766. In NAMS, check for one conversation with two messages and one trace, and check that extraction has finished.
+1. **Smoke test:** Ask the deployed app one question, "Which community is Account 15940 in?". The answer should name Community 19766. In NAMS, check for one conversation with two messages and one trace, and check that extraction has finished. Or run `make smoke QUESTION="Which community is Account 15940 in?"`.
 2. **Run live once:** Point `MEMORY_API_KEY` at an empty workspace A with the default ontology active. Run the traffic from `traffic/`. The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 3 of [Deploy and try](../README.md#deploy-and-try) explains. Otherwise all 24 turns land under your own user.
 
    ```bash
@@ -58,11 +60,15 @@ So this comparison runs the agent once and replays the stored conversations into
    cd ..
    ```
 
+   Or run `make traffic` from `neo4j-mcp-graph-agent/`. Its default size is this same 6, 2, and 2 run.
+
 3. **Save the transcripts:** This reads the 24 conversations and fails if the count is wrong.
 
    ```bash
    uv run ontology/replay_transcripts.py export --out transcripts.json --expect-turns 24
    ```
+
+   Or run `make export`.
 
 4. **Replay into the default side:** Point `MEMORY_API_KEY` at an empty workspace with the default ontology active. Replay the transcripts, then snapshot. Do this in two separate empty workspaces, so you get `before-1.json` and `before-2.json`.
 
@@ -71,6 +77,8 @@ So this comparison runs the agent once and replays the stored conversations into
    uv run ontology/measure_ingestion.py snapshot --label before-1 --out before-1.json \
      --ontology-yaml ontology/finance_genie.ontology.yaml --expect-turns 24
    ```
+
+   Or run `make replay`, then `make snapshot LABEL=before-1`. Use `LABEL=before-2` in the second workspace.
 
 5. **Replay into the ontology side:** Point `MEMORY_API_KEY` at another empty workspace. Load the ontology, then replay and snapshot as in step 4. Do this in two workspaces, so you get `after-1.json` and `after-2.json`.
 
@@ -81,12 +89,16 @@ So this comparison runs the agent once and replays the stored conversations into
      --ontology-yaml ontology/finance_genie.ontology.yaml --expect-turns 24
    ```
 
+   Or run `make apply-ontology`, `make replay`, and then `make snapshot LABEL=after-1`. Use `LABEL=after-2` in the second workspace.
+
 6. **Compare:** The `--users`, `--sessions`, and `--turns` flags give the run size and add the ground-truth rows.
 
    ```bash
    uv run ontology/measure_ingestion.py compare before-1.json after-1.json \
      --users 6 --sessions 2 --turns 2
    ```
+
+   Or run `make compare`. Set `BEFORE=` and `AFTER=` to compare other snapshot files.
 
 The difference between `before-1` and `before-2`, and between `after-1` and `after-2`, is the noise floor. Treat a change smaller than that as noise.
 
