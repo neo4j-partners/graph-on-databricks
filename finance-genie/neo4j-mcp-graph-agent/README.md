@@ -44,7 +44,7 @@ This is a Databricks App agent that answers questions about the finance-genie fr
 - **Tools:** You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), [jq](https://jqlang.org/), and the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/install).
 - **Agent Bricks CLI:** The CLI is in Beta. Install it with `uv tool install databricks-agentbricks`, or run it with `uvx --from databricks-agentbricks agentbricks ...`.
 - **Workspace:** The workspace needs Databricks Apps and Unity Catalog AI Gateway.
-- **MCP service:** The service `graph-on-databricks.finance_genie.finance_genie_mcp` must exist. It must expose the tools `get_neo4j_schema` and `read_neo4j_cypher`. TODO: link the MCP service creation doc.
+- **MCP service:** The service `graph-on-databricks.finance_genie.finance_genie_mcp` must exist. It must expose the tools `get_neo4j_schema` and `read_neo4j_cypher`. [Create the finance-genie MCP service](docs/mcp-service.md) covers the setup.
 - **Grant right:** You must own the MCP service or have `MANAGE` on it. Deploy grants `EXECUTE` on it for the app.
 - **NAMS key:** You need a NAMS key from https://memory.neo4jlabs.com/. [Set up the NAMS key](#set-up-the-nams-key) covers it.
 
@@ -119,7 +119,19 @@ Deploy the app, then send fake analyst traffic through it so NAMS fills with con
 
 1. **Install and sign in:** Do step 1 of [Run locally](#run-locally).
 2. **Save the NAMS key in Databricks:** Do steps 1 to 3 of [Set up the NAMS key](#set-up-the-nams-key).
-3. **Deploy:** The deploy name `neo4j-graph-agent` becomes the app `agent-bricks-neo4j-graph-agent`, because Agent Bricks adds the `agent-bricks-` prefix. App names can have at most 30 characters, and the prefix uses 13, so the deploy name can have at most 17. The `export` command saves the app URL in `APP_URL` for the traffic commands.
+3. **Trust your user for laptop traffic:** A laptop traffic run calls the app as you. The app honors the synthetic analyst ids only from callers listed in `MEMORY_TRUSTED_CALLERS`. Otherwise it saves every turn under your own user. Before you deploy, add your Databricks user email to that entry in `app.yaml`. Separate the values with commas. The checked-in values belong to this repo's workspace, so replace them with your own. The first command prints your user email.
+
+   ```bash
+   databricks current-user me -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .userName
+   ```
+
+   ```yaml
+   - name: MEMORY_TRUSTED_CALLERS
+     value: <SP_CLIENT_ID>,<your-email>
+   ```
+
+   The match is exact, so copy the email as printed. Leave out `<SP_CLIENT_ID>` if you do not run traffic as a Databricks Job.
+4. **Deploy:** The deploy name `neo4j-graph-agent` becomes the app `agent-bricks-neo4j-graph-agent`, because Agent Bricks adds the `agent-bricks-` prefix. App names can have at most 30 characters, and the prefix uses 13, so the deploy name can have at most 17. The `export` command saves the app URL in `APP_URL` for the traffic commands.
 
    ```bash
    agentbricks deploy neo4j-graph-agent
@@ -129,8 +141,8 @@ Deploy the app, then send fake analyst traffic through it so NAMS fills with con
    echo "$APP_URL"
    ```
 
-4. **Attach the NAMS key:** On the first deploy, do steps 4 and 5 of [Set up the NAMS key](#set-up-the-nams-key).
-5. **Test the deployed app:** Use a new `id` for every request. Reuse `session_id` to continue a conversation.
+5. **Attach the NAMS key:** On the first deploy, do steps 4 and 5 of [Set up the NAMS key](#set-up-the-nams-key).
+6. **Test the deployed app:** Use a new `id` for every request. Reuse `session_id` to continue a conversation.
 
    ```bash
    SESSION_ID=$(uuidgen)
@@ -140,7 +152,7 @@ Deploy the app, then send fake analyst traffic through it so NAMS fills with con
    agentbricks deployments logs agent-bricks-neo4j-graph-agent
    ```
 
-6. **Generate traffic:** Run the traffic CLI from `traffic/`. The setting `--users 6` is the smallest run that shows one community shared by two analysts. The dry run prints the plan and calls nothing. The second command signs in with your profile and sends 24 turns.
+7. **Generate traffic:** Run the traffic CLI from `traffic/`. The setting `--users 6` is the smallest run that shows one community shared by two analysts. The dry run prints the plan and calls nothing. The second command signs in with your profile and sends 24 turns. Your user must be trusted first, as step 3 explains.
 
    ```bash
    cd traffic
@@ -151,7 +163,7 @@ Deploy the app, then send fake analyst traffic through it so NAMS fills with con
    cd ..
    ```
 
-7. **Check NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`.
+8. **Check NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`. Then check the app logs. Open the app's Logs tab, or run `agentbricks deployments logs agent-bricks-neo4j-graph-agent`. Each line that starts with `memory identity bound:` should show `user=nams-load-...` and a `trusted caller` source. If it shows `user=<your email>` instead, your email is missing from `MEMORY_TRUSTED_CALLERS`. Fix it as step 3 explains, then deploy again.
 
 ## Run the ontology example
 
@@ -203,7 +215,7 @@ Entities in NAMS are not scoped by run, so each snapshot needs its own empty NAM
 So this comparison runs the agent once and replays the stored conversations into each workspace. Then the ontology and the extraction are the only things that change.
 
 1. **Smoke test:** Ask the deployed app one question, "Which community is Account 15940 in?". The answer should name Community 19766. In NAMS, check for one conversation with two messages and one trace, and check that extraction has finished.
-2. **Run live once:** Point `MEMORY_API_KEY` at an empty workspace A with the default ontology active. Run the traffic from `traffic/`. The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts.
+2. **Run live once:** Point `MEMORY_API_KEY` at an empty workspace A with the default ontology active. Run the traffic from `traffic/`. The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 3 of [Deploy and generate traffic](#deploy-and-generate-traffic) explains. Otherwise all 24 turns land under your own user.
 
    ```bash
    cd traffic
@@ -360,6 +372,8 @@ uv run agent-traffic --profile "$DATABRICKS_CONFIG_PROFILE" --app-url "$APP_URL"
 
 The dry run prints the plan and calls nothing. The second command signs in with your profile. This run is 24 turns.
 
+The run calls the app as you. Your user must be trusted before the deploy, as step 3 of [Deploy and generate traffic](#deploy-and-generate-traffic) explains. Step 8 there shows the log check.
+
 | Option | What it sets | Default |
 | --- | --- | --- |
 | `--users` | The number of analysts | 20 |
@@ -403,11 +417,11 @@ The Databricks Apps proxy returns a 401 for the token that a job gets from its o
      --json '{"access_control_list":[{"service_principal_name":"'"$SP_CLIENT_ID"'","permission_level":"CAN_USE"}]}'
    ```
 
-4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Set that entry in `app.yaml` to the principal's application id, then run `agentbricks deploy neo4j-graph-agent` again. The checked-in value is the `nams-traffic-runner` application id in this repo's workspace. If you created a new principal, replace it with `$SP_CLIENT_ID`. Separate several ids with commas. If the value is unset or wrong, the app ignores the synthetic users and saves every traffic turn under the principal itself.
+4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Add the principal's application id to that entry in `app.yaml`, then run `agentbricks deploy neo4j-graph-agent` again. The checked-in entry holds the `nams-traffic-runner` application id and a user from this repo's workspace. If you created a new principal, replace the id with `$SP_CLIENT_ID`. Separate the values with commas. Keep your own user email there for laptop runs, as step 3 of [Deploy and generate traffic](#deploy-and-generate-traffic) explains. If the principal is missing, the app ignores the synthetic users and saves every traffic turn under the principal itself.
 
    ```yaml
    - name: MEMORY_TRUSTED_CALLERS
-     value: <SP_CLIENT_ID>
+     value: <SP_CLIENT_ID>,<your-email>
    ```
 
 5. **Deploy the bundle and run the job:** The job runs as you, so you need `READ` on the scope `nams-traffic`.
@@ -576,11 +590,11 @@ scripts/            drift check of the prompt and scenarios against the live gra
 
 **Symptom:** `agentbricks endpoint invoke` returns `HTTP 500` with `{"detail": "agent invocation failed"}`. The app logs (`agentbricks deployments logs agent-bricks-neo4j-graph-agent`) show `No MCP server connected` and `Resource not found - Requested gateway does not exist`.
 
-**Cause:** The Neo4j MCP server was rebuilt. A rebuild creates a new AgentCore gateway ID and a new Cognito OAuth client. The Unity Catalog connection behind `finance_genie_mcp` still holds the old host and client, so the gateway returns 404. Your direct gateway test can pass while the service fails, because the test uses the new URL from `.mcp-credentials.finance.json` and the service does not.
+**Cause:** The Neo4j MCP server stack was torn down and deployed again. A fresh stack creates a new AgentCore gateway ID and a new Cognito OAuth client. A redeploy onto the existing stack keeps both, so it does not cause this error. The Unity Catalog connection behind `finance_genie_mcp` still holds the old host and client, so the gateway returns 404. Your direct gateway test can pass while the service fails, because the test uses the new URL from `.mcp-credentials.finance.json` and the service does not.
 
 **Where the URL lives:** The service holds no URL or credentials. It points at the connection `graph-on-databricks.finance_genie.finance_genie_mcp_connection`. `databricks ai-gateway update-mcp-service` only changes the comment and owner, so it cannot fix this. Update the connection instead.
 
-1. **Confirm the mismatch:** Compare the connection host with the `gateway_url` in `.mcp-credentials.finance.json`. The hosts differ after a rebuild.
+1. **Confirm the mismatch:** Compare the connection host with the `gateway_url` in `.mcp-credentials.finance.json`. The hosts differ after a fresh stack.
 
    ```bash
    databricks connections get graph-on-databricks.finance_genie.finance_genie_mcp_connection -o json | jq '.options | {host, client_id}'
@@ -618,9 +632,9 @@ scripts/            drift check of the prompt and scenarios against the live gra
      -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}'
    ```
 
-4. **Invoke the agent:** Run the `agentbricks endpoint invoke` command from step 5 of [Deploy and generate traffic](#deploy-and-generate-traffic) again. The app reads the service on every request, so it needs no redeploy.
+4. **Invoke the agent:** Run the `agentbricks endpoint invoke` command from step 6 of [Deploy and generate traffic](#deploy-and-generate-traffic) again. The app reads the service on every request, so it needs no redeploy.
 
 **Notes:**
-- **Repeat after each rebuild:** Every rebuild of the MCP server changes the gateway ID and the OAuth client, so repeat these steps each time.
+- **Repeat after each fresh stack:** Every fresh MCP server stack has a new gateway ID and OAuth client, so repeat these steps each time. A redeploy onto the existing stack needs none of them.
 - **Profile:** Pass `--profile` or set `DATABRICKS_CONFIG_PROFILE` for every command.
 - **Permissions:** You must own the connection or have `MANAGE` on it.

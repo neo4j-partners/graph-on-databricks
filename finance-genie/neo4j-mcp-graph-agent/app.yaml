@@ -12,7 +12,7 @@ env:
 - name: MEMORY_API_KEY
   valueFrom: nams-api-key
 - name: MEMORY_TRUSTED_CALLERS
-  value: 92051bdf-39bd-4443-95e6-ff50267e3493
+  value: 92051bdf-39bd-4443-95e6-ff50267e3493,ryan.knight@neo4j.com
 - name: PIP_INDEX_URL
   value: https://pypi.org/simple/
 - name: UV_INDEX_URL
