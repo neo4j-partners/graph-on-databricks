@@ -34,9 +34,10 @@ The demo is for the community, so simplicity wins over completeness.
 | E2 | Fix the prompt schema: the live relationships hold amounts and timestamps, but the prompt says they do not | zzz | Done and reviewed |
 | F | Strip Cypher from the tool-call arguments stored in NAMS traces | zzz | Done and reviewed |
 | I | In the MCP server fork, pass `routing_` and reject schema writes. Code and tests only, no rebuild | dbz | Done and reviewed, uncommitted in the fork |
-| J | Record the deployed MCP server image digest in the README troubleshooting section | dbz | Blocked on an expired AWS SSO token |
+| J | Rebuild the MCP server once: read-only Aura user, the fork fix, and a record of the deployed image | azz | Planning, needs fz approval before any change |
+| K | Fix the README inconsistencies in place, such as the three different names for the NAMS key steps | zzz | Done and reviewed |
 | G | Review all diffs, run the tests, and commit | fz | Done |
-| H | Deploy, smoke test, and run the ontology before-and-after experiment | fz | Next |
+| H | Deploy, smoke test, and run the ontology before-and-after experiment | fz | Waiting on J and on Ryan's traffic identity ruling |
 
 ## Proposed additions, waiting on Ryan
 
@@ -93,6 +94,8 @@ Ryan approved this on 2026-10-10.
 | 2026-10-10 | Simplicity is the key constraint, because this is a community demo | Ryan |
 | 2026-10-10 | Fix the fork's `routing_` keyword and schema-write check, and record the deployed image digest. The read-only Aura user goes to `future-improvements.md` | Ryan |
 | 2026-10-10 | A request with no input binds the caller's own identity, because the route defaults input to [] and the session id is client-chosen | fz |
+| 2026-10-10 | Implement the read-only Aura user now, with azz, the AWS specialist | Ryan |
+| 2026-10-10 | All requests go through fz, and fz coordinates all work | Ryan |
 | 2026-10-10 | Bind the memory user with middleware that writes it into the persisted invocation input | fz |
 | 2026-10-10 | Reject a deployed request that has no forwarded identity with a 401 | fz |
 | 2026-10-10 | Document, but do not fix, unnamespaced invocation reads in Agent Bricks | fz |
@@ -117,3 +120,9 @@ Ryan approved this on 2026-10-10.
 - **2026-10-10, fz:** Ryan approved untracking `mlflow.db`. fz ran `git rm --cached`, and the file stays on disk. Correction: the earlier entry said `.gitignore` lists the file, but no ignore rule covers it, so it now shows as untracked. `.agentbricks/mlflow.db` and `.agentbricks/mlflow-server.log` are also tracked. Adding ignore rules waits on Ryan.
 - **2026-10-10, fz:** dbz finished I in the fork. The read and schema tools now pass `routing_`, and the write check rejects query types containing "w" or "s". A new unit test covers the query types, and the fork's 58 unit tests pass. fz reviewed the diff. Nothing in the fork is committed, built, or deployed. J is blocked: the AWS SSO token has expired, and only Ryan can log in again.
 - **2026-10-10, fz:** zzz finished C, D, E, E2, and F. Recall reads conversations in parallel and documents the newest-first order. The agent uses the Responses API, and the Claude 4.5 pin is gone. `scripts/check_drift.py` passed all 11 checks live. The prompt schema lists the relationship amounts and timestamps. Cypher tool calls go to NAMS without the query. `agent-evaluate` passed on claude-sonnet-5-5. fz reviewed every diff. The agent suite has 273 passing tests, and the traffic suite has 21. fz committed the work with no co-author line.
+- **2026-10-10, fz:** Ryan asked for a more readable README and for its inconsistencies fixed. fz gave zzz the in-place fixes as K. A restructure into a short README plus `docs/` waits on Ryan.
+- **2026-10-10, fz:** Ryan approved the read-only Aura user now. fz briefed azz to plan one rebuild with the reader user, dbz's fork fix, and the image record. azz must send the plan before changing anything. J moved from dbz to azz.
+- **2026-10-10, fz:** fz found a regression from A. A laptop traffic run calls the app with the runner's own token, and that runner is not a trusted caller. So every synthetic analyst's turn is saved under the runner's email. The quick start and the ontology live run both use the laptop path. The fix is a design choice, so it went to Ryan.
+- **2026-10-10, fz:** Ryan ruled that all requests go through fz. fz told dbz, zzz, and azz.
+- **2026-10-10, fz:** azz reported. On Ryan's direct instruction, azz created the Aura user `mcp_reader` with the built-in `reader` role. Its password is in a gitignored file. Reads work and writes are forbidden. But Aura Professional also forbids `apoc.meta.schema` and `db.schema.*` for `reader`, so `get_neo4j_schema` would break. Custom roles need Business Critical. azz's options: A, an Aura-internal role; B, a schema fallback in the fork that uses plain Cypher; C, upgrade the tier; D, stay on the admin user. fz recommends B and took the choice to Ryan. The rebuild changes only the Runtime, so the gateway and the UC connection should survive. azz will confirm with `cdk diff` first.
+- **2026-10-10, fz:** zzz finished K. The README now has one set of NAMS key steps, one install step, one heading style, identity-aware flows, real sample ids, and a full table of contents. The prerequisite TODO for the MCP service creation doc stays, because no such doc exists in the repo. fz reviewed and committed it. The traffic lines that A broke stay unchanged until Ryan rules.

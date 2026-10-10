@@ -6,11 +6,11 @@ This is a Databricks App agent that answers questions about the finance-genie fr
 
 - [How it works](#how-it-works)
 - [Prerequisites](#prerequisites)
-- [Set up the key](#set-up-the-key)
+- [Set up the NAMS key](#set-up-the-nams-key)
 - [Quick start](#quick-start)
-  - [Getting started locally](#getting-started-locally)
-  - [Setting up and generating traffic in the cloud](#setting-up-and-generating-traffic-in-the-cloud)
-- [Running the ontology example](#running-the-ontology-example)
+  - [Run locally](#run-locally)
+  - [Deploy and generate traffic](#deploy-and-generate-traffic)
+- [Run the ontology example](#run-the-ontology-example)
 - [Add NAMS as a Databricks MCP service](#add-nams-as-a-databricks-mcp-service)
 - [Generate traffic](#generate-traffic)
 - [Architecture](#architecture)
@@ -20,7 +20,7 @@ This is a Databricks App agent that answers questions about the finance-genie fr
 - [Delete the agent](#delete-the-agent)
 - [Layout](#layout)
 - [Notes](#notes)
-- [Note: Responses API](#note-responses-api)
+- [Troubleshooting: Update the MCP connection](#troubleshooting-update-the-mcp-connection)
 
 ## How it works
 
@@ -30,7 +30,7 @@ This is a Databricks App agent that answers questions about the finance-genie fr
 - The Cypher guardrail also rejects admin clauses such as `GRANT`, `ALTER`, `USE`, and `STOP DATABASE`. It allows `CALL` only for subqueries and a short list of schema procedures: `db.labels`, `db.relationshipTypes`, `db.propertyKeys`, `db.schema.*`, and `apoc.meta.*`. The guardrail is a text check, so it is defense in depth and not the read-only boundary.
 - The agent remembers each analyst. After every turn, the app saves the question and the answer to NAMS. Before every turn, it reads the analyst's two latest conversations back.
 - The app decides whose memory a turn uses. In a deployed app, that is the caller identity the Databricks Apps proxy forwards, so a caller cannot read another analyst's memory by sending their `user_id`.
-- Memory is best effort. If the key is missing or NAMS is slow or down, the agent still answers.
+- Memory is best effort. If the NAMS key is missing or NAMS is slow or down, the agent still answers.
 - NAMS finds entities such as accounts, communities, and cases in the saved conversations. An optional ontology tells it what to look for.
 - The app runs on Agent Bricks. It uses the OpenAI Agents SDK for the agent loop and `DurableAgentServer` for sync, streaming, and background calls with crash recovery.
 - Agent Bricks keeps the session history for multi-turn chats and the MLflow traces.
@@ -46,25 +46,31 @@ This is a Databricks App agent that answers questions about the finance-genie fr
 - **Workspace:** The workspace needs Databricks Apps and Unity Catalog AI Gateway.
 - **MCP service:** The service `graph-on-databricks.finance_genie.finance_genie_mcp` must exist. It must expose the tools `get_neo4j_schema` and `read_neo4j_cypher`. TODO: link the MCP service creation doc.
 - **Grant right:** You must own the MCP service or have `MANAGE` on it. Deploy grants `EXECUTE` on it for the app.
-- **NAMS key:** You need a key from https://memory.neo4jlabs.com/.
+- **NAMS key:** You need a NAMS key from https://memory.neo4jlabs.com/. [Set up the NAMS key](#set-up-the-nams-key) covers it.
 
-## Set up the key
+## Set up the NAMS key
 
-The agent reads the NAMS key from the `MEMORY_API_KEY` environment variable. Run these steps from the `neo4j-mcp-graph-agent/` directory.
+The agent reads the NAMS key from the `MEMORY_API_KEY` environment variable. Run these steps from the `neo4j-mcp-graph-agent/` directory. The local path needs steps 1 and 2. The deployed app needs all five.
 
-1. **Create the key:** Make a key at https://memory.neo4jlabs.com/.
-2. **Save it locally:** Copy `.env.example` to `.env`, then put the key in `.env` as `MEMORY_API_KEY`. Also set `DATABRICKS_CONFIG_PROFILE` in `.env`.
-3. **Save it in Databricks:** Run `./setup_secrets.sh`. The script reads `MEMORY_API_KEY` and `DATABRICKS_CONFIG_PROFILE` from `.env`. It creates the secret scope `nams` if needed and writes the key as `memory-api-key`. Pass `--profile <name>` to use another profile.
-4. **Attach it to the app:** After the first `agentbricks deploy`, add an app resource named `nams-api-key`. Use type secret, scope `nams`, key `memory-api-key`, and `CAN_READ`. Add it in the app's Resources settings, or with `databricks apps update`.
-5. **Deploy again:** Run `agentbricks deploy neo4j-graph-agent` so the app picks up the key.
+1. **Create the NAMS key:** Make a key at https://memory.neo4jlabs.com/.
+2. **Save the NAMS key locally:** Copy `.env.example` to `.env`. Put the key in `.env` as `MEMORY_API_KEY`, and set `DATABRICKS_CONFIG_PROFILE` there too.
+3. **Save the NAMS key in Databricks:** Run `./setup_secrets.sh`. The script reads `MEMORY_API_KEY` and `DATABRICKS_CONFIG_PROFILE` from `.env`. It creates the secret scope `nams` if needed and writes the key as `memory-api-key`. Pass `--profile <name>` to use another profile.
+4. **Attach the NAMS key to the app:** After the first deploy, add an app resource named `nams-api-key` to the app. Use type secret, scope `nams`, key `memory-api-key`, and `CAN_READ`. Add it in the app's Resources settings, or with `databricks apps update`.
+5. **Deploy again:** Run `agentbricks deploy neo4j-graph-agent` so the app picks up the NAMS key.
 
 The resource stayed attached across later deploys in testing. Check it after each deploy anyway.
+
+Where each command reads the NAMS key:
+
+- **From `.env`:** `setup_secrets.sh`, `agent-evaluate`, and the ontology scripts read `.env`. A value exported in your shell wins over `.env`.
+- **From your shell:** `agentbricks dev` reads the NAMS key only from your shell. Export `MEMORY_API_KEY` before you start it.
+- **From the app resource:** The deployed app reads the NAMS key from the `nams-api-key` resource.
 
 ## Quick start
 
 Pick one path. The local path runs the agent on your laptop. The cloud path deploys the app and fills NAMS with test conversations.
 
-### Getting started locally
+### Run locally
 
 Run the agent on your laptop with memory on. This path uses two terminal windows, because the server keeps running.
 
@@ -85,12 +91,11 @@ Run the agent on your laptop with memory on. This path uses two terminal windows
    agentbricks doctor .
    ```
 
-3. **Get the key:** Create a NAMS key at https://memory.neo4jlabs.com/.
-4. **Start the server (window 1):** Put `DATABRICKS_CONFIG_PROFILE` and `MEMORY_API_KEY` in `.env`. Also export `MEMORY_API_KEY` in this shell, because `agentbricks dev` reads it from the shell and stops with an error if it is missing.
+3. **Set up the NAMS key:** Do steps 1 and 2 of [Set up the NAMS key](#set-up-the-nams-key).
+4. **Start the server (window 1):** Export `MEMORY_API_KEY` in this shell. `agentbricks dev` reads the NAMS key only from the shell, and it stops with an error if the key is missing.
 
    ```bash
-   cp .env.example .env     # set DATABRICKS_CONFIG_PROFILE and MEMORY_API_KEY
-   export MEMORY_API_KEY=<your-key>
+   export MEMORY_API_KEY=<your-nams-key>
    agentbricks dev          # serves http://localhost:8000
    ```
 
@@ -101,28 +106,20 @@ Run the agent on your laptop with memory on. This path uses two terminal windows
      --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":[{"role":"user","content":"Which communities look like fraud ring candidates?"}]}'
    ```
 
-6. **See recall:** Send a `user_id` next to `messages`. Then send a second question with a new `session_id` and the same `user_id`. The second answer uses the hub focus from the first question.
+6. **See recall:** Send a `user_id` next to `messages`. Then send a second question with a new `session_id` and the same `user_id`. The second answer uses the hub focus from the first question. A body `user_id` works locally. A deployed app takes the user from the caller's identity, as [What gets recalled](#what-gets-recalled) explains.
 
    ```bash
    agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
      --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":{"user_id":"analyst-7","messages":[{"role":"user","content":"I focus on hub accounts. Which accounts act as hubs?"}]}}'
    ```
 
-### Setting up and generating traffic in the cloud
+### Deploy and generate traffic
 
 Deploy the app, then send fake analyst traffic through it so NAMS fills with conversations.
 
-1. **Install and sign in:** Install the Agent Bricks CLI, pick your Databricks profile, and log in.
-
-   ```bash
-   uv tool install databricks-agentbricks
-   databricks auth profiles                      # list your profiles
-   export DATABRICKS_CONFIG_PROFILE=<your-profile>
-   agentbricks login --profile "$DATABRICKS_CONFIG_PROFILE"
-   ```
-
-2. **Save the key in Databricks:** Create a NAMS key at https://memory.neo4jlabs.com/ and put it in `.env` as `MEMORY_API_KEY`, next to `DATABRICKS_CONFIG_PROFILE`. Then run `./setup_secrets.sh`. It creates the secret scope `nams` and writes the key as `memory-api-key`.
-3. **Deploy:** App names can have at most 30 characters, and the `agent-bricks-` prefix uses 13, so the deploy name can have at most 17. The last two lines save the app URL in `APP_URL` for the traffic commands.
+1. **Install and sign in:** Do step 1 of [Run locally](#run-locally).
+2. **Save the NAMS key in Databricks:** Do steps 1 to 3 of [Set up the NAMS key](#set-up-the-nams-key).
+3. **Deploy:** The deploy name `neo4j-graph-agent` becomes the app `agent-bricks-neo4j-graph-agent`, because Agent Bricks adds the `agent-bricks-` prefix. App names can have at most 30 characters, and the prefix uses 13, so the deploy name can have at most 17. The `export` command saves the app URL in `APP_URL` for the traffic commands.
 
    ```bash
    agentbricks deploy neo4j-graph-agent
@@ -132,7 +129,7 @@ Deploy the app, then send fake analyst traffic through it so NAMS fills with con
    echo "$APP_URL"
    ```
 
-4. **Attach the key:** On the first deploy, add an app resource named `nams-api-key` to the new app. Use type secret, scope `nams`, key `memory-api-key`, and `CAN_READ`. Add it in the app's Resources settings, or with `databricks apps update`. Then run `agentbricks deploy neo4j-graph-agent` again.
+4. **Attach the NAMS key:** On the first deploy, do steps 4 and 5 of [Set up the NAMS key](#set-up-the-nams-key).
 5. **Test the deployed app:** Use a new `id` for every request. Reuse `session_id` to continue a conversation.
 
    ```bash
@@ -156,7 +153,7 @@ Deploy the app, then send fake analyst traffic through it so NAMS fills with con
 
 7. **Check NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`.
 
-## Running the ontology example
+## Run the ontology example
 
 NAMS reads each stored conversation and extracts entities from the text. An ontology tells the extractor what to look for. This section loads the ontology that ships in this repo and then measures what it changes with a before and after run.
 
@@ -291,7 +288,7 @@ You need a NAMS key from https://memory.neo4jlabs.com/ and permission to create 
    - **Server URL:** Enter `https://memory.neo4jlabs.com/mcp`. NAMS uses Streamable HTTP.
    - **Authentication:** Choose **Bearer token**.
    - **Bearer token:** Paste the NAMS key. Paste the key only, without a `Bearer ` prefix.
-5. **Load the tools:** Click **Create & load tools**. Databricks lists the 40 NAMS tools. A 401 error means the key is wrong.
+5. **Load the tools:** Click **Create & load tools**. Databricks lists the 40 NAMS tools. A 401 error means the NAMS key is wrong.
 6. **Trim the tools:** Click **Edit tools** on the service page and choose **Select manually**. Deselect every `memory_ontology_*` tool and `memory_create_relation`, which leaves 32 of 40 selected. The tool filter matches the exact start of a name, so type `memory_ontology` and then `memory_create_relation`.
 7. **Grant access:** Give each user or service principal that will call the service `USE CONNECTION` on the connection.
 8. **Try it:** Click **Try in Playground**, then ask the model to remember a fact and recall it in a new chat.
@@ -304,12 +301,12 @@ Use these in the Playground to check that the NAMS tools work. Run the recall qu
 
 **Save a fact**
 
-- "Remember that I'm investigating community 4127 as a fraud ring candidate and that the hub account is A-10482."
+- "Remember that I'm investigating Community 19766 as a fraud ring candidate and that the hub account is Account 15940."
 - "I prefer results as a table, top 10 only, with risk_score included. Remember that."
 
 **Recall in a new chat**
 
-- "What was I investigating last time?" The answer should name community 4127 and account A-10482 without being told again.
+- "What was I investigating last time?" The answer should name Community 19766 and Account 15940 without being told again.
 - "What account did I say was the hub?" The answer should be the specific account, not a summary.
 - "Show me the top ring candidate communities." The answer should follow the saved table preference.
 
@@ -319,7 +316,7 @@ Use these in the Playground to check that the NAMS tools work. Run the recall qu
 
 **Corrections**
 
-- "Actually, the hub account is A-20931, not A-10482." Then ask "What's the hub account?" The answer should be the new value, or the agent should point out the conflict.
+- "Actually, I'm investigating Community 22341 now, and its hub account is Account 7321." Then ask "What's the hub account?" The answer should be the new value, or the agent should point out the conflict.
 
 **Cases that should fail safely**
 
@@ -406,7 +403,7 @@ The Databricks Apps proxy returns a 401 for the token that a job gets from its o
      --json '{"access_control_list":[{"service_principal_name":"'"$SP_CLIENT_ID"'","permission_level":"CAN_USE"}]}'
    ```
 
-4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Set that entry in `app.yaml` to the principal's application id, then run `agentbricks deploy` again. The checked-in value is the `nams-traffic-runner` application id in this repo's workspace. If you created a new principal, replace it with `$SP_CLIENT_ID`. Separate several ids with commas. If the value is unset or wrong, the app ignores the synthetic users and saves every traffic turn under the principal itself.
+4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Set that entry in `app.yaml` to the principal's application id, then run `agentbricks deploy neo4j-graph-agent` again. The checked-in value is the `nams-traffic-runner` application id in this repo's workspace. If you created a new principal, replace it with `$SP_CLIENT_ID`. Separate several ids with commas. If the value is unset or wrong, the app ignores the synthetic users and saves every traffic turn under the principal itself.
 
    ```yaml
    - name: MEMORY_TRUSTED_CALLERS
@@ -455,7 +452,7 @@ The app answers questions about the fraud graph. It also remembers what each ana
 
 How one turn flows:
 
-1. **Request:** A caller sends a question with a `user_id`.
+1. **Request:** A caller sends a question. The app takes the memory user from the caller's forwarded identity. Locally, it uses the `user_id` in the request body. [What gets recalled](#what-gets-recalled) has the details.
 2. **Recall:** The app reads that user's recent conversations from NAMS.
 3. **Answer:** The agent asks the model and reads the graph through the MCP service.
 4. **Reply:** The app sends the answer back to the caller.
@@ -483,7 +480,7 @@ The app uses NAMS as long term memory. It saves every turn and reads recent turn
 
 How one turn uses NAMS:
 
-1. **Request:** The caller sends a question and a `user_id`.
+1. **Request:** The caller sends a question. The app takes the memory user from the caller's forwarded identity. Locally, it uses the `user_id` in the request body. [What gets recalled](#what-gets-recalled) has the details.
 2. **Recall:** The app opens a `TurnMemory` for the turn. It lists the user's conversations in NAMS and reads the latest two.
 3. **Run:** The app runs the agent with the recalled text in its instructions.
 4. **Buffer:** The app hands each tool call and the final answer to `TurnMemory`. It holds them in memory.
@@ -492,7 +489,7 @@ How one turn uses NAMS:
 
 ### What gets saved
 
-- **One conversation per turn:** Each turn is its own conversation in NAMS. Each one carries the `user_id` in its metadata, and recall filters on it.
+- **One conversation per turn:** Each turn is its own conversation in NAMS. Each one carries the memory user in its `user_id` metadata, and recall filters on it.
 - **Clean answer:** The stored assistant answer has Cypher code fences and MCP tool names removed. `sanitize_answer` in `agent/nams.py` does this, because NAMS would otherwise extract Cypher and tool names as entities. Plain fences, such as result tables, keep their text. Ids, scores, and counts stay in the text.
 - **Trace:** When the agent uses tools, the app saves one reasoning trace. The trace has one step and one tool call for each MCP call. Steps use the bare tool name and a plain sentence, such as "The agent read the graph schema." A Cypher tool call is saved without its query, so NAMS does not extract the query as entities. The MLflow trace keeps the full Cypher for debugging. NAMS keeps the steps and tool calls, but not the trace task or outcome.
 - **Entities:** NAMS finds entities in the messages on its own servers, and the app does nothing for this. The system prompt asks the agent to write ids the same way each time, as "Account <id>" and "Community <id>". That keeps the extracted names consistent.
@@ -506,20 +503,13 @@ How one turn uses NAMS:
 
 ### When NAMS is not available
 
-- **Best effort:** If the key is missing, or NAMS is slow or down, the agent answers without memory. NAMS never breaks an answer.
+- **Best effort:** If the NAMS key is missing, or NAMS is slow or down, the agent answers without memory. NAMS never breaks an answer.
 - **Retries:** A recovery run reads memory but does not write. A replayed turn is not saved twice.
 - **Evaluation:** `agent-evaluate` calls the agent directly. It never writes to NAMS.
 
 ### Try it
 
-Start a local server with `agentbricks dev`. Export `MEMORY_API_KEY` in that shell first, because `agentbricks dev` reads the key from your shell and not from `.env`. Then send a question with a `user_id`.
-
-```bash
-agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
-  --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":{"user_id":"analyst-7","messages":[{"role":"user","content":"I focus on hub accounts. Which accounts act as hubs?"}]}}'
-```
-
-Send a second question with a new `session_id` and the same `user_id`. The answer uses the hub focus from the first question.
+Follow steps 4 to 6 of [Run locally](#run-locally). Step 6 sends two questions as the same `user_id` in different sessions, and the second answer recalls the first.
 
 ## Configuration
 
@@ -562,12 +552,12 @@ agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deployments delete agent-bric
 
 ```
 agent.toml          MCP binding, session store, tracing
-app.yaml            App start command
+app.yaml            App start command and environment, such as MEMORY_TRUSTED_CALLERS
 setup_secrets.sh    Writes the .env secrets to a Databricks secret scope
-docs/               Architecture diagram
+docs/               Architecture and NAMS flow diagrams
 agent/              agent, system prompt, guardrails, NAMS memory, evaluation
-runtime/            DurableAgentServer entrypoint and adapter
-tests/              guardrail, adapter, and memory tests
+runtime/            DurableAgentServer entrypoint, adapter, and memory identity middleware
+tests/              guardrail, runtime and identity, memory, ontology, and drift check tests
 traffic/            synthetic analyst traffic CLI and its Databricks Job bundle
 ontology/           NAMS ontology, loader, measurement, and transcript replay scripts
 scripts/            drift check of the prompt and scenarios against the live graph
@@ -580,14 +570,11 @@ scripts/            drift check of the prompt and scenarios against the live gra
 - **Backing resources:** The MCP service must be allowed to reach whatever backs it. Agent Bricks does not grant access to those resources.
 - **Invocation ids across callers:** The memory identity is part of the saved request. So when a second caller reuses an invocation id, the app returns 409. This is expected.
 - **Reading another caller's result:** The status and events routes, `GET /api/invocations/{id}` and `/events`, do not check who started the invocation. Any caller with `CAN_USE` on the app who knows another caller's invocation UUID can read that result. UUIDs are hard to guess. This is framework behavior in `databricks_agentkit`.
-
-## Note: Responses API
-
-The agent calls the model through the Responses API. Chat completions streaming breaks on Claude 5 reasoning deltas in openai-agents 0.23.1.
+- **Responses API:** The agent calls the model through the Responses API. Chat completions streaming breaks on Claude 5 reasoning deltas in openai-agents 0.23.1.
 
 ## Troubleshooting: Update the MCP connection
 
-**Symptom:** `agentbricks endpoint invoke` returns `HTTP 500` with `{"detail": "agent invocation failed"}`. The app logs (`agentbricks deployments logs <name>`) show `No MCP server connected` and `Resource not found - Requested gateway does not exist`.
+**Symptom:** `agentbricks endpoint invoke` returns `HTTP 500` with `{"detail": "agent invocation failed"}`. The app logs (`agentbricks deployments logs agent-bricks-neo4j-graph-agent`) show `No MCP server connected` and `Resource not found - Requested gateway does not exist`.
 
 **Cause:** The Neo4j MCP server was rebuilt. A rebuild creates a new AgentCore gateway ID and a new Cognito OAuth client. The Unity Catalog connection behind `finance_genie_mcp` still holds the old host and client, so the gateway returns 404. Your direct gateway test can pass while the service fails, because the test uses the new URL from `.mcp-credentials.finance.json` and the service does not.
 
@@ -631,7 +618,7 @@ The agent calls the model through the Responses API. Chat completions streaming 
      -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}'
    ```
 
-4. **Invoke the agent:** Run the `agentbricks endpoint invoke` command from [Setting up and generating traffic in the cloud](#setting-up-and-generating-traffic-in-the-cloud) again. The app reads the service on every request, so it needs no redeploy.
+4. **Invoke the agent:** Run the `agentbricks endpoint invoke` command from step 5 of [Deploy and generate traffic](#deploy-and-generate-traffic) again. The app reads the service on every request, so it needs no redeploy.
 
 **Notes:**
 - **Repeat after each rebuild:** Every rebuild of the MCP server changes the gateway ID and the OAuth client, so repeat these steps each time.
