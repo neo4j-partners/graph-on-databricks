@@ -194,4 +194,4 @@ The agent already names this service in `agent.toml`. When you run `agentbricks 
 
 Running `./deploy.py --env finance` again on the existing stack updates the server in place. The Gateway and the Cognito client stay the same, so the connection needs no change.
 
-A teardown followed by a fresh deploy is different. It creates a new Gateway ID and a new Cognito client, and the connection keeps the old values until you update it. After a fresh stack, follow [Troubleshooting: Update the MCP connection](../README.md#troubleshooting-update-the-mcp-connection).
+A teardown followed by a fresh deploy is different. It creates a new Gateway ID and a new Cognito client, and the connection keeps the old values until you update it. After a fresh stack, follow [Troubleshooting: Update the MCP connection](troubleshooting.md#update-the-mcp-connection).
