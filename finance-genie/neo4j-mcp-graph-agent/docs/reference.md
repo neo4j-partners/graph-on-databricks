@@ -22,8 +22,9 @@
 - **Deploy grants:** `agentbricks deploy` creates the app and its stores. It also grants the app service principal `EXECUTE` on the MCP service, plus `USE_SCHEMA` and `USE_CATALOG` on its parents.
 - **Graph tools:** The agent has two read-only graph tools, `get_neo4j_schema` and `read_neo4j_cypher`. Guardrails reject write Cypher, cut results at 8000 characters, and stop a run after 20 steps.
 - **Cypher guardrail:** The Cypher guardrail also rejects admin clauses such as `GRANT`, `ALTER`, `USE`, and `STOP DATABASE`. It allows `CALL` only for subqueries and a short list of schema procedures: `db.labels`, `db.relationshipTypes`, `db.propertyKeys`, `db.schema.*`, and `apoc.meta.*`. The guardrail is a text check, so it is defense in depth and not the read-only boundary.
+- **Genie tools:** The Genie tools are function tools, so the MCP allowlist and the Cypher guardrail do not apply to them. Genie is read-only.
 
-Two files hold the agent logic. `agent/agent.py` builds the agent, loads the MCP server from `agent.toml`, and applies the guardrails. `agent/guardrails.py` defines them. `agent.toml` declares the MCP service as an app-identity tool, a session store for multi-turn history, and the MLflow tracing experiment. The `runtime/` folder serves the agent at `/api/invocations`.
+Two files hold the agent logic. `agent/agent.py` builds the agent, loads the MCP server from `agent.toml`, and applies the guardrails. `agent/guardrails.py` defines them. `agent.toml` declares the MCP service and the Genie space as app-identity tools, a session store for multi-turn history, and the MLflow tracing experiment. The `runtime/` folder serves the agent at `/api/invocations`.
 
 ## Evaluate
 
@@ -33,6 +34,7 @@ uv run agent-evaluate
 
 - **What it runs:** The agent answers the questions in `agent/evaluate.py`. MLflow scorers grade the answers.
 - **Judges:** The judges use a Databricks-hosted model, set by `JUDGE_MODEL`. They use no external API key.
+- **Graph and Genie question:** One question needs both the graph and Genie. Its scorer, `graph_and_genie_called`, checks only that both sources were called. It does not check Genie's answer.
 - **Pass rule:** The run fails unless every case passes the safety and no-write checks.
 - **NAMS:** The run never writes to NAMS.
 - **Drift check:** Run `uv run python scripts/check_drift.py` after the graph is re-seeded. It compares the prompt's graph schema and the traffic scenarios' named accounts, communities, phones, and merchants with the live graph. It only reads, and it exits 1 on drift. It is not part of `pytest`.

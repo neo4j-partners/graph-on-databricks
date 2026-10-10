@@ -1,10 +1,10 @@
 # neo4j-mcp-graph-agent
 
-This is a fraud analyst agent built on Agent Bricks. It reads the finance-genie fraud graph in Neo4j through a Unity Catalog MCP service. It remembers each analyst's earlier questions in NAMS, the hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/). MLflow tracing records every model call and tool call, so you can see how each answer was found.
+This is a fraud analyst agent built on Agent Bricks. It reads the finance-genie fraud graph in Neo4j through a Unity Catalog MCP service. It asks a Genie space for values over the gold Delta tables. The agent sends structure questions to the graph and value questions to Genie, and that routing is what makes the two better together. It remembers each analyst's earlier questions in NAMS, the hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/). MLflow tracing records every model call and tool call, so you can see how each answer was found.
 
 What you'll see:
 
-- **Graph answers:** The agent answers fraud questions with read-only Cypher. Each MLflow trace shows the queries it ran.
+- **Graph and Genie answers:** The agent answers structure questions with read-only Cypher and value questions with Genie. Each MLflow trace shows which source it called and what it asked.
 - **Memory across sessions:** A new session picks up what the same analyst asked before.
 - **Memory you can inspect:** NAMS shows each analyst's conversations, reasoning traces, and the entities it found.
 
@@ -26,10 +26,11 @@ The parts:
 
 - **Caller:** The caller is any client that sends questions, such as the CLI, the traffic generator, or a Databricks Job.
 - **Databricks App:** The app is the deployed agent, served by the Agent Bricks `DurableAgentServer`.
-- **Agent:** The agent is an OpenAI Agents SDK loop that has only two read-only graph tools.
+- **Agent:** The agent is an OpenAI Agents SDK loop with two read-only graph tools and the Genie tools.
 - **TurnMemory:** This class in `agent/nams.py` recalls memory before a turn and writes the turn to NAMS after it.
 - **AI Gateway model:** This model writes the answer. The default is `claude-sonnet-5-5`.
 - **MCP service:** The Unity Catalog service `finance_genie_mcp` runs read-only Cypher on Neo4j.
+- **Genie space:** The Genie space answers value questions over the gold Delta tables.
 - **NAMS:** NAMS stores conversations, messages, reasoning traces, and entities.
 - **Secret scope `nams`:** This scope holds the NAMS key, which the app reads as `MEMORY_API_KEY`.
 
@@ -42,6 +43,7 @@ The parts:
 - **Workspace:** The workspace needs Databricks Apps and Unity Catalog AI Gateway.
 - **MCP service:** The service `graph-on-databricks.finance_genie.finance_genie_mcp` must exist. It must expose the tools `get_neo4j_schema` and `read_neo4j_cypher`. [Create the finance-genie MCP service](docs/mcp-service.md) covers the setup.
 - **Grant right:** You must own the MCP service or have `MANAGE` on it. Deploy grants `EXECUTE` on it for the app.
+- **Genie space:** The agent asks the AFTER Genie space from finance-genie, which covers the gold tables. Set your own space id in the `genie` tool block of `agent.toml`. Deploy grants the app `CAN_RUN` on the space. The app's service principal also needs `CAN_USE` on the space's SQL warehouse and `SELECT` on the tables.
 - **NAMS key:** You need a NAMS key from https://memory.neo4jlabs.com/. [Set up the NAMS key](#set-up-the-nams-key) covers it.
 
 ## Set up the NAMS key
@@ -116,8 +118,8 @@ Ask each question with the `invoke` command from step 6 of [Deploy and try](#dep
 1. **Shared phone:** Ask "Which customers share phone 312-555-0142, and which accounts do they own?" Several customers share this phone. Look for Accounts 368, 927, 1033, and 1696 and a `read_neo4j_cypher` span. For an extra beat, ask which community those accounts are in. Look for Community 8174.
 2. **Hub:** Ask "I focus on hub accounts. Is Account 15940 a hub, and which community is it in?" Look for Community 19766 and a `read_neo4j_cypher` span.
 3. **Recall:** Run `SESSION_ID=$(uuidgen)` to start a new session, then ask "What was I looking at last time?" Look for Account 15940 in the answer, although this session never named it. Recall reads only your two latest conversations, so run steps 2 and 3 back to back.
-4. **Genie value question:** **Placeholder.** The question is not final yet. It asks for a value that Genie answers from the gold tables. Look for a `genie` tool span.
-5. **Graph and Genie:** **Placeholder.** The question is not final yet. It needs both the graph and Genie. Look for a `genie` tool span and a `read_neo4j_cypher` span in the same trace.
+4. **Genie value question:** Ask "What is the average account balance by region and account type?" Look for a `genie_ask` span followed by a `genie_query_result` span.
+5. **Graph and Genie:** Ask "Which phone numbers are shared by more than one customer, and what are the balances and 30-day transaction counts of the accounts those customers own?" Look for a `read_neo4j_cypher` span, then a `genie_ask` span whose question names the account ids that the graph found.
 6. **NAMS view:** Open your NAMS workspace and find your user, which is your Databricks email. Each turn above is its own conversation, with its messages and a reasoning trace. Entities such as Account 15940 and Community 19766 appear after NAMS extracts them, so they lag the write.
 
 **Optional ring question:** After step 3, ask "Is Community 3040 a fraud ring candidate?" Look for Community 3040 and a `read_neo4j_cypher` span.
