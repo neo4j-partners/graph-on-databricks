@@ -17,10 +17,12 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env", override=False)
 logging.getLogger("mlflow.utils.autologging_utils").setLevel(logging.ERROR)
 
 from agent.agent import configure, run_agent  # noqa: E402
-from agent.guardrails import is_read_only_cypher  # noqa: E402
+from agent.guardrails import READ_CYPHER_TOOL, is_read_only_cypher  # noqa: E402
 
 # Judges run on a Databricks-hosted foundation model, so no external API key is needed.
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "databricks:/databricks-claude-sonnet-5-5")
+# Genie tools are named after the `genie` tool id in agent.toml: genie_ask, genie_poll, and so on.
+GENIE_TOOL_PREFIX = "genie_"
 
 EVAL_DATA = [
     {
@@ -54,6 +56,20 @@ EVAL_DATA = [
                 "SIMILAR_TO connects accounts that share merchants",
                 "The similarity is a Jaccard similarity over shared merchants",
             ]
+        },
+    },
+    {
+        "inputs": {
+            "question": "Which phone numbers are shared by more than one customer, and what "
+            "are the balances and 30-day transaction counts of the accounts those "
+            "customers own?"
+        },
+        # Genie's answer is not checked. The scorer checks only that both sources were called.
+        "expectations": {
+            "expected_facts": [
+                "The answer names phone numbers shared by more than one customer",
+            ],
+            "requires_graph_and_genie": True,
         },
     },
     {
@@ -110,6 +126,16 @@ def tool_call_occurred(inputs: dict, outputs: dict) -> Feedback:
     return Feedback(value=bool(names), rationale=f"tool calls: {names}")
 
 
+@scorer
+def graph_and_genie_called(outputs: dict, expectations: dict) -> Feedback:
+    if not expectations.get("requires_graph_and_genie"):
+        return Feedback(value=True, rationale="not required for this question")
+    names = [call["name"] for call in outputs.get("tool_calls", [])]
+    graph = any(name.endswith(READ_CYPHER_TOOL) for name in names)
+    genie = any(name.startswith(GENIE_TOOL_PREFIX) for name in names)
+    return Feedback(value=graph and genie, rationale=f"tool calls: {names}")
+
+
 def evaluate() -> None:
     configure()
     results = mlflow.genai.evaluate(
@@ -121,6 +147,7 @@ def evaluate() -> None:
             Correctness(model=JUDGE_MODEL),
             no_write_executed,
             tool_call_occurred,
+            graph_and_genie_called,
         ],
     )
     failed = [name for name in GATED_METRICS if results.metrics.get(name) != 1.0]

@@ -17,3 +17,10 @@ experiment_name = "/Shared/agentbricks_traces/neo4j-mcp-graph-agent"
 id = "finance_genie_mcp"
 auth = "app"
 source = { kind = "mcp", service = "graph-on-databricks.finance_genie.finance_genie_mcp" }
+
+# Genie space over the gold tables, called as the app service principal. `agentbricks deploy`
+# attaches the space as an app resource with CAN_RUN.
+[[tools]]
+id = "genie"
+auth = "app"
+source = { kind = "genie_agent", space_id = "01f15efe10cf196a8d310614b9acf78e" }

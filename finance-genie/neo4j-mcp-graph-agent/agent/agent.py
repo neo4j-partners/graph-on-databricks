@@ -13,6 +13,7 @@ from agent.prompt import SYSTEM_PROMPT
 from databricks_agentkit import workspace_client, workspace_headers
 from databricks_agentkit.openai import (
     configure_tracing,
+    genie_tools,
     mcp_servers,
     session_store,
     start_trace,
@@ -45,6 +46,7 @@ def create_agent(servers: list[Any], memory_context: str = "") -> Agent:
         name="neo4j-mcp-graph-agent",
         instructions=SYSTEM_PROMPT + memory_context,
         model=MODEL,
+        tools=genie_tools(),
         mcp_servers=servers,
     )
 
@@ -55,7 +57,8 @@ async def run_agent(
 ) -> AsyncIterator[RunResultStreaming]:
     """Run the agent and expose its native streaming result.
 
-    The MCP servers come from `agent.toml`; each gets the allowlist and guardrails.
+    The MCP servers and the Genie tools come from `agent.toml`; each MCP server gets the
+    allowlist and guardrails.
     """
     servers = await mcp_servers()
     for server in servers:
