@@ -189,7 +189,7 @@ Run these from `neo4j-mcp-graph-agent/` with the variables from [Quick start wit
    uv run ontology/apply_ontology.py --reset
    ```
 
-   Or run `make reset-ontology`. The command finds the NAMS Default ontology by name and activates its newest revision that has none of the finance types. It prints the activated version. It needs no saved file, and it skips a hybrid revision built by `ontology/set_baseline.py`.
+   Or run `make reset-ontology`. The command finds the NAMS Default ontology by name and activates its newest revision that has none of the finance types. It prints the activated version. It needs no saved file.
 
 5. **Clear the saved run files (optional):** The ontology scripts save transcripts and snapshots in `ontology/out/`. This deletes them so the next run starts empty. Git ignores this folder, so the files cannot be restored.
 

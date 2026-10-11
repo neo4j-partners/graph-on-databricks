@@ -89,7 +89,7 @@ snapshot:
 apply-ontology:
 	uv run ontology/apply_ontology.py --create --activate
 
-# BASELINE= is default, hybrid, or none. Sets the ontology that trial 1 runs against.
+# BASELINE= is default or none. Sets the ontology that trial 1 runs against.
 baseline:
 	uv run ontology/set_baseline.py --baseline $(BASELINE)
 

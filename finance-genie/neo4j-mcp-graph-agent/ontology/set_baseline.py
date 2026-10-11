@@ -9,12 +9,9 @@
 """Put NAMS in the trial 1 baseline state for docs/ontology-experiment.md.
 
     uv run ontology/set_baseline.py --baseline default   # the plain NAMS Default
-    uv run ontology/set_baseline.py --baseline hybrid    # default plus finance types
     uv run ontology/set_baseline.py --baseline none      # check no ontology is active
 
 --baseline default activates the newest NAMS Default revision with no finance types.
---baseline hybrid adds the finance types to NAMS Default as a new revision and
-activates it. A second run reuses that revision.
 --baseline none only checks. The API cannot unbind an active ontology, so it exits
 with an error when one is active.
 
@@ -27,7 +24,6 @@ neo4j-mcp-graph-agent/.env.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -35,28 +31,7 @@ import apply_ontology as ao
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 STATE_DIR = SCRIPT_DIR / "out"
-BASELINES = ("default", "hybrid", "none")
-
-
-def merge_finance_into_default(default_doc: dict, finance_doc: dict) -> dict:
-    """Return the default document with the finance types and relationships added."""
-    merged = json.loads(json.dumps(default_doc))
-    labels = {e["label"] for e in merged.get("entity_types", [])}
-    merged["entity_types"] = merged.get("entity_types", []) + [
-        e for e in finance_doc["entity_types"] if e["label"] not in labels
-    ]
-    triples = ao.triples_of(merged.get("relationships") or [])
-    merged["relationships"] = (merged.get("relationships") or []) + [
-        r
-        for r in finance_doc.get("relationships") or []
-        if (r["type"], r["source"], r["target"]) not in triples
-    ]
-    return merged
-
-
-def entity_labels(version: dict) -> set[str]:
-    schema = json.loads(version.get("schema_json") or "{}")
-    return {e.get("label") for e in schema.get("entity_types") or []}
+BASELINES = ("default", "none")
 
 
 def activate(client: ao.NamsClient, version_id: str) -> None:
@@ -73,26 +48,12 @@ def set_default(client: ao.NamsClient, finance: dict) -> None:
     activate(client, ao.find_default_version(client, labels)["id"])
 
 
-def set_hybrid(client: ao.NamsClient, finance: dict) -> None:
-    finance_labels = {e["label"] for e in finance["entity_types"]}
-    base = ao.find_default_version(client, finance_labels)
-    existing = client.get_ontology(base["ontology_id"]).get("versions") or []
-    hybrid = next((v for v in existing if finance_labels <= entity_labels(v)), None)
-    if hybrid is None:
-        merged = merge_finance_into_default(json.loads(base["schema_json"]), finance)
-        if problems := ao.validate_ontology(merged):
-            raise ao.ApiError("merged ontology is invalid: " + "; ".join(problems))
-        hybrid = client.update(base["ontology_id"], merged)
-        ao.print_version("Created hybrid revision", hybrid)
-    activate(client, hybrid["id"])
-
-
 def check_none(client: ao.NamsClient) -> None:
     active = client.get_active().get("version")
     if active:
         raise ao.ApiError(
             f"version {active.get('id')} is active, and the API cannot unbind it. "
-            "Use --baseline default or --baseline hybrid instead."
+            "Use --baseline default instead."
         )
     print("No ontology is active. This is the no-ontology baseline.")
 
@@ -111,8 +72,6 @@ def main(argv: list[str] | None = None) -> int:
         with ao.NamsClient(ao.load_settings()) as client:
             if args.baseline == "default":
                 set_default(client, finance)
-            elif args.baseline == "hybrid":
-                set_hybrid(client, finance)
             else:
                 check_none(client)
     except ao.ApiError as exc:

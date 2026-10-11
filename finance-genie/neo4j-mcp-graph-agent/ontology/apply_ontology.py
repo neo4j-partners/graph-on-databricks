@@ -31,8 +31,7 @@ Restore it with --rollback <version id or that json file>. The API has no
 way to unbind the active ontology, so rolling back to "none" is refused.
 
 --reset needs no saved file. It looks up the system ontology "nams-default" and
-activates its newest revision that has none of the finance types. That skips a
-hybrid revision made by set_baseline.py.
+activates its newest revision that has none of the finance types.
 MEMORY_API_KEY (and optional MEMORY_ENDPOINT) come from the
 environment or from neo4j-mcp-graph-agent/.env. The key is never printed.
 """
@@ -530,11 +529,7 @@ def resolve_rollback_target(argument: str) -> str:
 
 
 def plain_default_version(versions: list[dict], finance_labels: set[str]) -> dict:
-    """Return the newest version that has none of the finance types.
-
-    A hybrid baseline adds the finance types as a new revision of the default.
-    That revision is not the plain default, so it is skipped here.
-    """
+    """Return the newest version that has none of the finance types."""
     plain = []
     for version in versions:
         schema = json.loads(version.get("schema_json") or "{}")

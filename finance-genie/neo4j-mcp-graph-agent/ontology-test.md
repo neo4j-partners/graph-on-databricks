@@ -36,7 +36,7 @@ Demo script
 
 Reset before the ontology example
 - [x] You: Reset the NAMS database again. `demo.py` wrote conversations into it, and the ontology example counts every stored conversation.
-- [ ] Claude: `make reset-ontology` and `make baseline BASELINE=default` leave the default active.
+- [x] Claude: `make reset-ontology` and `make baseline BASELINE=default` leave the default active.
 
 Ontology example, trial 1 (default baseline)
 - [x] Claude: Run traffic against the local server. The fourth attempt stored 24 of 24 conversations with no connect failures. Attempts 1 to 3 lost turns, see the audit log.
@@ -44,26 +44,24 @@ Ontology example, trial 1 (default baseline)
 - [x] Claude: `make snapshot LABEL=before-1` records the NAMS Default version. Saved `ontology/out/before-1.json`, conformance 0.0% (0/355).
 
 Ontology example, trial 2 (finance ontology)
-- [ ] You: Reset the NAMS database between the trials.
-- [!] Claude: `make apply-ontology` creates and activates the finance ontology. It failed with 409 because the NAMS reset keeps ontologies. `--update ont_c383f6622e01 --activate` worked (revision 2, `ov_db0ef7bb9529`).
-- [ ] Claude: `make replay` writes the 24 turns back.
-- [ ] Claude: `make snapshot LABEL=after-1` records the finance version.
-- [ ] Claude: `make compare` shows two different ontology versions and the expected direction of change.
+- [x] You: Reset the NAMS database between the trials.
+- [x] Claude: `make apply-ontology` creates and activates the finance ontology. The first try failed with 409 because the NAMS reset keeps ontologies. `apply_ontology.py --create` now falls back to adding a revision. Live run added revision 4 (`ov_602c9c3f3425`) and activated it.
+- [x] Claude: `make replay` writes the 24 turns back. Wrote 24 conversations, 48 messages, 28 steps, 28 tool calls.
+- [x] Claude: `make snapshot LABEL=after-1` records the finance version (revision 2, `ov_db0ef7bb9529`).
+- [x] Claude: `make compare` shows two different ontology versions and the expected direction of change. Conformance 0 to 100%, Object/Concept 183 to 0.
 
 Hybrid baseline
-- [ ] Claude: `make baseline BASELINE=hybrid` creates a new revision of the system `nams-default` and activates it. This adds a revision to a system ontology, so run it once.
-- [ ] Claude: `make baseline BASELINE=hybrid` a second time reuses that revision and creates nothing.
-- [ ] Claude: `make reset-ontology` skips the hybrid revision and activates plain revision 3.
+- [x] Dropped. It failed live with 403 (system ontologies are immutable), so you chose to remove it. `set_baseline.py` now takes `default` or `none`.
 
 Long-term memory demo
-- [ ] Claude: `make apply-ontology` (Tier 1 step 1), then local traffic.
+- [x] Claude: `make apply-ontology` (Tier 1 step 1), then local traffic. The finance ontology was already active from trial 2. Run `lt2` stored 24 of 24.
 - [ ] You: Find Community 3040 in the NAMS console and check that its provenance lists two analysts.
-- [ ] Claude: `uv run scripts/demo_longterm.py` prints analyst B's answer with analyst A's findings.
+- [x] Claude: `uv run scripts/demo_longterm.py --analyst-b demo-analyst-b-t1` prints analyst B's answer with analyst A's findings. Exit 0.
 
 Clean up
-- [ ] Claude: README Clean up step 4 (`--reset`) returns the default.
-- [ ] Claude: README Clean up step 5 clears `ontology/out/*.json`.
-- [ ] Claude: Stop the local server.
+- [x] Claude: README Clean up step 4 (`--reset`) returns the default. Activated `ov_345ad0e8d72a`.
+- [ ] Claude: README Clean up step 5 clears `ontology/out/*.json`. Held back so the cloud trial can be compared with the local snapshots.
+- [x] Claude: Stop the local server.
 
 ### Phase 2: cloud
 
@@ -87,7 +85,6 @@ Starts only after you reset the NAMS database again.
 ## What else needs testing
 
 - **Local traffic:** Whether `agent-traffic` works against `http://localhost:8000`. If it does not, the docs must say the ontology example needs the cloud app.
-- **Hybrid on a system ontology:** The hybrid adds a revision to the system `nams-default`. Check that the revision does not break other users of the workspace and that `--reset` still finds the plain revision.
 - **`--baseline none`:** Only the failure path is tested. The success path needs a workspace that never activated an ontology, which this workspace is not.
 - **Copy-paste of the doc commands:** Run each raw command in `docs/ontology-experiment.md` as written, not only the `make` wrapper, because the two can drift.
 - **README links:** Check every in-page anchor after the section move, and the anchors that other docs use (`#quick-start-cloud-with-make`, `#quick-start-with-make`).
@@ -115,3 +112,9 @@ Starts only after you reset the NAMS database again.
 - **2026-10-11, trial 1 traffic, fourth attempt:** NAMS reset, then `agent-traffic` (old client, new 5-attempt retry) finished ok=24 failed=0 in 154s. NAMS held 24 conversations, 2 per session across 12 sessions, with no connect failures. `make export` saved 24 conversations, 48 messages, 28 steps, 28 tool calls. Open items from hthz: the connect failure counts in the earlier attempts do not reconcile with the stored counts (run 2 logged 11 connect failures but 4 turns went missing), and snapshots do not record the git commit, so the code under test changed during trial 1.
 - **2026-10-11, trial 1 complete:** `make snapshot LABEL=before-1` saved `ontology/out/before-1.json` after extraction finished: 355 entities, 0 of 355 conform to the finance types (NAMS Default types Object, Person, Organization, Concept, Event dominate). The stored-count check paged correctly against the live API with a page size of 5 (24 conversations, 12 sessions). Caveat from hthz: none of this code is committed, and the retry changed during trial 1, so commit before trial 2 so both trials run on the same code.
 - **2026-10-11, trial 2 start (code committed as `0254207`):** `make apply-ontology` exited 3 with `409 ontology with this name already exists in workspace`, because the console reset clears conversations and entities but keeps ontologies, so `finance-genie-fraud-memory` (`ont_c383f6622e01`) still existed. The make target printed the validation text and the rollback line and nothing about the 409, because the filtered make output hid the error line. I did not check the active ontology before starting the replay, so `make replay` wrote 11 conversations while the NAMS Default was still active, and I stopped it. I then ran `--update ont_c383f6622e01 --activate`, which created revision 2 (`ov_db0ef7bb9529`) and activated it. A second `make replay` refused: 11 replayed session ids already exist with the `-r1` suffix. NAMS needs another reset before trial 2 can run. Lesson: confirm `GET /v1/ontologies/active` names the finance ontology before the replay.
+- **2026-10-11, trial 2 replay and compare:** After another NAMS reset, `make apply-ontology` hit the 409 again. `apply_ontology.py --create` now looks up the existing ontology by `domain.id` and adds a revision, with three new tests (58 pass with the baseline tests). The live run added revision 4 (`ov_602c9c3f3425`) and activated it. I confirmed the active ontology before `make replay`, which wrote 24 conversations, 48 messages, 28 steps and 28 tool calls. `make compare` of `before-1` (NAMS Default `ov_345ad0e8d72a`) with `after-1` (Finance Genie Fraud Memory revision 2, `ov_db0ef7bb9529`): total entities 355 to 288, generic Object/Concept 183 to 0 (share 0.515 to 0), duplicate groups 77 to 72, duplicate excess 169 to 138, type conflicts 6 to 2, conformance 0 to 100% (288 of 288). Instance counts (account 64, community 12, identity_cluster 1, phone 2, case 6) and gold recall are unchanged. Typed relationships MEMBER_OF, REPORTS_TO, OWNS and INVESTIGATES increased.
+- **2026-10-11, new traffic client, live:** Run `lt1` failed 4 turns with "agent invocation failed". The server log showed `No MCP server connected: TimeoutError()` on a stale server. The client reported each failed turn and exited 1. After a clean `make dev`, run `lt2` finished ok=24 failed=0 in 147s and printed "NAMS stored 24 of 24 completed turn(s)". Minor oddity: a turn interrupted with "stopped" is counted as failed.
+- **2026-10-11, hybrid baseline:** `make baseline BASELINE=hybrid` fails live with 403 "system ontologies are immutable; clone to edit", because it PUTs a revision to the system `nams-default`. The unit tests do not catch it because the fake client allows the PUT. Open: decide between cloning the ontology (if the API supports it), dropping the hybrid baseline, or changing the docs. No fix made.
+- **2026-10-11, long-term demo (local):** `uv run scripts/demo_longterm.py --analyst-b demo-analyst-b-t1` exited 0. Analyst B's answer recalled analyst A's work on Community 3040, including the comparison with Community 24683 and the stats (126 members, average risk 2.72, highest risk 3.80 for Account 7890).
+- **2026-10-11, local clean up:** `apply_ontology.py --reset` activated plain NAMS Default revision 3. The local server on :8000 is stopped. `ontology/out/*.json` is kept for now. NAMS holds the `lt2` traffic, the trial 2 replay and the demo conversations, so it needs a reset before Phase 2.
+- **2026-10-11, hybrid baseline dropped:** Removed `--baseline hybrid`, `merge_finance_into_default`, `set_hybrid`, the two hybrid tests and the doc references (`docs/ontology-experiment.md`, `docs/reference.md`, `README.md`, Makefile comment, `apply_ontology.py` docstrings). The `--reset` logic that picks the newest revision with no finance types is unchanged. 313 tests pass.

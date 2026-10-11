@@ -1,6 +1,6 @@
 # Run the ontology example
 
-NAMS reads each stored conversation and extracts entities from the text. An ontology tells the extractor what to look for. This page runs the same conversations through NAMS twice, each time with a different ontology active, and then compares what NAMS stored. As run for the snapshots discussed here, trial 1 had the generic NAMS Default ontology active and trial 2 had only the finance ontology. The comparison is generic default versus finance-only, not no ontology versus ontology, because resetting the database does not unbind the active ontology. [Choose the trial 1 baseline](#choose-the-trial-1-baseline) shows how to run the other baselines, including a hybrid of the default plus the finance types.
+NAMS reads each stored conversation and extracts entities from the text. An ontology tells the extractor what to look for. This page runs the same conversations through NAMS twice, each time with a different ontology active, and then compares what NAMS stored. As run for the snapshots discussed here, trial 1 had the generic NAMS Default ontology active and trial 2 had only the finance ontology. The comparison is generic default versus finance-only, not no ontology versus ontology, because resetting the database does not unbind the active ontology. [Choose the trial 1 baseline](#choose-the-trial-1-baseline) shows how to run the other baseline.
 
 You need these before you start:
 
@@ -39,7 +39,7 @@ An agent gives a different answer each time and extraction is LLM based. So the 
 
 ### Choose the trial 1 baseline
 
-Trial 1 can run against three baselines. Run `ontology/set_baseline.py` once with the baseline you want, before you start. Each run saves the active version id to `ontology/out/previous_active_<timestamp>.json` first.
+Trial 1 can run against two baselines. Run `ontology/set_baseline.py` once with the baseline you want, before you start. Each run saves the active version id to `ontology/out/previous_active_<timestamp>.json` first.
 
 ```bash
 uv run ontology/set_baseline.py --baseline default
@@ -47,8 +47,7 @@ uv run ontology/set_baseline.py --baseline default
 
 Or run `make baseline BASELINE=default`.
 
-- **`--baseline default`:** Activates the plain NAMS Default ontology. Its generic types (Person, Organization, Location, Event, Object, and a few software types) guide extraction. This is the baseline the reference run used. The script picks the newest default revision that has none of the finance types, so it also works after you have built the hybrid.
-- **`--baseline hybrid`:** Adds the 11 finance types and 15 relationships to the NAMS Default ontology as a new revision, then activates it. This mirrors a team that adopts an ontology without giving up the generic types. A second run reuses that revision.
+- **`--baseline default`:** Activates the plain NAMS Default ontology. Its generic types (Person, Organization, Location, Event, Object, and a few software types) guide extraction. This is the baseline the reference run used. The script picks the newest default revision that has none of the finance types.
 - **`--baseline none`:** Checks that no ontology is active, and fails if one is. The API cannot unbind an active ontology, so this baseline only works on a workspace that has never activated one. The snapshot records `ontology_version_id: none`.
 
 Confirm which baseline ran from the `ontology_version_id` and `ontology_name` in the trial 1 snapshot.
@@ -91,7 +90,7 @@ Run trial 1 with the baseline you set above. As run, this was the generic defaul
      --ontology-yaml ontology/finance_genie.ontology.yaml --expect-turns 24
    ```
 
-   Or run `make snapshot LABEL=before-1`. The snapshot records the active baseline ontology version: the NAMS Default version as run, the hybrid revision, or `none` for the no-ontology baseline. The `ontology_name` field says which it was.
+   Or run `make snapshot LABEL=before-1`. The snapshot records the active baseline ontology version: the NAMS Default version as run, or `none` for the no-ontology baseline. The `ontology_name` field says which it was.
 
 ### Trial 2: with the finance-only ontology
 
@@ -135,7 +134,7 @@ uv run ontology/measure_ingestion.py compare \
 
 Or run `make compare`. Set `BEFORE=` and `AFTER=` to compare other snapshot files.
 
-The output starts with the ontology line for each snapshot. Check that `before` records the baseline you chose (the NAMS Default version as run, the hybrid revision, or none) and `after` names the finance ontology and its version. The two versions must differ. If they are the same, trial 2 did not activate the finance ontology and the comparison is invalid.
+The output starts with the ontology line for each snapshot. Check that `before` records the baseline you chose (the NAMS Default version as run, or none) and `after` names the finance ontology and its version. The two versions must differ. If they are the same, trial 2 did not activate the finance ontology and the comparison is invalid.
 
 Then read the table. Each row shows the before value, the after value, the delta, and the direction of the change. These rows are where an effect of the ontology shows:
 
