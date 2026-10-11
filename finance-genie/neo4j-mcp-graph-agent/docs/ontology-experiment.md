@@ -50,7 +50,7 @@ Entities in NAMS are not scoped by run, so each snapshot needs its own empty NAM
 So this comparison runs the agent once and replays the stored conversations into each workspace. Then the ontology and the extraction are the only things that change.
 
 1. **Smoke test:** Ask the deployed app one question, "Which community is Account 15940 in?". The answer should name Community 19766. In NAMS, check for one conversation with two messages and one trace, and check that extraction has finished. Or run `make smoke QUESTION="Which community is Account 15940 in?"`.
-2. **Run live once:** Point `MEMORY_API_KEY` at an empty workspace A with the default ontology active. Run the traffic from `traffic/`. The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 4 of [Quick start with make](../README.md#quick-start-with-make) explains. Otherwise all 24 turns land under your own user.
+2. **Run live once:** Point `MEMORY_API_KEY` at an empty workspace A with the default ontology active. Run the traffic from `traffic/`. The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 7 of [Quick start with make](../README.md#quick-start-with-make) explains. Otherwise all 24 turns land under your own user.
 
    ```bash
    cd traffic
