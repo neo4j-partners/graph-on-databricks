@@ -205,7 +205,7 @@ To run the tests and the CLI check, see [Develop and test](docs/reference.md#dev
 
 - [How memory works](docs/how-memory-works.md): This page walks through one turn and shows what NAMS saves and recalls.
 - [Generate traffic](docs/traffic.md): The traffic generator runs from your laptop or as a Databricks Job.
-- [Run the ontology example](docs/ontology-experiment.md): A before and after run measures what an ontology changes.
+- [Run the ontology example](docs/ontology-experiment.md): Two trials, without and with the ontology, show how it drives the schema.
 - [Add NAMS as a Databricks MCP service](docs/nams-mcp-service.md): Other agents, such as the Playground, can use the NAMS tools.
 - [Create the finance-genie MCP service](docs/mcp-service.md): The agent reads the graph through this Neo4j MCP service.
 - [Reference](docs/reference.md): This page covers configuration, guardrails, evaluation, tests, delete, layout, and notes.

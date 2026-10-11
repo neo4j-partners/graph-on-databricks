@@ -59,7 +59,7 @@ traffic: check-profile
 	  --app-url "$${APP_URL:-$$($(APP_URL_CMD))}" \
 	  --users $(USERS) --sessions-per-user $(SESSIONS) --turns-per-session $(TURNS)
 
-# Ontology before and after run. See docs/ontology-experiment.md for the order and the manual MEMORY_API_KEY switch.
+# Ontology before and after run. See docs/ontology-experiment.md for the order and where to reset the NAMS database.
 export:
 	uv run ontology/replay_transcripts.py export --out $(TRANSCRIPTS) --expect-turns $(EXPECT_TURNS)
 
