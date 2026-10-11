@@ -14,6 +14,7 @@ What you'll see:
 - [Prerequisites](#prerequisites)
 - [Set up the NAMS key](#set-up-the-nams-key)
 - [Quick start with make](#quick-start-with-make)
+- [Clean up](#clean-up)
 - [Demo script](#demo-script)
 - [Run locally](#run-locally)
 - [Documentation](#documentation)
@@ -124,6 +125,26 @@ Run these steps from `neo4j-mcp-graph-agent/`. [What the make targets run](docs/
    make deploy
    make traffic
    ```
+
+## Clean up
+
+Run these from `neo4j-mcp-graph-agent/` with the variables from [Quick start with make](#quick-start-with-make) loaded. The first command also starts you over if a deploy fails and you want a fresh app.
+
+1. **Delete the app:** This deletes the app `agent-bricks-neo4j-graph-agent` and its Agent Bricks Runtime Store. The command asks you to confirm. Add `--yes` to skip the prompt.
+
+   ```bash
+   agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deployments delete agent-bricks-neo4j-graph-agent
+   ```
+
+2. **Delete the NAMS secret:** This deletes the secret scope `nams`, which holds the NAMS key. Skip it if you plan to deploy again.
+
+   ```bash
+   databricks secrets delete-scope nams -p "$DATABRICKS_CONFIG_PROFILE"
+   ```
+
+3. **Delete the NAMS data:** The conversations from your runs stay in NAMS. Remove them in your NAMS workspace at https://memory.neo4jlabs.com/, or revoke the key there.
+
+To deploy again after a cleanup, start at step 3 of [Quick start with make](#quick-start-with-make). A new app has a new service principal, so run `make grant-genie` again after the deploy.
 
 ## Demo script
 
