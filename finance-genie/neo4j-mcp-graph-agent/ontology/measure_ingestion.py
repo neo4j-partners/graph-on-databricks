@@ -8,14 +8,17 @@
 READ-ONLY against NAMS: this script only issues GET requests.
 
 Commands:
-    uv run ontology/measure_ingestion.py snapshot --label baseline --out before.json \
-      --expect-turns 48
-    uv run ontology/measure_ingestion.py snapshot --label after --out after.json \
+    uv run ontology/measure_ingestion.py snapshot --label baseline \
+      --out ontology/out/before.json --expect-turns 48
+    uv run ontology/measure_ingestion.py snapshot --label after \
+      --out ontology/out/after.json \
       --ontology-yaml ontology/finance_genie.ontology.yaml --expect-turns 48
-    uv run ontology/measure_ingestion.py compare before.json after.json \
+    uv run ontology/measure_ingestion.py compare \
+      ontology/out/before.json ontology/out/after.json \
       [--users 4 --sessions 4 --turns 3]
-    uv run ontology/measure_ingestion.py recompute before.json --out before2.json
-    uv run ontology/measure_ingestion.py gold --snapshot after.json \
+    uv run ontology/measure_ingestion.py recompute ontology/out/before.json \
+      --out ontology/out/before2.json
+    uv run ontology/measure_ingestion.py gold --snapshot ontology/out/after.json \
       --users 4 --sessions 4 --turns 3
 
 A snapshot stores the raw entities, the relationships (from GET /v1/entities/graph,
@@ -1335,6 +1338,7 @@ def cmd_snapshot(args: argparse.Namespace) -> int:
         )
 
     out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(snap, indent=2) + "\n", encoding="utf-8")
     print(format_snapshot(snap))
     print(f"\nsaved {out}")
@@ -1366,6 +1370,7 @@ def cmd_recompute(args: argparse.Namespace) -> int:
         yaml_poles = load_declared_poles(Path(args.ontology_yaml))
     new = recompute_snapshot(snap, declared, yaml_poles)
     out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
     print(format_snapshot(new))
     print(f"\nsaved {out}")

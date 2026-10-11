@@ -320,7 +320,7 @@ def test_create_and_activate_saves_previous_version_first(
         ("POST", "/v1/ontologies/active"),
     ]
     assert fake_client.calls[3][2] == {"version_id": "ov_new"}
-    saved = list(tmp_path.glob("previous_active_*.json"))
+    saved = list((tmp_path / "out").glob("previous_active_*.json"))
     assert len(saved) == 1
     assert json.loads(saved[0].read_text())["version_id"] == "ov_old"
     assert "nams_secret_value" not in capsys.readouterr().out
@@ -507,7 +507,9 @@ def test_activation_with_no_active_version_records_null(
     sequence = [(m, p) for m, p, _ in fake_client.calls]
     assert sequence[0] == ("GET", "/v1/ontologies/active")
     assert sequence[-1] == ("POST", "/v1/ontologies/active")
-    saved = json.loads(next(tmp_path.glob("previous_active_*.json")).read_text())
+    saved = json.loads(
+        next((tmp_path / "out").glob("previous_active_*.json")).read_text()
+    )
     assert saved["version_id"] is None
     assert saved["about_to_activate"] == "<new>"
     out = capsys.readouterr().out

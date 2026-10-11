@@ -12,11 +12,11 @@ USERS ?= 6
 SESSIONS ?= 2
 TURNS ?= 2
 EXPECT_TURNS ?= 24
-TRANSCRIPTS ?= transcripts.json
+TRANSCRIPTS ?= ontology/out/transcripts.json
 LABEL ?=
-OUT ?= $(LABEL).json
-BEFORE ?= before-1.json
-AFTER ?= after-1.json
+OUT ?= ontology/out/$(LABEL).json
+BEFORE ?= ontology/out/before-1.json
+AFTER ?= ontology/out/after-1.json
 ONTOLOGY_YAML = ontology/finance_genie.ontology.yaml
 
 APP_URL_CMD = databricks apps get $(APP_NAME) -p "$(DATABRICKS_CONFIG_PROFILE)" -o json | jq -r .url

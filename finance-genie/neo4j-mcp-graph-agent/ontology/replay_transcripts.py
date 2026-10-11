@@ -10,11 +10,11 @@ one tool call per MCP call) and an assistant message. Entity extraction runs ove
 Replaying the same stored text into a workspace under a different ontology shows how much of a
 before/after difference comes from extraction rather than from the agent answering differently.
 
-    uv run ontology/replay_transcripts.py export --out run1.json
-    uv run ontology/replay_transcripts.py export --out run1.json \
+    uv run ontology/replay_transcripts.py export --out ontology/out/run1.json
+    uv run ontology/replay_transcripts.py export --out ontology/out/run1.json \
         --run-id-prefix nams-load-abc --expect-turns 40
-    uv run ontology/replay_transcripts.py replay run1.json                  # dry run
-    uv run ontology/replay_transcripts.py replay run1.json --execute \
+    uv run ontology/replay_transcripts.py replay ontology/out/run1.json  # dry run
+    uv run ontology/replay_transcripts.py replay ontology/out/run1.json --execute \
         --label ontology-v2 --session-suffix=-r1 --wait
 
 `export` only issues GET requests. `replay` makes no network call unless --execute is given.
@@ -356,6 +356,7 @@ def cmd_export(args: argparse.Namespace) -> int:
             client, endpoint, args.run_id_prefix, args.expect_turns
         )
     out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     print(f"exported {count_transcripts(doc['conversations']).as_line()}")
     print(f"saved {out}")

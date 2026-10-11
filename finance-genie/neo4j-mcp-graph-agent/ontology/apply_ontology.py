@@ -25,7 +25,7 @@ one the created version is read back and diffed against the YAML; anything
 the service dropped is reported (never an error).
 
 Before any activation the currently active version id (or "none" on a fresh
-workspace) is printed and saved to a previous_active_<timestamp>.json file.
+workspace) is printed and saved to ontology/out/previous_active_<timestamp>.json.
 Restore it with --rollback <version id or that json file>. The API has no
 way to unbind the active ontology, so rolling back to "none" is refused.
 MEMORY_API_KEY (and optional MEMORY_ENDPOINT) come from the
@@ -426,12 +426,22 @@ def report_round_trip(client: NamsClient, document: dict, created: dict) -> None
         return
     try:
         record = client.get_version(ontology_id, revision)
-        returned = json.loads(record.get("schema_json") or "{}")
+        # GET /v1/ontologies/{id}/versions/{rev} returns
+        # {"ontology": {...}, "version": {..., "schema_json": "..."}}:
+        # schema_json is nested under "version", not at the top level.
+        version = record.get("version")
+        schema_text = record.get("schema_json") or (
+            version.get("schema_json") if isinstance(version, dict) else None
+        )
+        returned = json.loads(schema_text or "{}")
     except (ApiError, json.JSONDecodeError) as exc:
         print(f"Round trip skipped: could not read the version back ({exc}).")
         return
-    if "entity_types" not in returned and isinstance(returned.get("ontology"), dict):
-        returned = returned["ontology"]
+    if "entity_types" not in returned:
+        for candidate in (record.get("ontology"), returned.get("ontology")):
+            if isinstance(candidate, dict) and "entity_types" in candidate:
+                returned = candidate
+                break
     drops = diff_round_trip(document, returned)
     if not drops:
         print("Round trip: the service returned everything we sent.")
@@ -453,6 +463,7 @@ def record_active_version(
     A fresh or reset workspace may have no active version; that is recorded
     as an explicit null.
     """
+    state_dir.mkdir(parents=True, exist_ok=True)
     version = client.get_active().get("version") or {}
     active_id = version.get("id")
     snapshot = {
@@ -563,7 +574,7 @@ def run(args: argparse.Namespace, document: dict) -> int:
         print("\nDry run: no network calls were made. Nothing was created.")
         print("Pass --create (and --activate) to load it into NAMS.")
         return 0
-    state_dir = SCRIPT_DIR
+    state_dir = SCRIPT_DIR / "out"
     rollback_id = resolve_rollback_target(args.rollback) if args.rollback else None
     with NamsClient(load_settings()) as client:
         if rollback_id:
