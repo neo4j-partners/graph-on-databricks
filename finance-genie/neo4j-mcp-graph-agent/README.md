@@ -14,6 +14,9 @@ What you'll see:
 - [Prerequisites](#prerequisites)
 - [Set up the NAMS key](#set-up-the-nams-key)
 - [Quick start with make](#quick-start-with-make)
+  - [Quick start local with make](#quick-start-local-with-make)
+  - [Quick start cloud with make](#quick-start-cloud-with-make)
+- [Ontology and long-term memory](#ontology-and-long-term-memory)
 - [Clean up](#clean-up)
 - [Demo script](#demo-script)
 - [Run locally](#run-locally)
@@ -64,7 +67,7 @@ Where each command reads the NAMS key:
 
 ## Quick start with make
 
-Run these steps from `neo4j-mcp-graph-agent/`. [What the make targets run](docs/reference.md#what-the-make-targets-run) shows the raw commands behind each target.
+Run these steps from `neo4j-mcp-graph-agent/`. [What the make targets run](docs/reference.md#what-the-make-targets-run) shows the raw commands behind each target. Steps 1 and 2 are shared. Then pick a path: [Quick start local with make](#quick-start-local-with-make) runs the agent on your laptop, and [Quick start cloud with make](#quick-start-cloud-with-make) deploys it as a Databricks app.
 
 1. **Set your variables:** Two variables drive everything below. `DATABRICKS_CONFIG_PROFILE` is your Databricks profile, and `databricks auth profiles` lists them. `MEMORY_API_KEY` is your [NAMS key](#set-up-the-nams-key). Copy the example file, fill in both values, then load them into your shell. Run the last line again in every new terminal.
 
@@ -82,6 +85,26 @@ Run these steps from `neo4j-mcp-graph-agent/`. [What the make targets run](docs/
    uv tool install databricks-agentbricks
    agentbricks login --profile "$DATABRICKS_CONFIG_PROFILE"
    ```
+
+### Quick start local with make
+
+The local server runs the same code as the deployed app. It needs no secret scope and no deploy. Use two terminals, because the server keeps running.
+
+3. **Start the server (terminal 1):** `make dev` loads `.env` and starts the agent on http://localhost:8000. It stops with an error if `.env` or `MEMORY_API_KEY` is missing.
+
+   ```bash
+   make dev
+   ```
+
+4. **Ask a question (terminal 2):** This asks the local server one question in a new session. Set another question with `make smoke-local QUESTION="..."`.
+
+   ```bash
+   make smoke-local
+   ```
+
+   [Run locally](#run-locally) shows memory recall across sessions on the local server.
+
+### Quick start cloud with make
 
 3. **Save the NAMS key in Databricks:** This saves `MEMORY_API_KEY` from `.env` as the Databricks secret `nams/memory-api-key`.
 
@@ -126,6 +149,21 @@ Run these steps from `neo4j-mcp-graph-agent/`. [What the make targets run](docs/
    make traffic
    ```
 
+## Ontology and long-term memory
+
+NAMS reads each conversation it stores and pulls out entities. The entities form a graph. That graph is the long-term memory. Do these two pages after the quick start, in this order.
+
+1. [Run the ontology example](docs/ontology-experiment.md)
+   - **Ontology:** An ontology is a list of entity types. It tells NAMS what to look for.
+   - **What you do:** You run the same 24 conversations through NAMS twice and compare the results.
+   - **Trial 1:** This trial uses the NAMS Default ontology.
+   - **Trial 2:** This trial uses the finance ontology.
+   - **Warning:** The run resets your NAMS database. Use a database that holds nothing you want to keep.
+2. [Show long-term memory](docs/longterm.md)
+   - **Demo 1:** This demo shows the entity graph in the NAMS console.
+   - **Demo 2:** This demo shows the agent answering a new analyst with another analyst's findings.
+   - **Before you start:** The first step on that page turns on the finance ontology.
+
 ## Clean up
 
 Run these from `neo4j-mcp-graph-agent/` with the variables from [Quick start with make](#quick-start-with-make) loaded. The first command also starts you over if a deploy fails and you want a fresh app.
@@ -157,55 +195,165 @@ Run these from `neo4j-mcp-graph-agent/` with the variables from [Quick start wit
 
 3. **Delete the NAMS data:** The conversations from your runs stay in NAMS. Remove them in your NAMS workspace at https://memory.neo4jlabs.com/, or revoke the key there.
 
-To deploy again after a cleanup, start at step 3 of [Quick start with make](#quick-start-with-make). A new app has a new service principal, so run `make grant-genie` again after the deploy.
+4. **Reset the ontology to the default:** NAMS cannot remove an active ontology. You switch back to the NAMS Default ontology instead. Do this before you repeat the [ontology example](docs/ontology-experiment.md) or the [long-term memory demo](docs/longterm.md) from a clean start.
+
+   The first `ontology/out/previous_active_*.json` file records the version that was active before you first loaded the finance ontology. On a new workspace that version is NAMS Default. This command makes it active again.
+
+   ```bash
+   uv run ontology/apply_ontology.py --rollback "$(ls ontology/out/previous_active_*.json | head -n 1)"
+   ```
+
+   Check the result. The command prints the name of the active ontology, which should be `nams-default`.
+
+   ```bash
+   set -a; source .env; set +a
+   curl -sS -H "Authorization: Bearer $MEMORY_API_KEY" https://memory.neo4jlabs.com/v1/ontologies \
+     | jq -r '.ontologies[] | select(.is_active) | .name'
+   ```
+
+   If the folder has no `previous_active_*.json` file, run only the check. If it prints another name, find `nams-default` in the `GET /v1/ontologies` list. Read its newest version id from `GET /v1/ontologies/<ontology id>`. Then run `uv run ontology/apply_ontology.py --activate --version-id <version id>`.
+
+5. **Clear the saved run files (optional):** The ontology scripts save transcripts and snapshots in `ontology/out/`. This deletes them so the next run starts empty. Git ignores this folder, so the files cannot be restored.
+
+   ```bash
+   rm -f ontology/out/*.json
+   ```
+
+To start the ontology example over, finish steps 3 to 5, then go to [Run the ontology example](docs/ontology-experiment.md).
+
+To deploy again after a cleanup, start at step 3 of [Quick start cloud with make](#quick-start-cloud-with-make). A new app has a new service principal, so run `make grant-genie` again after the deploy.
 
 ## Demo script
 
-Ask each question with the `invoke` command that `make smoke` runs, shown in [What the make targets run](docs/reference.md#what-the-make-targets-run), and put the question in `content`. Keep the same `SESSION_ID` unless a step says to start a new one. You can also run `make smoke QUESTION="..."`. It starts a new session for every question, so ask the step 1 extra beat with the raw command in the same session. The evidence is the ids and the spans in the MLflow trace, not the exact answer text.
+Six questions show the graph, Genie, and memory working together. Ask each one with the `ask` helper below. The evidence is the ids in the answer and the spans in the MLflow trace. The exact answer text changes from run to run.
 
-1. **Shared phone:** Ask "Which customers share phone 312-555-0142, and which accounts do they own?" Several customers share this phone. Look for Accounts 368, 927, 1033, and 1696 and a `read_neo4j_cypher` span. For an extra beat, ask which community those accounts are in. Look for Community 8174.
-2. **Hub:** Ask "I focus on hub accounts. Is Account 15940 a hub, and which community is it in?" Look for Community 19766 and a `read_neo4j_cypher` span.
-3. **Recall:** Run `SESSION_ID=$(uuidgen)` to start a new session, then ask "What was I looking at last time?" Look for Account 15940 in the answer, although this session never named it. Recall reads only your two latest conversations, so run steps 2 and 3 back to back.
-4. **Genie value question:** Ask "What is the average account balance by region and account type?" Look for a `genie_ask` span followed by a `genie_query_result` span.
-5. **Graph and Genie:** Ask "Which phone numbers are shared by more than one customer, and what are the balances and 30-day transaction counts of the accounts those customers own?" Look for a `read_neo4j_cypher` span, then a `genie_ask` span whose question names the account ids that the graph found.
-6. **NAMS view:** Open your NAMS workspace and find your user, which is your Databricks email. Each turn above is its own conversation, with its messages and a reasoning trace. Entities such as Account 15940 and Community 19766 appear after NAMS extracts them, so they lag the write.
+### Set up
 
-**Optional ring question:** After step 3, ask "Is Community 3040 a fraud ring candidate?" Look for Community 3040 and a `read_neo4j_cypher` span.
+Run from `neo4j-mcp-graph-agent/` with the variables from [Quick start with make](#quick-start-with-make) loaded.
+
+- **Cloud:** Paste this to ask the deployed app. It needs the [cloud quick start](#quick-start-cloud-with-make).
+
+  ```bash
+  ask() {
+    agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" endpoint invoke agent-bricks-neo4j-graph-agent \
+      --path /api/invocations --routing-key "$SESSION_ID" \
+      --json "$(jq -nc --arg q "$1" --arg s "$SESSION_ID" --arg id "$(uuidgen)" \
+        '{id:$id,session_id:$s,input:[{role:"user",content:$q}]}')"
+  }
+  ```
+
+- **Local:** Paste this to ask the local server. It needs `make dev` running in another terminal, as in the [local quick start](#quick-start-local-with-make).
+
+  ```bash
+  ask() {
+    agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
+      --json "$(jq -nc --arg q "$1" --arg s "$SESSION_ID" --arg id "$(uuidgen)" \
+        '{id:$id,session_id:$s,input:[{role:"user",content:$q}]}')"
+  }
+  ```
+
+Then start the first session. The session id keeps all questions in one conversation until a step says to start a new one.
+
+```bash
+SESSION_ID=$(uuidgen)
+```
+
+### 1. Shared phone
+
+```bash
+ask "Which customers share phone 312-555-0142, and which accounts do they own?"
+```
+
+- **You should see:** The answer names Accounts 368, 927, 1033, and 1696, and the trace has a `read_neo4j_cypher` span.
+
+Extra beat, in the same session:
+
+```bash
+ask "Which community are those accounts in?"
+```
+
+- **You should see:** The answer names Community 8174.
+
+### 2. Hub
+
+```bash
+ask "I focus on hub accounts. Is Account 15940 a hub, and which community is it in?"
+```
+
+- **You should see:** The answer names Community 19766, and the trace has a `read_neo4j_cypher` span.
+
+### 3. Recall
+
+Start a new session, then ask a question that names nothing. Run steps 2 and 3 back to back, because recall reads only your two latest conversations.
+
+```bash
+SESSION_ID=$(uuidgen)
+ask "What was I looking at last time?"
+```
+
+- **You should see:** The answer names Account 15940, although this session never did.
+
+### 4. Genie value question
+
+```bash
+ask "What is the average account balance by region and account type?"
+```
+
+- **You should see:** The trace has a `genie_ask` span followed by a `genie_query_result` span.
+
+### 5. Graph and Genie
+
+```bash
+ask "Which phone numbers are shared by more than one customer, and what are the balances and 30-day transaction counts of the accounts those customers own?"
+```
+
+- **You should see:** The trace has a `read_neo4j_cypher` span, then a `genie_ask` span. The Genie question names the account ids that the graph found.
+
+### 6. NAMS view
+
+Open your NAMS workspace at https://memory.neo4jlabs.com/ and find your user, which is your Databricks email.
+
+- **Conversations:** Each question above is its own conversation, with its messages and a reasoning trace.
+- **Entities:** Entities such as Account 15940 and Community 19766 appear after NAMS extracts them. They lag the write by seconds to minutes.
+
+### Optional: ring question
+
+Ask this after step 3, in the same session.
+
+```bash
+ask "Is Community 3040 a fraud ring candidate?"
+```
+
+- **You should see:** The answer names Community 3040, and the trace has a `read_neo4j_cypher` span.
 
 ## Run locally
 
-Run the agent on your laptop with memory on. This path uses two terminal windows, because the server keeps running.
+[Quick start local with make](#quick-start-local-with-make) starts the server with `make dev`, which loads `.env` for you. This section shows memory recall on that server. Use a second terminal for the requests, because the server keeps running.
 
-1. **Install and sign in:** Do step 2 of [Quick start with make](#quick-start-with-make).
-2. **Set up the NAMS key:** Do steps 1 and 2 of [Set up the NAMS key](#set-up-the-nams-key).
-3. **Start the server (window 1):** Export `MEMORY_API_KEY` in this shell. `agentbricks dev` reads the NAMS key only from the shell, and it stops with an error if the key is missing.
-
-   ```bash
-   export MEMORY_API_KEY=<your-nams-key>
-   agentbricks dev          # serves http://localhost:8000
-   ```
-
-4. **Ask a question (window 2):** Export `DATABRICKS_CONFIG_PROFILE` in this shell too, then send a request.
+1. **Ask a question (terminal 2):** Export `DATABRICKS_CONFIG_PROFILE` in this shell, then send a request.
 
    ```bash
    agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
      --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":[{"role":"user","content":"Which communities look like fraud ring candidates?"}]}'
    ```
 
-5. **See recall:** Send a `user_id` next to `messages`. Then send a second question with a new `session_id` and the same `user_id`. The second answer uses the hub focus from the first question. A body `user_id` works locally. A deployed app takes the user from the caller's identity, as [What gets recalled](docs/how-memory-works.md#what-gets-recalled) explains.
+2. **See recall:** Send a `user_id` next to `messages`. Then send a second question with a new `session_id` and the same `user_id`. The second answer uses the hub focus from the first question. A body `user_id` works locally. A deployed app takes the user from the caller's identity, as [What gets recalled](docs/how-memory-works.md#what-gets-recalled) explains.
 
    ```bash
    agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
      --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":{"user_id":"analyst-7","messages":[{"role":"user","content":"I focus on hub accounts. Which accounts act as hubs?"}]}}'
    ```
 
+If you start the server by hand instead of through make, export `MEMORY_API_KEY` first: `agentbricks dev` reads the NAMS key only from the shell, and it stops with an error if the key is missing.
+
 To run the tests and the CLI check, see [Develop and test](docs/reference.md#develop-and-test).
 
 ## Documentation
 
 - [How memory works](docs/how-memory-works.md): This page walks through one turn and shows what NAMS saves and recalls.
+- [Long-term memory](docs/longterm.md): Two demos show the NAMS entity graph and the agent recalling it across analysts.
 - [Generate traffic](docs/traffic.md): The traffic generator runs from your laptop or as a Databricks Job.
-- [Run the ontology example](docs/ontology-experiment.md): Two trials, without and with the ontology, show how it drives the schema.
+- [Run the ontology example](docs/ontology-experiment.md): Two trials, with the generic default and with the finance ontology, show how the ontology drives the schema.
 - [Add NAMS as a Databricks MCP service](docs/nams-mcp-service.md): Other agents, such as the Playground, can use the NAMS tools.
 - [Create the finance-genie MCP service](docs/mcp-service.md): The agent reads the graph through this Neo4j MCP service.
 - [Reference](docs/reference.md): This page covers configuration, guardrails, evaluation, tests, delete, layout, and notes.

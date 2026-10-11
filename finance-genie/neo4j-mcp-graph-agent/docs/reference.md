@@ -4,6 +4,20 @@
 
 Each make target wraps the commands below. Run them from `neo4j-mcp-graph-agent/` with `DATABRICKS_CONFIG_PROFILE` exported in your shell. The make targets read it from `.env` instead.
 
+- **`make dev`:** This target loads `.env` into the environment and starts the local server. It fails with a message if `.env` or `MEMORY_API_KEY` is missing. The server runs until you press Ctrl-C.
+
+  ```bash
+  set -a && . ./.env && set +a
+  agentbricks dev          # serves http://localhost:8000
+  ```
+
+- **`make smoke-local`:** This target asks the local server one question in a new session. `LOCAL_URL=` overrides the URL and `QUESTION=` overrides the question.
+
+  ```bash
+  agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
+    --json '{"id":"'$(uuidgen)'","session_id":"make-smoke-local","input":[{"role":"user","content":"What does the SIMILAR_TO relationship mean?"}]}'
+  ```
+
 - **`make secrets`:** This target runs `setup_secrets.sh`. The script creates the secret scope `nams` if needed and writes `MEMORY_API_KEY` from `.env` as the key `memory-api-key`.
 
   ```bash

@@ -102,7 +102,7 @@ The merged document keeps the default's domain and generic types and adds the 11
 
 Run trial 1 with the baseline you chose above. As run, this was the generic default: the reset cleared the entities but left the NAMS Default ontology active, so NAMS typed entities with the generic types. Step 3 records which version actually ran.
 
-1. **Run the traffic:** The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 7 of [Quick start with make](../README.md#quick-start-with-make) explains. Otherwise all 24 turns land under your own user.
+1. **Run the traffic:** The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 7 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains. Otherwise all 24 turns land under your own user.
 
    ```bash
    cd traffic

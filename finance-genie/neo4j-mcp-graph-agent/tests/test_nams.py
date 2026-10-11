@@ -5,9 +5,13 @@ from types import SimpleNamespace
 import pytest
 
 from agent.nams import (
+    ENTITY_RECALL_HEADER,
     RECALL_CONVERSATIONS,
+    RECALL_ENTITIES,
     RECALL_MAX_CHARS,
     TurnMemory,
+    extract_entity_terms,
+    format_entities,
     nams_enabled,
     recall_instructions,
     safe_scope_id,
@@ -17,12 +21,13 @@ from runtime.adapter import _last_user_text, _record
 
 
 class FakeMemory:
-    """Records every NAMS call in order; list/get_context are scripted per test."""
+    """Records every NAMS call in order; list/get_context/search are scripted per test."""
 
-    def __init__(self, conversations=None, contexts=None, fail_on=None):
+    def __init__(self, conversations=None, contexts=None, entities=None, fail_on=None):
         self.calls: list[tuple] = []
         self._conversations = conversations or []
         self._contexts = contexts or {}
+        self._entities = entities or []
         self._fail_on = fail_on
         self.short_term = SimpleNamespace(
             list_conversations=self._list,
@@ -30,6 +35,7 @@ class FakeMemory:
             create_conversation=self._create,
             add_message=self._add_message,
         )
+        self.long_term = SimpleNamespace(search_entities=self._search_entities)
         self.reasoning = SimpleNamespace(
             start_trace=self._start_trace,
             add_step=self._add_step,
@@ -56,6 +62,11 @@ class FakeMemory:
     async def _get_context(self, query, **kwargs):
         self.calls.append(("get_context", query, kwargs["conversation_id"]))
         return self._contexts.get(kwargs["conversation_id"], "")
+
+    async def _search_entities(self, query, **kwargs):
+        self._maybe_fail("search_entities")
+        self.calls.append(("search_entities", query, kwargs))
+        return self._entities
 
     async def _create(self, session_id, **kwargs):
         self._maybe_fail("create_conversation")
@@ -87,10 +98,10 @@ def conversation(conv_id, age_minutes, user_id=None):
 
 
 def turn_memory(memory, **kwargs):
+    kwargs.setdefault("prompt", "which communities look like rings?")
     return TurnMemory(
         user_id="u1",
         session_id="s1",
-        prompt="which communities look like rings?",
         client_factory=lambda: memory,
         **kwargs,
     )
@@ -214,6 +225,108 @@ async def test_recall_is_capped(nams_key):
     )
     async with turn_memory(memory) as turn:
         assert len(await turn.recall()) == RECALL_MAX_CHARS
+
+
+def entity(name, type_="Object", description=""):
+    return SimpleNamespace(name=name, type=type_, description=description)
+
+
+async def test_recall_adds_long_term_entities_after_conversations(nams_key):
+    memory = FakeMemory(
+        conversations=[conversation("c1", 1)],
+        contexts={"c1": "earlier context"},
+        entities=[entity("Community 3040", "Community", "61 accounts, two flagged")],
+    )
+    prompt = "What is already known about Community 3040?"
+    async with turn_memory(memory, prompt=prompt) as turn:
+        recalled = await turn.recall()
+    assert recalled.startswith("earlier context")
+    assert ENTITY_RECALL_HEADER in recalled
+    assert "- Community 3040 (Community): 61 accounts, two flagged" in recalled
+    search = next(c for c in memory.calls if c[0] == "search_entities")
+    assert search[1] == "Community 3040"
+    assert search[2] == {"limit": RECALL_ENTITIES}
+
+
+async def test_recall_returns_entities_when_there_are_no_conversations(nams_key):
+    memory = FakeMemory(entities=[entity("Account 7890", "Account", "hub account")])
+    async with turn_memory(memory, prompt="Tell me about Account 7890") as turn:
+        recalled = await turn.recall()
+    assert recalled == (
+        f"{ENTITY_RECALL_HEADER}\n- Account 7890 (Account): hub account"
+    )
+
+
+async def test_recall_skips_entity_search_when_the_prompt_names_no_entity(nams_key):
+    memory = FakeMemory(entities=[entity("Account 7890")])
+    async with turn_memory(memory) as turn:
+        recalled = await turn.recall()
+    assert recalled == ""
+    assert "search_entities" not in names(memory)
+
+
+async def test_recall_searches_each_term_once_and_dedupes_entities_by_name(nams_key):
+    memory = FakeMemory(
+        entities=[entity("Community 3040"), entity("Account 7890"), entity("community 3040")]
+    )
+    prompt = "Did Account 7890 touch Community 3040? Account 7890 matters."
+    async with turn_memory(memory, prompt=prompt) as turn:
+        recalled = await turn.recall()
+    searches = [c[1] for c in memory.calls if c[0] == "search_entities"]
+    assert searches == ["Account 7890", "Community 3040"]
+    assert recalled.count("ommunity 3040 (Object)") == 1
+
+
+async def test_entity_recall_failure_keeps_conversation_recall(nams_key):
+    memory = FakeMemory(
+        conversations=[conversation("c1", 1)],
+        contexts={"c1": "ctx"},
+        fail_on="search_entities",
+    )
+    async with turn_memory(memory, prompt="Tell me about Account 7890") as turn:
+        assert await turn.recall() == "ctx"
+
+
+async def test_recall_cap_counts_entities_too(nams_key):
+    memory = FakeMemory(
+        conversations=[conversation("c1", 1)],
+        contexts={"c1": "x" * RECALL_MAX_CHARS},
+        entities=[entity("Community 3040", "Community", "y" * 500)],
+    )
+    prompt = "What is already known about Community 3040?"
+    async with turn_memory(memory, prompt=prompt) as turn:
+        assert len(await turn.recall()) == RECALL_MAX_CHARS
+
+
+def test_extract_entity_terms_finds_labeled_ids_in_order():
+    prompt = "Compare Account 7890 with Community 3040 and CASE-4002. Account 7890 again."
+    assert extract_entity_terms(prompt) == ["Account 7890", "Community 3040", "CASE-4002"]
+
+
+def test_extract_entity_terms_ignores_words_without_ids():
+    assert extract_entity_terms("Which accounts act as hubs?") == []
+    assert extract_entity_terms("I focus on account activity.") == []
+
+
+def test_extract_entity_terms_caps_the_count():
+    prompt = " ".join(f"Account {n}" for n in range(10))
+    terms = extract_entity_terms(prompt)
+    assert terms == ["Account 0", "Account 1", "Account 2"]
+
+
+def test_format_entities_formats_bullets_and_skips_nameless_entries():
+    text = format_entities(
+        [
+            entity("Account 7890", "Account", "hub account"),
+            entity("Plain"),
+            SimpleNamespace(description="no name"),
+        ]
+    )
+    assert text == "- Account 7890 (Account): hub account\n- Plain (Object)"
+
+
+def test_format_entities_is_empty_without_entities():
+    assert format_entities([]) == ""
 
 
 async def test_recovery_recalls_but_does_not_write(nams_key):
