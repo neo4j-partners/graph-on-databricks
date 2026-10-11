@@ -72,7 +72,7 @@ Run trial 1 with the baseline you set above. As run, this was the generic defaul
    cd ..
    ```
 
-   Or run `make traffic` from `neo4j-mcp-graph-agent/`. Its default size is this same 6, 2, and 2 run.
+   Or run `make traffic` from `neo4j-mcp-graph-agent/`. Its default size is this same 6, 2, and 2 run. When the run ends, it checks NAMS. If NAMS stored fewer turns than completed, the run exits with code 2 and prints a `NOT STORED` line for each short session. Reset NAMS and run the traffic again.
 
 2. **Save the transcripts:** This reads the 24 conversations and fails if the count is wrong. Trial 2 replays this file.
 
@@ -96,7 +96,7 @@ Run trial 1 with the baseline you set above. As run, this was the generic defaul
 ### Trial 2: with the finance-only ontology
 
 1. **Reset the database:** Reset the NAMS database again so the entities from trial 1 are gone. Entities are not scoped by run, so without the reset the second snapshot would count both trials.
-2. **Load the ontology:** This creates a new standalone ontology with only the 11 finance types and activates it, replacing the baseline. It loads in permissive mode.
+2. **Load the ontology:** This loads the 11 finance types and activates them, replacing the baseline. It loads in permissive mode. A reset of the NAMS database keeps ontologies, so after an earlier run the finance ontology already exists. In that case `--create` adds a new revision to the existing ontology of the same name instead of failing with a 409.
 
    ```bash
    uv run ontology/apply_ontology.py --create --activate

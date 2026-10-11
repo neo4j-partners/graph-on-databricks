@@ -81,6 +81,10 @@ class OntologyError(Exception):
 class ApiError(Exception):
     """A NAMS request failed."""
 
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -329,7 +333,8 @@ class NamsClient:
         if response.status_code >= 400:
             raise ApiError(
                 f"{method} {path} returned {response.status_code}: "
-                f"{response.text[:500]}"
+                f"{response.text[:500]}",
+                status_code=response.status_code,
             )
         return response.json()
 
@@ -558,6 +563,28 @@ def find_default_version(client: NamsClient, finance_labels: set[str]) -> dict:
     return plain_default_version(versions, finance_labels)
 
 
+def create_or_update(client: NamsClient, document: dict) -> tuple[str, dict]:
+    """Create the ontology, or add a revision when one with the same name already exists.
+
+    A NAMS database reset keeps ontologies, so a rerun finds its own earlier ontology.
+    """
+    try:
+        return "Created", client.create(document)
+    except ApiError as exc:
+        if exc.status_code != 409:
+            raise
+        name = document["domain"]["id"]
+        existing = next(
+            (o for o in client.list_ontologies().get("ontologies") or []
+             if o.get("name") == name),
+            None,
+        )
+        if existing is None:
+            raise
+        print(f"Ontology {name!r} already exists ({existing['id']}); adding a revision.")
+        return "Created new revision", client.update(existing["id"], document)
+
+
 def print_version(label: str, record: dict) -> None:
     print(
         f"{label}: version_id={record.get('id')} "
@@ -645,8 +672,8 @@ def run(args: argparse.Namespace, document: dict) -> int:
         version_id = args.version_id
         if args.create or args.update:
             if args.create:
-                created = client.create(document)
-                print_version("Created", created)
+                label, created = create_or_update(client, document)
+                print_version(label, created)
             else:
                 created = client.update(args.update, document)
                 print_version("Created new revision", created)

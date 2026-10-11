@@ -257,6 +257,7 @@ class FakeClient:
     stored: dict = {}
     listed: dict = {"ontologies": []}
     detail: dict = {"versions": []}
+    create_status: int = 200
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -270,6 +271,10 @@ class FakeClient:
         elif (method, path) == ("GET", "/v1/ontologies/ont_default"):
             body = FakeClient.detail
         elif (method, path) == ("POST", "/v1/ontologies"):
+            if FakeClient.create_status != 200:
+                return httpx.Response(
+                    FakeClient.create_status, json={"error": "ontology with this name already exists"}
+                )
             FakeClient.stored = json["ontology"]
             body = {"id": "ov_new", "ontology_id": "ont_new", "revision": 1}
         elif (method, path) == ("PUT", "/v1/ontologies/ont_x"):
@@ -299,6 +304,7 @@ def default_version(version_id, revision, labels):
 def fake_client(monkeypatch):
     FakeClient.calls = []
     FakeClient.stored = {}
+    FakeClient.create_status = 200
     FakeClient.listed = {
         "ontologies": [
             {"id": "ont_user", "name": "mine", "is_system": False},
@@ -353,6 +359,35 @@ def test_create_and_activate_saves_previous_version_first(
     assert len(saved) == 1
     assert json.loads(saved[0].read_text())["version_id"] == "ov_old"
     assert "nams_secret_value" not in capsys.readouterr().out
+
+
+def test_create_adds_a_revision_when_the_name_already_exists(fake_client, capsys):
+    fake_client.create_status = 409
+    fake_client.listed["ontologies"].append(
+        {"id": "ont_x", "name": "finance-genie-fraud-memory", "is_system": False}
+    )
+    assert apply_ontology.main(["--yaml", str(YAML_PATH), "--create"]) == 0
+    assert [(m, p) for m, p, _ in fake_client.calls] == [
+        ("POST", "/v1/ontologies"),
+        ("GET", "/v1/ontologies"),
+        ("PUT", "/v1/ontologies/ont_x"),
+        ("GET", "/v1/ontologies/ont_x/versions/4"),
+    ]
+    out = capsys.readouterr().out
+    assert "already exists (ont_x)" in out
+    assert "Created new revision" in out
+
+
+def test_create_conflict_with_no_matching_ontology_still_fails(fake_client, capsys):
+    fake_client.create_status = 409
+    assert apply_ontology.main(["--yaml", str(YAML_PATH), "--create"]) == 3
+    assert "409" in capsys.readouterr().err
+
+
+def test_create_does_not_swallow_other_errors(fake_client, capsys):
+    fake_client.create_status = 500
+    assert apply_ontology.main(["--yaml", str(YAML_PATH), "--create"]) == 3
+    assert [(m, p) for m, p, _ in fake_client.calls] == [("POST", "/v1/ontologies")]
 
 
 def test_rollback_records_current_then_activates(fake_client, monkeypatch, tmp_path):

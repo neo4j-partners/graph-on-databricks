@@ -49,8 +49,22 @@ The run calls the app as you. Your user must be trusted before the deploy, as st
 | `--retry-attempts` | The tries for each turn | 1 |
 | `--continue-after-error` | Keeps going after a failed turn | Off, so the run stops |
 | `--run-id` | The name that the users and sessions carry | A random id |
+| `--verify-nams` / `--no-verify-nams` | Turns the stored-count check on or off | On when a key is found, off when it is not |
 
 The default run is 240 turns. Each turn takes 20 to 60 seconds, so the full run takes close to an hour.
+
+### The stored-count check
+
+The app answers a turn even when NAMS is down, so a completed turn does not prove that NAMS stored it. The run therefore checks NAMS itself.
+
+- **Readiness wait:** Before it sends any turn, the run waits until NAMS answers 200 twice in a row. A database that was just reset can fail at first.
+- **Stored count:** After the last turn, the run counts the conversations that NAMS holds for each session of the run. It prints a `NOT STORED` line for every session that holds fewer turns than completed. It prints a `FAILED` line for every turn that failed.
+- **Exit codes:** The run exits with 0 when every turn completed and NAMS stored all of them. It exits with 1 when a turn failed or was skipped. It exits with 2 when NAMS stored too few turns or was not ready.
+- **The key:** The check needs `MEMORY_API_KEY` in your shell or in `.env`. The make target runs from `traffic/`, so the check also reads `../.env`. Without a key, the check is skipped with a warning. If you pass `--verify-nams` and no key exists, the run exits with 1 before it sends any turn.
+- **Turning it off:** Pass `--no-verify-nams` to skip both the readiness wait and the check.
+- **Databricks Job:** The Job has no `MEMORY_API_KEY`, because only the app holds the key. The Job skips the check and prints a warning.
+
+If the check exits with 2, reset NAMS and run the traffic again.
 
 ## Run it as a Databricks Job
 

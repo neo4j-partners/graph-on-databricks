@@ -22,7 +22,7 @@ The app writes every turn to NAMS. NAMS reads each stored conversation and extra
 This demo proves the long-term memory exists. Run these steps in order.
 
 1. **Apply the ontology:** Run `uv run ontology/apply_ontology.py --create --activate`, or `make apply-ontology`. Extraction now types entities as Account, Community, Case, and Analyst.
-2. **Run the traffic:** Run `make traffic`. This sends 24 turns from six analysts. Analysts 1 and 6 investigate the same Community 3040 from different teams.
+2. **Run the traffic:** Run `make traffic`. This sends 24 turns from six analysts. Analysts 1 and 6 investigate the same Community 3040 from different teams. If the run exits with code 2 and prints `NOT STORED` lines, NAMS dropped some turns. Reset NAMS and run the traffic again.
 3. **Open the NAMS console:** Go to https://memory.neo4jlabs.com/ and find the Community 3040 entity. Show its type, its description, and its relationships. Open its provenance. The provenance lists source messages from both analysts. One entity now spans two people.
 4. **Say this:** "The conversation history belongs to one analyst. This entity graph belongs to the team. Nobody queried for it. It fell out of storing conversations."
 5. **Use a backup if the console fails:** Run `uv run ontology/measure_ingestion.py snapshot --label demo --out snapshot.json`. It waits for extraction and writes every entity and relationship to `snapshot.json`.
