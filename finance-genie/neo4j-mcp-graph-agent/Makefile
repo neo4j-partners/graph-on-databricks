@@ -15,6 +15,7 @@ EXPECT_TURNS ?= 24
 TRANSCRIPTS ?= ontology/out/transcripts.json
 LABEL ?=
 OUT ?= ontology/out/$(LABEL).json
+BASELINE ?= default
 BEFORE ?= ontology/out/before-1.json
 AFTER ?= ontology/out/after-1.json
 ONTOLOGY_YAML = ontology/finance_genie.ontology.yaml
@@ -23,7 +24,7 @@ LOCAL_URL ?= http://localhost:8000
 APP_URL_CMD = databricks apps get $(APP_NAME) -p "$(DATABRICKS_CONFIG_PROFILE)" -o json | jq -r .url
 
 .PHONY: secrets deploy grant-genie smoke logs traffic check-profile dev smoke-local
-.PHONY: export replay snapshot apply-ontology compare
+.PHONY: export replay snapshot apply-ontology compare baseline reset-ontology
 
 # Loads .env so the server sees MEMORY_API_KEY; agentbricks dev reads the key only
 # from the environment, not from .env on its own.
@@ -87,6 +88,14 @@ snapshot:
 
 apply-ontology:
 	uv run ontology/apply_ontology.py --create --activate
+
+# BASELINE= is default, hybrid, or none. Sets the ontology that trial 1 runs against.
+baseline:
+	uv run ontology/set_baseline.py --baseline $(BASELINE)
+
+# Activates the plain NAMS Default ontology again.
+reset-ontology:
+	uv run ontology/apply_ontology.py --reset
 
 compare:
 	uv run ontology/measure_ingestion.py compare $(BEFORE) $(AFTER) \

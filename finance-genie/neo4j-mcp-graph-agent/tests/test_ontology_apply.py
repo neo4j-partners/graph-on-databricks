@@ -255,6 +255,8 @@ class FakeClient:
     calls: list[tuple[str, str, dict | None]] = []
     active_body: dict = {}
     stored: dict = {}
+    listed: dict = {"ontologies": []}
+    detail: dict = {"versions": []}
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -263,6 +265,10 @@ class FakeClient:
         FakeClient.calls.append((method, path, json))
         if (method, path) == ("GET", "/v1/ontologies/active"):
             body = FakeClient.active_body
+        elif (method, path) == ("GET", "/v1/ontologies"):
+            body = FakeClient.listed
+        elif (method, path) == ("GET", "/v1/ontologies/ont_default"):
+            body = FakeClient.detail
         elif (method, path) == ("POST", "/v1/ontologies"):
             FakeClient.stored = json["ontology"]
             body = {"id": "ov_new", "ontology_id": "ont_new", "revision": 1}
@@ -279,10 +285,33 @@ class FakeClient:
         pass
 
 
+def default_version(version_id, revision, labels):
+    schema = {"entity_types": [{"label": label} for label in labels]}
+    return {
+        "id": version_id,
+        "ontology_id": "ont_default",
+        "revision": revision,
+        "schema_json": dumps(schema),
+    }
+
+
 @pytest.fixture
 def fake_client(monkeypatch):
     FakeClient.calls = []
     FakeClient.stored = {}
+    FakeClient.listed = {
+        "ontologies": [
+            {"id": "ont_user", "name": "mine", "is_system": False},
+            {"id": "ont_default", "name": "nams-default", "is_system": True},
+        ]
+    }
+    FakeClient.detail = {
+        "versions": [
+            default_version("ov_d1", 1, ["Person"]),
+            default_version("ov_d2", 2, ["Person", "Event"]),
+            default_version("ov_hybrid", 3, ["Person", "Account"]),
+        ]
+    }
     FakeClient.active_body = {
         "version": {"id": "ov_old", "ontology_id": "ont_x", "revision": 3}
     }
@@ -542,3 +571,39 @@ def test_rollback_accepts_a_snapshot_file_with_a_version(
         "/v1/ontologies/active",
         {"version_id": "ov_old"},
     )
+
+
+def test_plain_default_version_skips_versions_with_finance_types():
+    versions = [
+        default_version("ov_d1", 1, ["Person"]),
+        default_version("ov_d2", 2, ["Person", "Event"]),
+        default_version("ov_hybrid", 3, ["Person", "Account"]),
+    ]
+    chosen = apply_ontology.plain_default_version(versions, {"Account", "Case"})
+    assert chosen["id"] == "ov_d2"
+
+
+def test_plain_default_version_errors_when_every_version_has_finance_types():
+    versions = [default_version("ov_hybrid", 3, ["Account"])]
+    with pytest.raises(apply_ontology.ApiError):
+        apply_ontology.plain_default_version(versions, {"Account"})
+
+
+def test_reset_saves_active_then_activates_plain_default(
+    fake_client, monkeypatch, tmp_path
+):
+    monkeypatch.setattr(apply_ontology, "SCRIPT_DIR", tmp_path)
+    assert apply_ontology.main(["--yaml", str(YAML_PATH), "--reset"]) == 0
+    assert fake_client.calls[-1] == (
+        "POST",
+        "/v1/ontologies/active",
+        {"version_id": "ov_d2"},
+    )
+    saved = list((tmp_path / "out").glob("previous_active_*.json"))
+    assert len(saved) == 1
+    assert json.loads(saved[0].read_text())["version_id"] == "ov_old"
+
+
+def test_reset_cannot_combine_with_rollback(capsys):
+    with pytest.raises(SystemExit):
+        apply_ontology.main(["--reset", "--rollback", "ov_x"])

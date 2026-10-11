@@ -17,6 +17,7 @@ print a summary. Nothing is sent to NAMS unless you pass an explicit flag.
     uv run ontology/apply_ontology.py --update ont_...   # new revision via PUT
     uv run ontology/apply_ontology.py --activate --version-id ov_...
     uv run ontology/apply_ontology.py --rollback ov_...  # re-activate older
+    uv run ontology/apply_ontology.py --reset            # back to NAMS Default
 
 --create and --update never mutate an existing version: the hosted spec says
 PUT /v1/ontologies/{id} creates a new revision, so --update posts the YAML as
@@ -28,6 +29,10 @@ Before any activation the currently active version id (or "none" on a fresh
 workspace) is printed and saved to ontology/out/previous_active_<timestamp>.json.
 Restore it with --rollback <version id or that json file>. The API has no
 way to unbind the active ontology, so rolling back to "none" is refused.
+
+--reset needs no saved file. It looks up the system ontology "nams-default" and
+activates its newest revision that has none of the finance types. That skips a
+hybrid revision made by set_baseline.py.
 MEMORY_API_KEY (and optional MEMORY_ENDPOINT) come from the
 environment or from neo4j-mcp-graph-agent/.env. The key is never printed.
 """
@@ -52,6 +57,7 @@ DEFAULT_ENV_FILE = SCRIPT_DIR.parent / ".env"
 DEFAULT_ENDPOINT = "https://memory.neo4jlabs.com"
 VALIDATION_MODE = "permissive"
 COMMIT_MESSAGE = "finance-genie fraud-analyst ontology (apply_ontology.py)"
+DEFAULT_ONTOLOGY_NAME = "nams-default"
 HTTP_TIMEOUT_SECONDS = 30.0
 
 POLE_TYPES = frozenset({"PERSON", "ORGANIZATION", "LOCATION", "EVENT", "OBJECT"})
@@ -352,6 +358,12 @@ class NamsClient:
             "GET", f"/v1/ontologies/{ontology_id}/versions/{revision}"
         )
 
+    def list_ontologies(self) -> dict:
+        return self._request("GET", "/v1/ontologies")
+
+    def get_ontology(self, ontology_id: str) -> dict:
+        return self._request("GET", f"/v1/ontologies/{ontology_id}")
+
     def activate(self, version_id: str) -> dict:
         return self._request(
             "POST", "/v1/ontologies/active", json={"version_id": version_id}
@@ -512,6 +524,40 @@ def resolve_rollback_target(argument: str) -> str:
     return version_id
 
 
+def plain_default_version(versions: list[dict], finance_labels: set[str]) -> dict:
+    """Return the newest version that has none of the finance types.
+
+    A hybrid baseline adds the finance types as a new revision of the default.
+    That revision is not the plain default, so it is skipped here.
+    """
+    plain = []
+    for version in versions:
+        schema = json.loads(version.get("schema_json") or "{}")
+        labels = {e.get("label") for e in schema.get("entity_types") or []}
+        if not labels & finance_labels:
+            plain.append(version)
+    if not plain:
+        raise ApiError("every revision of nams-default already has the finance types")
+    return max(plain, key=lambda version: version["revision"])
+
+
+def find_default_version(client: NamsClient, finance_labels: set[str]) -> dict:
+    """Look up the plain NAMS Default version by the system ontology's name."""
+    listed = client.list_ontologies().get("ontologies") or []
+    default = next(
+        (
+            o
+            for o in listed
+            if o.get("name") == DEFAULT_ONTOLOGY_NAME and o.get("is_system")
+        ),
+        None,
+    )
+    if default is None:
+        raise ApiError(f"no system ontology named {DEFAULT_ONTOLOGY_NAME!r} was found")
+    versions = client.get_ontology(default["id"]).get("versions") or []
+    return plain_default_version(versions, finance_labels)
+
+
 def print_version(label: str, record: dict) -> None:
     print(
         f"{label}: version_id={record.get('id')} "
@@ -550,14 +596,21 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="VERSION_ID",
         help="activate an older version by id, or by a previous_active_*.json file",
     )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="activate the plain NAMS Default ontology, found by name",
+    )
     return parser
 
 
 def check_flags(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
-    if args.rollback and (
+    if args.rollback and args.reset:
+        parser.error("--reset and --rollback are separate; pass one")
+    if (args.rollback or args.reset) and (
         args.create or args.update or args.activate or args.version_id
     ):
-        parser.error("--rollback cannot be combined with other write flags")
+        parser.error("--rollback and --reset cannot be combined with other write flags")
     if args.update and (args.create or args.version_id):
         parser.error("--update cannot be combined with --create or --version-id")
     if args.version_id and not args.activate:
@@ -569,7 +622,7 @@ def check_flags(parser: argparse.ArgumentParser, args: argparse.Namespace) -> No
 
 
 def run(args: argparse.Namespace, document: dict) -> int:
-    writes = args.create or args.update or args.activate or args.rollback
+    writes = args.create or args.update or args.activate or args.rollback or args.reset
     if not writes:
         print("\nDry run: no network calls were made. Nothing was created.")
         print("Pass --create (and --activate) to load it into NAMS.")
@@ -577,6 +630,12 @@ def run(args: argparse.Namespace, document: dict) -> int:
     state_dir = SCRIPT_DIR / "out"
     rollback_id = resolve_rollback_target(args.rollback) if args.rollback else None
     with NamsClient(load_settings()) as client:
+        if args.reset:
+            finance_labels = {e["label"] for e in document["entity_types"]}
+            default = find_default_version(client, finance_labels)
+            record_active_version(client, state_dir, default["id"])
+            print_version("Activated", client.activate(default["id"]))
+            return 0
         if rollback_id:
             record_active_version(client, state_dir, rollback_id)
             print_version("Activated", client.activate(rollback_id))

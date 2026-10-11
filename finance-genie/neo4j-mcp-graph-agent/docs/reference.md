@@ -60,7 +60,7 @@ Each make target wraps the commands below. Run them from `neo4j-mcp-graph-agent/
   ```
 
 - **`make traffic`:** This target runs the laptop traffic in [Generate traffic](traffic.md#run-it-from-your-laptop), without the dry run. Change the size with `USERS=`, `SESSIONS=`, and `TURNS=`.
-- **Ontology targets:** `make export`, `replay`, `snapshot LABEL=`, `apply-ontology`, and `compare` run the steps in [Run the ontology example](ontology-experiment.md#understand-how-the-ontology-drives-the-schema). Each step there shows its raw command.
+- **Ontology targets:** `make baseline BASELINE=default|hybrid|none`, `export`, `replay`, `snapshot LABEL=`, `apply-ontology`, `reset-ontology`, and `compare` run the steps in [Run the ontology example](ontology-experiment.md#understand-how-the-ontology-drives-the-schema). Each step there shows its raw command.
 
 ## Configuration
 

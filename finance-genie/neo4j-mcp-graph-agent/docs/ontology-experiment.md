@@ -39,59 +39,19 @@ An agent gives a different answer each time and extraction is LLM based. So the 
 
 ### Choose the trial 1 baseline
 
-Trial 1 can run against three baselines. Pick one before you start, and confirm which one ran from the `ontology_version_id` and `ontology_name` in the trial 1 snapshot.
-
-- **The generic default (as run):** Reset the database and leave it alone. The reset clears entities but does not unbind the active ontology, so the NAMS Default ontology stays active and its generic types guide extraction. The saved `before-1.json` records the NAMS Default version, which is how we know this is the baseline that ran.
-- **No ontology:** Only possible on a workspace where no version has ever been activated. The API has no way to unbind the active ontology, so once any version is active you cannot get back to this baseline. The snapshot records `ontology_version_id: none`.
-- **Hybrid:** The finance types merged into the NAMS Default ontology, loaded as a new revision of the default. This mirrors how a team adopts an ontology without giving up the generic types, and it measures what the generic buckets cost when domain types are also available.
-
-To build the hybrid baseline, run these commands while the NAMS Default ontology is the active one. If the finance ontology is currently active, first restore the default with `uv run ontology/apply_ontology.py --rollback <version id>`, using the id saved in the newest `ontology/out/previous_active_*.json` file.
+Trial 1 can run against three baselines. Run `ontology/set_baseline.py` once with the baseline you want, before you start. Each run saves the active version id to `ontology/out/previous_active_<timestamp>.json` first.
 
 ```bash
-source .env
-ENDPOINT=${MEMORY_ENDPOINT:-https://memory.neo4jlabs.com}
-
-# Find the active default ontology and download its document.
-curl -sS -H "Authorization: Bearer $MEMORY_API_KEY" \
-  "$ENDPOINT/v1/ontologies/active" -o ontology/out/active.json
-ONT_ID=$(python3 -c "import json; print(json.load(open('ontology/out/active.json'))['version']['ontology_id'])")
-REV=$(python3 -c "import json; print(json.load(open('ontology/out/active.json'))['version']['revision'])")
-curl -sS -H "Authorization: Bearer $MEMORY_API_KEY" \
-  "$ENDPOINT/v1/ontologies/$ONT_ID/versions/$REV" -o ontology/out/default_version.json
-
-# Append the finance types and relationships to the default document.
-uv run --with pyyaml python - <<'EOF'
-import json
-
-import yaml
-
-record = json.load(open("ontology/out/default_version.json"))
-merged = json.loads(record["version"]["schema_json"])
-finance = yaml.safe_load(open("ontology/finance_genie.ontology.yaml"))
-
-labels = {e["label"] for e in merged["entity_types"]}
-merged["entity_types"] += [
-    e for e in finance["entity_types"] if e["label"] not in labels
-]
-triples = {
-    (r["type"], r["source"], r["target"]) for r in merged.get("relationships", [])
-}
-merged.setdefault("relationships", [])
-merged["relationships"] += [
-    r
-    for r in finance.get("relationships", [])
-    if (r["type"], r["source"], r["target"]) not in triples
-]
-with open("ontology/out/hybrid.ontology.yaml", "w") as fh:
-    yaml.safe_dump(merged, fh, sort_keys=False)
-EOF
-
-# Load the merged document as a new revision of the default and activate it.
-uv run ontology/apply_ontology.py --update "$ONT_ID" \
-  --yaml ontology/out/hybrid.ontology.yaml --activate
+uv run ontology/set_baseline.py --baseline default
 ```
 
-The merged document keeps the default's domain and generic types and adds the 11 finance types and 15 relationships, and it passes the script's local validation. To return to the plain default afterwards, roll back to the version id in the `previous_active_*.json` file that the activation saved.
+Or run `make baseline BASELINE=default`.
+
+- **`--baseline default`:** Activates the plain NAMS Default ontology. Its generic types (Person, Organization, Location, Event, Object, and a few software types) guide extraction. This is the baseline the reference run used. The script picks the newest default revision that has none of the finance types, so it also works after you have built the hybrid.
+- **`--baseline hybrid`:** Adds the 11 finance types and 15 relationships to the NAMS Default ontology as a new revision, then activates it. This mirrors a team that adopts an ontology without giving up the generic types. A second run reuses that revision.
+- **`--baseline none`:** Checks that no ontology is active, and fails if one is. The API cannot unbind an active ontology, so this baseline only works on a workspace that has never activated one. The snapshot records `ontology_version_id: none`.
+
+Confirm which baseline ran from the `ontology_version_id` and `ontology_name` in the trial 1 snapshot.
 
 ### Set up
 
@@ -100,7 +60,7 @@ The merged document keeps the default's domain and generic types and adds the 11
 
 ### Trial 1: the baseline
 
-Run trial 1 with the baseline you chose above. As run, this was the generic default: the reset cleared the entities but left the NAMS Default ontology active, so NAMS typed entities with the generic types. Step 3 records which version actually ran.
+Run trial 1 with the baseline you set above. As run, this was the generic default (`--baseline default`). Step 3 records which version actually ran.
 
 1. **Run the traffic:** The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 7 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains. Otherwise all 24 turns land under your own user.
 
@@ -142,7 +102,7 @@ Run trial 1 with the baseline you chose above. As run, this was the generic defa
    uv run ontology/apply_ontology.py --create --activate
    ```
 
-   Or run `make apply-ontology`. The next section lists the other flags.
+   Or run `make apply-ontology`. The next section lists the other flags. `make reset-ontology` runs `--reset`.
 
 3. **Replay the conversations:** This writes the trial 1 conversations into NAMS unchanged, so the extractor now runs with the ontology.
 
@@ -230,6 +190,7 @@ uv run ontology/apply_ontology.py --rollback <version id>
 - **`--update`:** This flag loads the YAML as a new revision. It never edits an existing version.
 - **`--activate`:** This flag makes the version active. Before it activates, the script prints the currently active version id and saves that id to `ontology/out/previous_active_<UTC timestamp>.json`. If no ontology is active, it records `none`.
 - **`--rollback <version id>`:** This flag reactivates an earlier version. Use an id from a `previous_active_*.json` file. There is no way to unbind an ontology, so a rollback to `none` fails.
+- **`--reset`:** This flag activates the plain NAMS Default ontology. It looks the default up by name, so it needs no saved file. It saves the version it replaces first, like `--activate`.
 
 The hosted API spec does not model `aliases` on entity types, so the service may silently ignore the four Team aliases. The dry run prints a warning, and the read-back after `--create` shows what survived. The Team description also lists the aliases as a fallback. The `description` fields are accepted.
 
