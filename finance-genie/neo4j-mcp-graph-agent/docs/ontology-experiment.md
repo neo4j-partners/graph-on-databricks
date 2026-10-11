@@ -179,14 +179,14 @@ The reference `after-1` snapshot holds 26 conversations instead of 24, because t
 
 ```bash
 uv run ontology/apply_ontology.py                      # dry run, no network, validates locally
-uv run ontology/apply_ontology.py --create             # load it in permissive mode
+uv run ontology/apply_ontology.py --create             # load it in permissive mode, or add a revision if it exists
 uv run ontology/apply_ontology.py --create --activate  # load it and make it the active ontology
 uv run ontology/apply_ontology.py --update <ontology id>   # load the YAML as a new revision
 uv run ontology/apply_ontology.py --rollback <version id>
 ```
 
 - **Dry run:** The default run makes no network calls. It prints the types and relationships and checks them locally.
-- **`--create`:** This flag loads the ontology with validation mode `permissive`. Afterward the script reads the version back and prints what the service dropped.
+- **`--create`:** This flag loads the ontology with validation mode `permissive`. If an ontology of the same name already exists, it adds a new revision to that ontology instead of failing with a 409. Afterward the script reads the version back and prints what the service dropped.
 - **`--update`:** This flag loads the YAML as a new revision. It never edits an existing version.
 - **`--activate`:** This flag makes the version active. Before it activates, the script prints the currently active version id and saves that id to `ontology/out/previous_active_<UTC timestamp>.json`. If no ontology is active, it records `none`.
 - **`--rollback <version id>`:** This flag reactivates an earlier version. Use an id from a `previous_active_*.json` file. There is no way to unbind an ontology, so a rollback to `none` fails.
