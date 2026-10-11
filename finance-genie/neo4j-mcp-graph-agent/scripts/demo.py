@@ -64,7 +64,7 @@ STEPS = (
         expect=(
             "The first answer names Accounts 368, 927, 1033, and 1696.",
             "The second answer names Community 8174.",
-            "MLflow trace: a read_neo4j_cypher span.",
+            "MLflow trace: a span ending in read_neo4j_cypher.",
         ),
         new_session=True,
     ),
@@ -77,7 +77,7 @@ STEPS = (
         ),
         expect=(
             "The answer names Community 19766.",
-            "MLflow trace: a read_neo4j_cypher span.",
+            "MLflow trace: a span ending in read_neo4j_cypher.",
         ),
     ),
     Step(
@@ -105,7 +105,7 @@ STEPS = (
             "customers own?",
         ),
         expect=(
-            "MLflow trace: a read_neo4j_cypher span, then a genie_ask span.",
+            "MLflow trace: a span ending in read_neo4j_cypher, then a genie_ask span.",
             "The Genie question names the account ids that the graph found.",
         ),
     ),
@@ -115,7 +115,7 @@ STEPS = (
         questions=("Is Community 3040 a fraud ring candidate?",),
         expect=(
             "The answer names Community 3040.",
-            "MLflow trace: a read_neo4j_cypher span.",
+            "MLflow trace: a span ending in read_neo4j_cypher.",
         ),
     ),
 )

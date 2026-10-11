@@ -9,23 +9,44 @@ The app writes every turn to NAMS. NAMS reads each stored conversation and extra
 ## Key terms
 
 - **Short-term memory**: one analyst's stored conversations. The app reads the analyst's two latest conversations before each turn.
-- **Long-term memory**: the entity graph in NAMS. It holds what all analysts' conversations mentioned, merged by entity.
+- **Long-term memory**: the entity graph in NAMS. It holds the entities that all analysts' conversations mentioned.
 - **Entity**: one thing analysts talked about, such as Community 3040 or Account 7890. An entity has a name, a type, and a description.
 - **Extraction**: the NAMS background process that reads a stored conversation and creates entities. It finishes seconds to minutes after a turn.
 - **Ontology**: the type list in `ontology/finance_genie.ontology.yaml`. It makes extraction produce types such as Account, Community, and Case.
 - **Recall**: what the app reads from NAMS before it answers.
 - **NAMS console**: the web UI at https://memory.neo4jlabs.com/. It shows conversations, reasoning traces, and entities.
+- **NAMS graph database**: the Neo4j database behind NAMS. The Aura Query tab and `make who-shares` read it. It holds conversations, messages, and entities, and each entity links to the messages it came from.
 - **Snapshot**: a JSON dump of the entity graph from `ontology/measure_ingestion.py`.
 
 ## Tier 1: show the entity graph
 
-This demo proves the long-term memory exists. Run these steps in order.
+This demo proves the long-term memory exists. Steps 3 to 5 read the NAMS graph database directly. Install `neo4j-cli`, and set `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, and `NEO4J_DATABASE` in `.env` to the connection details of that database. Run these steps in order.
 
 1. **Apply the ontology:** Run `uv run ontology/apply_ontology.py --create --activate`, or `make apply-ontology`. Extraction now types entities as Account, Community, Case, and Analyst.
 2. **Run the traffic:** Run `make traffic`. This sends 24 turns from six analysts. Analysts 1 and 6 investigate the same Community 3040 from different teams. If the run exits with code 2 and prints `NOT STORED` lines, NAMS dropped some turns. Reset NAMS and run the traffic again.
-3. **Open the NAMS console:** Go to https://memory.neo4jlabs.com/ and search for 3040. The search returns about ten nodes named Community 3040, because extraction merges some mentions and leaves others as duplicates. Open the Community node with the most source messages. Show its type, its description, and its relationships. Open its provenance. The provenance lists source messages from several analysts. One entity now spans many people.
-4. **Say this:** "The conversation history belongs to one analyst. This entity graph belongs to the team. Nobody queried for it. It fell out of storing conversations."
-5. **Use a backup if the console fails:** Run `uv run ontology/measure_ingestion.py snapshot --label demo --out snapshot.json`. It waits for extraction and writes every entity and relationship to `snapshot.json`.
+3. **Wait for extraction:** `make traffic` returns before NAMS finishes extracting, which takes a few minutes. Run `neo4j-cli query "MATCH (m:Message) RETURN m.extractionStatus AS status, count(*) AS n"`. Continue when the only status is `done`.
+4. **Find the shared entity:** Run `make who-shares`. It lists the entities that more than one analyst's conversations fed, most analysts first. Copy the id from the top row. Extraction merges some mentions and leaves others as duplicates, so the top row can change between runs. After `make traffic`, it has been Community 3040. To run it in the Aura Query tab instead, paste this query, which is the content of `ontology/who_shares.cypher`:
+
+   ```cypher
+   MATCH (e:Entity)-[:EXTRACTED_FROM]->(:Message)<-[:HAS_MESSAGE]-(c:Conversation)
+   WHERE c.userId IS NOT NULL
+   WITH e, collect(DISTINCT c.userId) AS analysts
+   WHERE size(analysts) > 1
+   RETURN e.name AS name, e.type AS type, size(analysts) AS analysts, e.mentionCount AS mentions, e.id AS id
+   ORDER BY analysts DESC, mentions DESC
+   LIMIT 8
+   ```
+
+5. **Show the entity:** Open the Aura Query tab for the NAMS database and run this query. Replace `<id>` with the id from the last step.
+
+   ```cypher
+   MATCH p=(e:Entity {id:'<id>'})-[:EXTRACTED_FROM]->(:Message)<-[:HAS_MESSAGE]-(:Conversation)
+   RETURN p
+   ```
+
+   The Graph view shows one entity in the center, with a message on each `EXTRACTED_FROM` arrow and a conversation behind each message. The conversation nodes show timestamps. In the results overview, click the Conversation chip and set its caption to `userId`. Each conversation node then shows its analyst id. One entity now spans many people.
+6. **Say this:** "The conversation history belongs to one analyst. This entity graph belongs to the team. Nobody queried for it. It fell out of storing conversations."
+7. **Use a backup if the graph view fails:** Run `uv run ontology/measure_ingestion.py snapshot --label demo --out snapshot.json`. It waits for extraction and writes every entity and relationship to `snapshot.json`.
 
 ## Tier 2: show the agent using the graph
 
@@ -54,5 +75,6 @@ This demo shows the agent answering a new analyst with another analyst's finding
 ## Limits
 
 - **Keyword search:** Entity recall needs an entity name in the prompt, such as "Community 3040". A prompt without a name gets conversation recall only.
+- **Duplicate entities:** Extraction merges some mentions of an entity and leaves others as separate nodes. After `make traffic`, nine nodes are named Community 3040, and one of them holds six messages from four analysts. A run with only two turns, such as `demo_longterm.py` on an empty NAMS, produced no merged entity at all. Use `make who-shares` to find the merged entity instead of searching by name.
 - **Async extraction:** A turn's entities appear after extraction finishes. The demo script waits for this.
 - **NAMS scope:** On NAMS, long-term memory is the entity graph. Preferences and facts need the self-hosted Neo4j backend.

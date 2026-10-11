@@ -237,11 +237,11 @@ uv run scripts/demo.py --ask "Which community is Account 15940 in?"
 
 ### The steps
 
-- **1. Shared phone:** Asks which customers share phone 312-555-0142 and which accounts they own, then which community those accounts are in. The answers name Accounts 368, 927, 1033, and 1696, then Community 8174. The trace has a `read_neo4j_cypher` span.
-- **2. Hub:** Asks whether Account 15940 is a hub and which community it is in. The answer names Community 19766. The trace has a `read_neo4j_cypher` span.
+- **1. Shared phone:** Asks which customers share phone 312-555-0142 and which accounts they own, then which community those accounts are in. The answers name Accounts 368, 927, 1033, and 1696, then Community 8174. The trace has a span ending in `read_neo4j_cypher`. The Gateway adds a prefix, so the full name is `neo4j-mcp-server-target___read_neo4j_cypher`.
+- **2. Hub:** Asks whether Account 15940 is a hub and which community it is in. The answer names Community 19766. The trace has a span ending in `read_neo4j_cypher`.
 - **3. Recall:** Starts a new session and asks "What was I looking at last time?" The answer names Account 15940, although this session never did.
 - **4. Genie value question:** Asks for the average account balance by region and account type. The trace has a `genie_ask` span followed by a `genie_query_result` span.
-- **5. Graph and Genie:** Asks which phone numbers are shared by more than one customer, and what the balances and 30-day transaction counts of those accounts are. The trace has a `read_neo4j_cypher` span, then a `genie_ask` span. The Genie question names the account ids that the graph found.
+- **5. Graph and Genie:** Asks which phone numbers are shared by more than one customer, and what the balances and 30-day transaction counts of those accounts are. The trace has a span ending in `read_neo4j_cypher`, then a `genie_ask` span. The Genie question names the account ids that the graph found.
 - **ring (optional):** Asks whether Community 3040 is a fraud ring candidate. Run it with `--step ring` after step 3. The answer names Community 3040.
 
 Steps 1 and 2 share one session. Step 3 starts a new session, and steps 4 and 5 stay in it.

@@ -24,7 +24,7 @@ LOCAL_URL ?= http://localhost:8000
 APP_URL_CMD = databricks apps get $(APP_NAME) -p "$(DATABRICKS_CONFIG_PROFILE)" -o json | jq -r .url
 
 .PHONY: secrets deploy grant-genie smoke logs traffic check-profile dev smoke-local
-.PHONY: export replay snapshot apply-ontology compare baseline reset-ontology
+.PHONY: export replay snapshot apply-ontology compare baseline reset-ontology who-shares
 
 # Loads .env so the server sees MEMORY_API_KEY; agentbricks dev reads the key only
 # from the environment, not from .env on its own.
@@ -96,6 +96,10 @@ baseline:
 # Activates the plain NAMS Default ontology again.
 reset-ontology:
 	uv run ontology/apply_ontology.py --reset
+
+# Lists entities that more than one analyst's conversations fed, most analysts first. Reads the NAMS graph with neo4j-cli and the NEO4J_* values in .env.
+who-shares:
+	neo4j-cli query --format table "$$(cat ontology/who_shares.cypher)"
 
 compare:
 	uv run ontology/measure_ingestion.py compare $(BEFORE) $(AFTER) \
