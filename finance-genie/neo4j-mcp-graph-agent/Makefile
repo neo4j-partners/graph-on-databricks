@@ -1,5 +1,9 @@
 # One-command wrappers around the commands in README.md and docs/traffic.md.
-# Set DATABRICKS_CONFIG_PROFILE first. The README has no default profile.
+# Set DATABRICKS_CONFIG_PROFILE in .env or in your shell. A shell value wins.
+
+ifndef DATABRICKS_CONFIG_PROFILE
+DATABRICKS_CONFIG_PROFILE := $(shell sed -nE 's/^[[:space:]]*DATABRICKS_CONFIG_PROFILE=[[:space:]]*"?([^"\#[:space:]]*).*/\1/p' .env 2>/dev/null | tail -n 1)
+endif
 
 DEPLOY_NAME ?= neo4j-graph-agent
 APP_NAME ?= agent-bricks-$(DEPLOY_NAME)
@@ -17,16 +21,28 @@ ONTOLOGY_YAML = ontology/finance_genie.ontology.yaml
 
 APP_URL_CMD = databricks apps get $(APP_NAME) -p "$(DATABRICKS_CONFIG_PROFILE)" -o json | jq -r .url
 
-.PHONY: deploy smoke logs traffic check-profile
+.PHONY: secrets deploy grant-genie smoke logs traffic check-profile
 .PHONY: export replay snapshot apply-ontology compare
 
 check-profile:
-	@test -n "$(DATABRICKS_CONFIG_PROFILE)" || { echo "Set DATABRICKS_CONFIG_PROFILE first." >&2; exit 1; }
+	@test -n "$(DATABRICKS_CONFIG_PROFILE)" || { echo "Set DATABRICKS_CONFIG_PROFILE in .env." >&2; exit 1; }
 
+secrets: check-profile
+	./setup_secrets.sh --profile "$(DATABRICKS_CONFIG_PROFILE)"
+
+# Attaches the NAMS key resource when the app lacks it (exit 3), then deploys again to pick it up.
 deploy: check-profile
-	agentbricks --profile "$(DATABRICKS_CONFIG_PROFILE)" deploy $(DEPLOY_NAME)
+	agentbricks --profile "$(DATABRICKS_CONFIG_PROFILE)" deploy $(DEPLOY_NAME); deployed=$$?; \
+	uv run python scripts/attach_nams_key.py --profile "$(DATABRICKS_CONFIG_PROFILE)" --app $(APP_NAME); \
+	attached=$$?; \
+	if [ $$attached -eq 3 ]; then agentbricks --profile "$(DATABRICKS_CONFIG_PROFILE)" deploy $(DEPLOY_NAME); \
+	elif [ $$attached -ne 0 ]; then exit $$attached; \
+	else exit $$deployed; fi
 	agentbricks --profile "$(DATABRICKS_CONFIG_PROFILE)" deployments get $(APP_NAME)
 	@echo "APP_URL=$$($(APP_URL_CMD))"
+
+grant-genie: check-profile
+	uv run python scripts/grant_genie.py --profile "$(DATABRICKS_CONFIG_PROFILE)" --app $(APP_NAME) $(if $(DRY_RUN),--dry-run)
 
 smoke: check-profile
 	SESSION_ID=$$(uuidgen); \
