@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" width="960" height="480" font-family="Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
   <title id="t">Architecture of the neo4j-mcp-graph-agent with NAMS memory</title>
-  <desc id="d">A caller sends a question to the Databricks App. The app recalls memory from NAMS, asks the model and reads the Neo4j graph through a Unity Catalog MCP service, returns the answer, and writes the turn to NAMS.</desc>
+  <desc id="d">A caller sends a question to the Databricks App. The app recalls memory from NAMS, asks the model and reads the Neo4j graph through a Unity Catalog MCP service and the gold Delta tables through a Genie space, returns the answer, and writes the turn to NAMS.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#2d3748"/>
@@ -45,15 +45,22 @@
   <line x1="210" y1="385" x2="268" y2="350" stroke="#c53030" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
 
   <!-- AI Gateway -->
-  <rect x="700" y="60" width="240" height="64" rx="10" fill="#f4f6fa" stroke="#4a5568" stroke-width="2"/>
-  <text x="820" y="88" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a202c">AI Gateway model</text>
-  <text x="820" y="108" text-anchor="middle" font-size="12" fill="#4a5568">system.ai.claude-sonnet-4-5</text>
+  <rect x="700" y="36" width="240" height="52" rx="10" fill="#f4f6fa" stroke="#4a5568" stroke-width="2"/>
+  <text x="820" y="58" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a202c">AI Gateway model</text>
+  <text x="820" y="77" text-anchor="middle" font-size="12" fill="#4a5568">system.ai.claude-sonnet-4-5</text>
 
   <!-- MCP -->
-  <rect x="700" y="170" width="240" height="76" rx="10" fill="#f4f6fa" stroke="#4a5568" stroke-width="2"/>
-  <text x="820" y="198" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a202c">Unity Catalog MCP service</text>
-  <text x="820" y="218" text-anchor="middle" font-size="12" fill="#4a5568">finance_genie_mcp</text>
-  <text x="820" y="235" text-anchor="middle" font-size="11" fill="#4a5568">read-only Cypher on Neo4j</text>
+  <rect x="700" y="100" width="240" height="70" rx="10" fill="#f4f6fa" stroke="#4a5568" stroke-width="2"/>
+  <text x="820" y="124" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a202c">Unity Catalog MCP service</text>
+  <text x="820" y="143" text-anchor="middle" font-size="12" fill="#4a5568">finance_genie_mcp</text>
+  <text x="820" y="160" text-anchor="middle" font-size="11" fill="#4a5568">read-only Cypher on Neo4j</text>
+
+  <!-- Genie -->
+  <rect x="700" y="182" width="240" height="86" rx="10" fill="#f4f6fa" stroke="#4a5568" stroke-width="2"/>
+  <text x="820" y="204" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a202c">Genie space</text>
+  <text x="820" y="223" text-anchor="middle" font-size="12" fill="#4a5568">value questions on gold Delta tables</text>
+  <text x="820" y="240" text-anchor="middle" font-size="11" fill="#4a5568">graph-on-databricks.graph-enriched-schema</text>
+  <text x="820" y="256" text-anchor="middle" font-size="11" fill="#4a5568">SQL warehouse, called as the app</text>
 
   <!-- NAMS -->
   <rect x="700" y="290" width="240" height="96" rx="10" fill="#e8f7ee" stroke="#2f855a" stroke-width="2"/>
@@ -82,11 +89,15 @@
   <line x1="552" y1="356" x2="698" y2="356" stroke="#2f855a" stroke-width="1.8" marker-end="url(#arrow)"/>
   <circle cx="625" cy="372" r="9" fill="#2f855a"/><text x="625" y="376" text-anchor="middle" font-size="11" fill="#ffffff">5</text>
 
-  <!-- 3 model and graph -->
-  <line x1="552" y1="212" x2="698" y2="100" stroke="#2d3748" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <circle cx="625" cy="156" r="9" fill="#2d3748"/><text x="625" y="160" text-anchor="middle" font-size="11" fill="#ffffff">3</text>
-  <line x1="552" y1="236" x2="698" y2="214" stroke="#2d3748" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <circle cx="625" cy="225" r="9" fill="#2d3748"/><text x="625" y="229" text-anchor="middle" font-size="11" fill="#ffffff">3</text>
+  <!-- 3 model, graph, and Genie -->
+  <line x1="552" y1="208" x2="698" y2="72" stroke="#2d3748" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <circle cx="625" cy="140" r="9" fill="#2d3748"/><text x="625" y="144" text-anchor="middle" font-size="11" fill="#ffffff">3</text>
+  <line x1="552" y1="226" x2="698" y2="140" stroke="#2d3748" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <circle cx="625" cy="183" r="9" fill="#2d3748"/><text x="625" y="187" text-anchor="middle" font-size="11" fill="#ffffff">3</text>
+  <line x1="552" y1="246" x2="698" y2="228" stroke="#2d3748" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <circle cx="625" cy="237" r="9" fill="#2d3748"/><text x="625" y="241" text-anchor="middle" font-size="11" fill="#ffffff">3</text>
+  <text x="625" y="262" text-anchor="middle" font-size="10" fill="#4a5568">genie_ask, genie_poll,</text>
+  <text x="625" y="275" text-anchor="middle" font-size="10" fill="#4a5568">genie_query_result</text>
 
   <!-- 6 session store -->
   <line x1="572" y1="432" x2="698" y2="432" stroke="#2d3748" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>

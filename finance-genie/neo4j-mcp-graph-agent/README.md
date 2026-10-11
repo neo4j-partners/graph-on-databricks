@@ -20,7 +20,7 @@ What you'll see:
 
 ## Architecture
 
-![Architecture of the agent, the MCP service, and NAMS](docs/architecture.svg)
+![Architecture of the agent, the MCP service, the Genie space, and NAMS](docs/architecture.svg)
 
 The parts:
 

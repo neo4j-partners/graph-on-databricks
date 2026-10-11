@@ -15,3 +15,8 @@ mlruns/
 
 # NAMS ontology rollback snapshots written by apply_ontology.py
 ontology/previous_active_*.json
+
+# Local MLflow state written by agentbricks dev and agent-evaluate
+mlflow.db
+.agentbricks/mlflow.db
+.agentbricks/mlflow-server.log
