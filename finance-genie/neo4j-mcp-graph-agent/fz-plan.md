@@ -175,3 +175,4 @@ Ryan approved this on 2026-10-10.
   - Unverified until a live app exists: whether the first deploy fails before the nams-api-key resource exists, the real attach and redeploy path, and the existing-grant checks.
 - **2026-10-10, fz:** fz assigned T to zzz: a numbered make quick start in the README (secrets, deploy, grant-genie, smoke, logs, traffic), with the raw commands moved to a reference section and the manual attach steps removed.
 - **2026-10-10, Ryan:** Ryan approved ignoring app.agentbricksdev.yaml and fixing the diagram's model name. fz added the file to .gitignore and untracked it with `git rm --cached`; the local copy stays. On Ryan's question about a generic model label, fz asked azz for "any chat model, set by LLM_MODEL", so the diagram does not go stale.
+- **2026-10-10, azz:** azz changed the AI Gateway box to read "any chat model, set by LLM_MODEL". fz committed it.
