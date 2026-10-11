@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import random
 import re
 from dataclasses import dataclass, field
 from types import TracebackType
@@ -52,6 +53,8 @@ _ENTITY_TERM_RE = re.compile(
 )
 
 CONNECT_TIMEOUT_SECONDS = 10
+CONNECT_ATTEMPTS = 3
+CONNECT_RETRY_SECONDS = 0.5
 RECALL_TIMEOUT_SECONDS = 10
 WRITE_TIMEOUT_SECONDS = 30
 OUTCOME_MAX_CHARS = 1000
@@ -146,13 +149,26 @@ class TurnMemory:
     async def __aenter__(self) -> TurnMemory:
         if not nams_enabled():
             return self
-        try:
-            async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
-                memory = self.client_factory()
-                await memory.connect()
-            self._memory = memory
-        except Exception:  # noqa: BLE001 - NAMS must never break an answer
-            logger.warning("NAMS unavailable, continuing without memory", exc_info=True)
+        # NAMS sometimes answers the connect probe with a transient 424 external_database_error
+        # that the SDK does not retry. Without a retry the turn runs without memory and is never
+        # stored, and nothing tells the caller.
+        for attempt in range(CONNECT_ATTEMPTS):
+            try:
+                async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
+                    memory = self.client_factory()
+                    await memory.connect()
+                self._memory = memory
+                return self
+            except Exception:  # noqa: BLE001 - NAMS must never break an answer
+                logger.warning(
+                    "NAMS connect failed (attempt %d of %d)",
+                    attempt + 1,
+                    CONNECT_ATTEMPTS,
+                    exc_info=True,
+                )
+            if attempt + 1 < CONNECT_ATTEMPTS:
+                await asyncio.sleep(CONNECT_RETRY_SECONDS * 2**attempt * random.uniform(0.75, 1.25))
+        logger.warning("NAMS unavailable, continuing without memory")
         return self
 
     async def __aexit__(

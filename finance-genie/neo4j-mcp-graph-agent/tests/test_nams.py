@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from agent import nams
 from agent.nams import (
     ENTITY_RECALL_HEADER,
     RECALL_CONVERSATIONS,
@@ -23,8 +24,11 @@ from runtime.adapter import _last_user_text, _record
 class FakeMemory:
     """Records every NAMS call in order; list/get_context/search are scripted per test."""
 
-    def __init__(self, conversations=None, contexts=None, entities=None, fail_on=None):
+    def __init__(
+        self, conversations=None, contexts=None, entities=None, fail_on=None, connect_failures=0
+    ):
         self.calls: list[tuple] = []
+        self._connect_failures = connect_failures
         self._conversations = conversations or []
         self._contexts = contexts or {}
         self._entities = entities or []
@@ -49,6 +53,9 @@ class FakeMemory:
 
     async def connect(self):
         self._maybe_fail("connect")
+        if self._connect_failures:
+            self._connect_failures -= 1
+            raise RuntimeError("connect failed")
         self.calls.append(("connect",))
 
     async def close(self):
@@ -110,6 +117,7 @@ def turn_memory(memory, **kwargs):
 @pytest.fixture
 def nams_key(monkeypatch):
     monkeypatch.setenv("MEMORY_API_KEY", "nams_test")
+    monkeypatch.setattr(nams, "CONNECT_RETRY_SECONDS", 0)
 
 
 def names(memory):
@@ -343,6 +351,20 @@ async def test_connect_failure_disables_memory_without_raising(nams_key):
     memory = FakeMemory(fail_on="connect")
     async with turn_memory(memory) as turn:
         assert await turn.recall() == ""
+        turn.set_answer("ok")
+    assert memory.calls == []
+
+
+async def test_connect_retries_a_transient_failure_then_records_the_turn(nams_key):
+    memory = FakeMemory(connect_failures=2)
+    async with turn_memory(memory) as turn:
+        turn.set_answer("ok")
+    assert "create_conversation" in names(memory)
+
+
+async def test_connect_gives_up_after_the_last_attempt(nams_key):
+    memory = FakeMemory(connect_failures=nams.CONNECT_ATTEMPTS)
+    async with turn_memory(memory) as turn:
         turn.set_answer("ok")
     assert memory.calls == []
 
