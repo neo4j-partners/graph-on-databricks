@@ -639,6 +639,17 @@ def test_reset_saves_active_then_activates_plain_default(
     assert json.loads(saved[0].read_text())["version_id"] == "ov_old"
 
 
+def test_reset_skips_the_finance_ontology_summary(
+    fake_client, monkeypatch, tmp_path, capsys
+):
+    monkeypatch.setattr(apply_ontology, "SCRIPT_DIR", tmp_path)
+    assert apply_ontology.main(["--yaml", str(YAML_PATH), "--reset"]) == 0
+    out = capsys.readouterr().out
+    assert apply_ontology.summarize(apply_ontology.load_ontology(YAML_PATH)) not in out
+    assert "Local validation passed" not in out
+    assert out.strip().splitlines()[-1].startswith("Activated: version_id=ov_d2")
+
+
 def test_reset_cannot_combine_with_rollback(capsys):
     with pytest.raises(SystemExit):
         apply_ontology.main(["--reset", "--rollback", "ov_x"])

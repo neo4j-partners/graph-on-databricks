@@ -688,16 +688,18 @@ def main(argv: list[str] | None = None) -> int:
     except OntologyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(summarize(document))
-    for warning in lint_ontology(document):
-        print(f"warning: {warning}")
+    if not args.reset:
+        print(summarize(document))
+        for warning in lint_ontology(document):
+            print(f"warning: {warning}")
     problems = validate_ontology(document)
     if problems:
         print("\nValidation FAILED:", file=sys.stderr)
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         return 1
-    print("\nLocal validation passed.")
+    if not args.reset:
+        print("\nLocal validation passed.")
     try:
         return run(args, document)
     except ApiError as exc:

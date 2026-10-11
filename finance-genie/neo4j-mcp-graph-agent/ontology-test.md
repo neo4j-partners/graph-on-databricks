@@ -31,7 +31,7 @@ Setup and the quick start
 Demo script
 - [x] Claude: `uv run scripts/demo.py` runs steps 1 to 5 locally.
 - [x] Claude: `uv run scripts/demo.py --step ring` runs the ring question.
-- [ ] You: Check the MLflow spans by hand (`read_neo4j_cypher`, `genie_ask`, `genie_query_result`).
+- [x] spdz: Check the MLflow spans (`read_neo4j_cypher`, `genie_ask`, `genie_query_result`). All present, no errors. The local server logs to `.agentbricks/mlflow.db`, not the workspace. The cypher span is named `neo4j-mcp-server-target___read_neo4j_cypher`, not the bare name the docs use.
 - [ ] You: Open https://memory.neo4jlabs.com/ and confirm each demo question appears as a conversation.
 
 Reset before the ontology example
@@ -55,32 +55,32 @@ Hybrid baseline
 
 Long-term memory demo
 - [x] Claude: `make apply-ontology` (Tier 1 step 1), then local traffic. The finance ontology was already active from trial 2. Run `lt2` stored 24 of 24.
-- [ ] You: Find Community 3040 in the NAMS console and check that its provenance lists two analysts.
+- [!] You: Find Community 3040 in the NAMS console and check that its provenance lists two analysts. The console shows 11 separate Community nodes named "Community 3040" (19 entities with that name in all), each with one source message and no analyst listing. See the audit log.
 - [x] Claude: `uv run scripts/demo_longterm.py --analyst-b demo-analyst-b-t1` prints analyst B's answer with analyst A's findings. Exit 0.
 
 Clean up
 - [x] Claude: README Clean up step 4 (`--reset`) returns the default. Activated `ov_345ad0e8d72a`.
-- [ ] Claude: README Clean up step 5 clears `ontology/out/*.json`. Held back so the cloud trial can be compared with the local snapshots.
+- [x] Claude: README Clean up step 5 clears `ontology/out/*.json`. Done after the cloud trial. The local snapshots are in `ontology/out/local-run/`.
 - [x] Claude: Stop the local server.
 
 ### Phase 2: cloud
 
 Starts only after you reset the NAMS database again.
 
-- [ ] You: Reset the NAMS database.
-- [ ] Claude: `make reset-ontology`, then confirm the default is active.
-- [ ] Claude: `make secrets`.
-- [ ] Claude: `make deploy` prints `APP_URL`.
-- [ ] Claude: `make grant-genie`.
-- [ ] Claude: `make smoke` returns an answer.
-- [ ] Claude: `uv run scripts/demo.py --cloud` runs steps 1 to 5.
-- [ ] Claude: `uv run scripts/demo.py --cloud --step ring`.
-- [ ] You: Reset the NAMS database before the ontology example.
-- [ ] Claude: Trial 1 with `make traffic`, `make export`, `make snapshot LABEL=before-1`.
-- [ ] You: Reset the NAMS database between the trials.
-- [ ] Claude: Trial 2 with `make apply-ontology`, `make replay`, `make snapshot LABEL=after-1`, `make compare`.
-- [ ] Claude: `uv run scripts/demo_longterm.py --app-url "$APP_URL" --profile "$DATABRICKS_CONFIG_PROFILE"`.
-- [ ] Claude: README Clean up steps 4 and 5. Do not run step 1 (delete the app) unless you say so.
+- [x] You: Reset the NAMS database.
+- [x] Claude: `make reset-ontology`, then confirm the default is active. Activated `ov_345ad0e8d72a`. Local run files moved to `ontology/out/local-run/`.
+- [x] Claude: `make secrets`.
+- [x] Claude: `make deploy` prints `APP_URL`. The deploy succeeded. The app already existed. The output did not print an `APP_URL=` line, see the audit log.
+- [x] Claude: `make grant-genie`. All grants already present.
+- [x] Claude: `make smoke` returns an answer.
+- [x] Claude: `uv run scripts/demo.py --cloud` runs steps 1 to 5.
+- [x] Claude: `uv run scripts/demo.py --cloud --step ring`.
+- [x] You: Reset the NAMS database before the ontology example.
+- [x] Claude: Trial 1 with `make traffic`, `make export`, `make snapshot LABEL=before-1`. Stored 24 of 24, exported 24 turns, snapshot conformance 0.0% (0/362).
+- [x] You: Reset the NAMS database between the trials.
+- [x] Claude: Trial 2 with `make apply-ontology`, `make replay`, `make snapshot LABEL=after-1`, `make compare`. Conformance 0 to 100% (267/267), Object/Concept 185 to 0.
+- [x] Claude: `uv run scripts/demo_longterm.py --app-url "$APP_URL" --profile "$DATABRICKS_CONFIG_PROFILE"`. Exit 0 with `--analyst-b demo-analyst-b-cloud`.
+- [x] Claude: README Clean up steps 4 and 5. Done. The app was not deleted.
 
 ## What else needs testing
 
@@ -89,7 +89,6 @@ Starts only after you reset the NAMS database again.
 - **Copy-paste of the doc commands:** Run each raw command in `docs/ontology-experiment.md` as written, not only the `make` wrapper, because the two can drift.
 - **README links:** Check every in-page anchor after the section move, and the anchors that other docs use (`#quick-start-cloud-with-make`, `#quick-start-with-make`).
 - **Error paths:** `make dev` with no `.env`, `demo.py` with the server down, `demo.py --cloud` without a profile, and `set_baseline.py` without `MEMORY_API_KEY`.
-- **`--reset` output:** It prints the whole finance ontology summary before it acts. Decide whether to quiet it.
 - **Trusted callers:** Whether `MEMORY_TRUSTED_CALLERS` makes the traffic land under six analyst ids in the cloud, and one user when it is not set.
 - **Deploy from a clean app:** The first-deploy path that attaches `nams-api-key` and deploys twice.
 - **Run-to-run noise:** Extraction is LLM based. If a result looks wrong, repeat one side (`before-2`) before blaming the code.
@@ -118,3 +117,12 @@ Starts only after you reset the NAMS database again.
 - **2026-10-11, long-term demo (local):** `uv run scripts/demo_longterm.py --analyst-b demo-analyst-b-t1` exited 0. Analyst B's answer recalled analyst A's work on Community 3040, including the comparison with Community 24683 and the stats (126 members, average risk 2.72, highest risk 3.80 for Account 7890).
 - **2026-10-11, local clean up:** `apply_ontology.py --reset` activated plain NAMS Default revision 3. The local server on :8000 is stopped. `ontology/out/*.json` is kept for now. NAMS holds the `lt2` traffic, the trial 2 replay and the demo conversations, so it needs a reset before Phase 2.
 - **2026-10-11, hybrid baseline dropped:** Removed `--baseline hybrid`, `merge_finance_into_default`, `set_hybrid`, the two hybrid tests and the doc references (`docs/ontology-experiment.md`, `docs/reference.md`, `README.md`, Makefile comment, `apply_ontology.py` docstrings). The `--reset` logic that picks the newest revision with no finance types is unchanged. 313 tests pass.
+- **2026-10-11, `--reset` output quieted:** `apply_ontology.py --reset` no longer prints the finance ontology summary, the lint warnings or "Local validation passed". It still prints the rollback lines and the activated version, and still reports validation failures. One test added, 314 pass. Live run printed 4 lines. Asked spdz to check the MLflow spans, because the databricks MCP server would not reconnect in this session.
+- **2026-10-11, MLflow spans (spdz):** The local `make dev` server logs to a local MLflow store (`.agentbricks/mlflow.db`, experiment 1 `neo4j-mcp-graph-agent`), so the Databricks MCP cannot see them. The complete run (steps 1 to 5 and ring, 11:21 to 11:25) shows `read_neo4j_cypher` for steps 1, 2 and ring, `genie_ask` then `genie_query_result` for step 4, and `read_neo4j_cypher`, `genie_ask`, `genie_query_result` in that order for step 5. Step 3 has no tool spans, which is expected. All spans are OK. Finding: the cypher span is stored as `neo4j-mcp-server-target___read_neo4j_cypher`, so an exact-name match on the docs' bare name fails. The cloud app logs to the workspace experiment, which has not been checked.
+- **2026-10-11, Community 3040 provenance:** Ryan's console screenshots show 11 Community-type nodes named "Community 3040" and a message node linked to one of them by a single edge. The raw properties list id, name, type, description, confidence and sourceStage, with no analyst or provenance list. `GET /v1/entities` confirms 19 entities named "Community 3040": 11 Community, 6 Organization, 2 Location, all with `userId` null. NAMS did not merge them, so no single entity spans two analysts, and `docs/longterm.md` Tier 1 step 3 ("One entity now spans two people") does not match what the console shows. The entity endpoint has no provenance sub-route (404). `demo_longterm.py` still works because search returns every match. Open: decide how to fix the doc step.
+- **2026-10-11, cloud setup and demo:** After the NAMS reset, `make reset-ontology` activated plain revision 3. `make secrets` and `make deploy` succeeded (deployment `01f1c5ac00ee1b1cbd29be66a2970f8a`, state SUCCEEDED, app `agent-bricks-neo4j-graph-agent` at `https://agent-bricks-neo4j-graph-agent-7474647869599596.aws.databricksapps.com`). `make grant-genie` found every grant already present. `make smoke` returned a graph-backed answer about `SIMILAR_TO`. `demo.py --cloud` ran steps 1 to 5 and `--step ring` with exit 0. Step 5 named phones 312-555-0142 and 312-555-0143 with eight accounts and Genie balances. The ring answer named Community 3040 (126 members, average risk 2.72, 90% internal transfers). Findings: `make deploy` printed no `APP_URL=` line in the tail of its output (the last 37 lines were truncated in my view, so unconfirmed). The deploy uploads the whole directory, including scratch files such as `nams-424.md` and `ontology-test.md`. NAMS holds the demo conversations, so it needs a reset before the ontology example.
+- **2026-10-11, cloud MLflow spans (spdz):** Workspace experiment `2180908208794102` holds 14 traces for 2026-10-11, all OK with no errored spans. The cloud demo run (13:44 to 13:48) shows `neo4j-mcp-server-target___read_neo4j_cypher` for the smoke question, steps 1, 2, 5 and ring, `genie_ask` then `genie_query_result` for step 4, and cypher then `genie_ask` then `genie_query_result` for step 5. Step 3 has no tool spans. Nothing is missing. Cypher span counts differ slightly from the local run (1b: 2 vs 1, ring: 3 vs 2), which is normal run-to-run variation. Not checked: span inputs and outputs, and the app's own logs.
+- **2026-10-11, cloud trial 1:** After the NAMS reset and a check that the default was active, `make traffic` ran against the cloud app (run id `2fb85d42`) and exited 0. The tail of its output was cut by the output filter, so I confirmed the result from NAMS: 24 conversations across 12 sessions, 2 per session. `make export` saved 24 conversations, 48 messages, 31 steps, 31 tool calls. `make snapshot LABEL=before-1` recorded NAMS Default `ov_345ad0e8d72a`: 362 entities, 0 of 362 conform to the finance types (Object 137, Person 67, Organization 58, Concept 48, Location 20). Instances: account 63 distinct, community 9, identity_cluster 1, phone 2, case 6. The local snapshots are in `ontology/out/local-run/`.
+- **2026-10-11, cloud trial 2:** After the NAMS reset, `make apply-ontology` hit the 409 path again and added revision 5 (`ov_27503888bfcf`), then activated it. I confirmed the active version through the API. The first `make replay` failed at once with `GET /v1/conversations failed with HTTP 424` (the known post-reset error, nothing written). I waited for NAMS to answer 200 twice, then the replay finished with extraction done for 24 conversations and 0 failed. `make compare` of `before-1` (NAMS Default `ov_345ad0e8d72a`) with `after-1` (Finance Genie Fraud Memory revision 5): total entities 362 to 267, Object/Concept 185 to 0 (share 0.511 to 0), duplicate groups 79 to 65, duplicate excess 168 to 124, type conflicts 17 to 2, conformance 0 to 100% (267 of 267), gold type accuracy 0.786 to 1.0, and gold recall stays 1.0. Community instances went from 9 to 12 distinct. Typed relationships MEMBER_OF, REPORTS_TO and OWNS improved. Same direction as the local run.
+- **2026-10-11, cloud long-term demo:** `demo_longterm.py --app-url ... --profile aws-partner-rk --analyst-b demo-analyst-b-cloud` exited 0. Analyst A's answer gave the Community 3040 risk spread and top accounts. Analyst B's answer, in a new session, recalled the CASE-4001 note that none of the top 25 betweenness accounts are in the community. That note came from the replayed trial data, so it does not prove recall of analyst A's own turn. The conversations carry the analyst ids (`userId` `demo-analyst-a` and `demo-analyst-b-cloud`), so `MEMORY_TRUSTED_CALLERS` works in the cloud. The extracted entities have `userId` null. NAMS holds 10 separate Community-type entities named "Community 3040" (288 entities in all), so the cloud also does not merge them. Whether any one of them lists source messages from both analysts is not visible through the API, and needs your console check.
+- **2026-10-11, cloud clean up:** `--reset` activated plain NAMS Default revision 3. `ontology/out/*.json` is cleared (`local-run/` and `old-run/` kept). The app `agent-bricks-neo4j-graph-agent` is still deployed.
