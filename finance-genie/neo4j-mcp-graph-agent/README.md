@@ -13,7 +13,7 @@ What you'll see:
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Set up the NAMS key](#set-up-the-nams-key)
-- [Deploy and try](#deploy-and-try)
+- [Quick start with make](#quick-start-with-make)
 - [Demo script](#demo-script)
 - [Run locally](#run-locally)
 - [Documentation](#documentation)
@@ -43,20 +43,17 @@ The parts:
 - **Workspace:** The workspace needs Databricks Apps and Unity Catalog AI Gateway.
 - **MCP service:** The service `graph-on-databricks.finance_genie.finance_genie_mcp` must exist. It must expose the tools `get_neo4j_schema` and `read_neo4j_cypher`. [Create the finance-genie MCP service](docs/mcp-service.md) covers the setup.
 - **Grant right:** You must own the MCP service or have `MANAGE` on it. Deploy grants `EXECUTE` on it for the app.
-- **Genie space:** The agent asks the AFTER Genie space from finance-genie, which covers the gold tables. Set your own space id in the `genie` tool block of `agent.toml`. Deploy grants the app `CAN_RUN` on the space. The app's service principal also needs `CAN_USE` on the space's SQL warehouse and `SELECT` on the tables.
+- **Genie space:** The agent asks the AFTER Genie space from finance-genie, which covers the gold tables. Set your own space id in the `genie` tool block of `agent.toml`. Deploy grants the app `CAN_RUN` on the space. Then `make grant-genie` grants the warehouse and table access that Genie needs.
 - **NAMS key:** You need a NAMS key from https://memory.neo4jlabs.com/. [Set up the NAMS key](#set-up-the-nams-key) covers it.
 
 ## Set up the NAMS key
 
-The agent reads the NAMS key from the `MEMORY_API_KEY` environment variable. Run these steps from the `neo4j-mcp-graph-agent/` directory. The local path needs steps 1 and 2. The deployed app needs all five.
+The agent reads the NAMS key from the `MEMORY_API_KEY` environment variable. Run these steps from the `neo4j-mcp-graph-agent/` directory. The local path needs steps 1 and 2. The deployed app needs all four.
 
 1. **Create the NAMS key:** Make a key at https://memory.neo4jlabs.com/.
 2. **Save the NAMS key locally:** Copy `.env.example` to `.env`. Put the key in `.env` as `MEMORY_API_KEY`, and set `DATABRICKS_CONFIG_PROFILE` there too.
-3. **Save the NAMS key in Databricks:** Run `./setup_secrets.sh`. The script reads `MEMORY_API_KEY` and `DATABRICKS_CONFIG_PROFILE` from `.env`. It creates the secret scope `nams` if needed and writes the key as `memory-api-key`. Pass `--profile <name>` to use another profile.
-4. **Attach the NAMS key to the app:** After the first deploy, add an app resource named `nams-api-key` to the app. Use type secret, scope `nams`, key `memory-api-key`, and `CAN_READ`. Add it in the app's Resources settings, or with `databricks apps update`.
-5. **Deploy again:** Run `agentbricks deploy neo4j-graph-agent` so the app picks up the NAMS key. Or run `make deploy`.
-
-The resource stayed attached across later deploys in testing. Check it after each deploy anyway.
+3. **Save the NAMS key in Databricks:** Run `make secrets`. It reads `MEMORY_API_KEY` from `.env` and saves it as the Databricks secret `nams/memory-api-key`. It creates the secret scope `nams` if needed.
+4. **Attach the NAMS key to the app:** `make deploy` does this for you. On the first deploy, it adds the app resource `nams-api-key`, which points at the secret `nams/memory-api-key` with `READ` permission. To check it, open the app's Resources tab and look for `nams-api-key`.
 
 Where each command reads the NAMS key:
 
@@ -64,32 +61,33 @@ Where each command reads the NAMS key:
 - **From your shell:** `agentbricks dev` reads the NAMS key only from your shell. Export `MEMORY_API_KEY` before you start it.
 - **From the app resource:** The deployed app reads the NAMS key from the `nams-api-key` resource.
 
-## Deploy and try
+## Quick start with make
 
-**Shortcuts:** The `Makefile` wraps the deploy, test, and traffic commands. Run `make` from `neo4j-mcp-graph-agent/` with `DATABRICKS_CONFIG_PROFILE` set. Each step below shows the raw command first and the shortcut after it.
+Run these steps from `neo4j-mcp-graph-agent/`. Every make target reads `DATABRICKS_CONFIG_PROFILE` from `.env`, and a value set in your shell wins. [What the make targets run](docs/reference.md#what-the-make-targets-run) shows the raw commands behind each target.
 
-| Target | What it does |
-| --- | --- |
-| `make deploy` | Deploys the app, shows its status, and prints `APP_URL`. |
-| `make smoke` | Asks the deployed app one question in a new session. Set the question with `QUESTION=`. |
-| `make logs` | Streams the app logs until you press Ctrl-C. |
-| `make traffic` | Runs laptop traffic with 6 users, 2 sessions, and 2 turns. Change the size with `USERS=`, `SESSIONS=`, and `TURNS=`. |
-| `make export`, `replay`, `snapshot LABEL=`, `apply-ontology`, `compare` | These run the ontology steps. [Run the ontology example](docs/ontology-experiment.md) gives the order. |
-
-1. **Install and sign in:** Install the Agent Bricks CLI, pick your Databricks profile, and log in.
+1. **Install and sign in:** Install the tools in [Prerequisites](#prerequisites), then sign in to Agent Bricks with your Databricks profile. `databricks auth profiles` lists your profiles.
 
    ```bash
    uv tool install databricks-agentbricks
-   databricks auth profiles                      # list your profiles
-   export DATABRICKS_CONFIG_PROFILE=<your-profile>
-   agentbricks login --profile "$DATABRICKS_CONFIG_PROFILE"
+   agentbricks login --profile <your-profile>
    ```
 
-2. **Save the NAMS key in Databricks:** Do steps 1 to 3 of [Set up the NAMS key](#set-up-the-nams-key).
-3. **Trust your user for laptop traffic:** A laptop traffic run calls the app as you. The app honors the synthetic analyst ids only from callers listed in `MEMORY_TRUSTED_CALLERS`. Otherwise it saves every turn under your own user. Before you deploy, add your Databricks user email to that entry in `app.yaml`. Separate the values with commas. The checked-in values belong to this repo's workspace, so replace them with your own. The first command prints your user email.
+2. **Configure:** Copy the example file, then set `MEMORY_API_KEY` to your [NAMS key](#set-up-the-nams-key) and `DATABRICKS_CONFIG_PROFILE` to your profile.
 
    ```bash
-   databricks current-user me -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .userName
+   cp .env.example .env
+   ```
+
+3. **Save the NAMS key in Databricks:** This saves `MEMORY_API_KEY` from `.env` as the Databricks secret `nams/memory-api-key`.
+
+   ```bash
+   make secrets
+   ```
+
+4. **Trust your user:** Add your Databricks user email to `MEMORY_TRUSTED_CALLERS` in `app.yaml`, and separate the values with commas. Laptop traffic calls the app as you, and the app honors the synthetic analyst ids only from trusted callers. Otherwise it saves every turn under your own user. The checked-in values belong to this repo's workspace, so replace them with your own. The command prints your email.
+
+   ```bash
+   databricks current-user me -p <your-profile> -o json | jq -r .userName
    ```
 
    ```yaml
@@ -98,34 +96,34 @@ Where each command reads the NAMS key:
    ```
 
    The match is exact, so copy the email as printed. Leave out `<SP_CLIENT_ID>` if you do not run traffic as a Databricks Job.
-4. **Deploy:** The deploy name `neo4j-graph-agent` becomes the app `agent-bricks-neo4j-graph-agent`, because Agent Bricks adds the `agent-bricks-` prefix. App names can have at most 30 characters, and the prefix uses 13, so the deploy name can have at most 17. The `export` command saves the app URL in `APP_URL` for the traffic commands.
+5. **Deploy:** This deploys the app `agent-bricks-neo4j-graph-agent` and prints its URL. On the first deploy, it also attaches the NAMS key and deploys again.
 
    ```bash
-   agentbricks deploy neo4j-graph-agent
-   agentbricks deployments get agent-bricks-neo4j-graph-agent   # URL and status
-   export APP_URL=$(databricks apps get agent-bricks-neo4j-graph-agent \
-     -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .url)
-   echo "$APP_URL"
+   make deploy
    ```
 
-   Or run `make deploy`. It prints the app URL but does not export `APP_URL`. `make traffic` looks the URL up on its own.
-5. **Attach the NAMS key:** On the first deploy, do steps 4 and 5 of [Set up the NAMS key](#set-up-the-nams-key).
-6. **Test the deployed app:** Use a new `id` for every request. Reuse `session_id` to continue a conversation.
+6. **Grant Genie access:** This grants the app what Genie needs to run its SQL. Run it once after the first deploy. It is safe to run again, and `make grant-genie DRY_RUN=1` only prints the grants.
 
    ```bash
-   SESSION_ID=$(uuidgen)
-   agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" endpoint invoke agent-bricks-neo4j-graph-agent \
-     --path /api/invocations --routing-key "$SESSION_ID" \
-     --json '{"id":"'$(uuidgen)'","session_id":"'$SESSION_ID'","input":[{"role":"user","content":"What does the SIMILAR_TO relationship mean?"}]}'
-   agentbricks deployments logs agent-bricks-neo4j-graph-agent
+   make grant-genie
    ```
 
-   Or run `make smoke`, then `make logs`. `make smoke` starts a new session each time.
-7. **Fill NAMS with traffic:** This step is optional. [Generate traffic](docs/traffic.md) sends fake analyst conversations through the app, from your laptop or as a Databricks Job.
+7. **Test:** `make smoke` asks the app one question in a new session. `make logs` streams the app logs until you press Ctrl-C. Set another question with `make smoke QUESTION="..."`.
+
+   ```bash
+   make smoke
+   make logs
+   ```
+
+8. **Fill NAMS with traffic:** This step is optional. It sends 24 fake analyst turns through the app. [Generate traffic](docs/traffic.md) covers larger runs and the Databricks Job.
+
+   ```bash
+   make traffic
+   ```
 
 ## Demo script
 
-Ask each question with the `invoke` command from step 6 of [Deploy and try](#deploy-and-try), and put the question in `content`. Keep the same `SESSION_ID` unless a step says to start a new one. You can also run `make smoke QUESTION="..."`. It starts a new session for every question, so ask the step 1 extra beat with the raw command in the same session. The evidence is the ids and the spans in the MLflow trace, not the exact answer text.
+Ask each question with the `invoke` command that `make smoke` runs, shown in [What the make targets run](docs/reference.md#what-the-make-targets-run), and put the question in `content`. Keep the same `SESSION_ID` unless a step says to start a new one. You can also run `make smoke QUESTION="..."`. It starts a new session for every question, so ask the step 1 extra beat with the raw command in the same session. The evidence is the ids and the spans in the MLflow trace, not the exact answer text.
 
 1. **Shared phone:** Ask "Which customers share phone 312-555-0142, and which accounts do they own?" Several customers share this phone. Look for Accounts 368, 927, 1033, and 1696 and a `read_neo4j_cypher` span. For an extra beat, ask which community those accounts are in. Look for Community 8174.
 2. **Hub:** Ask "I focus on hub accounts. Is Account 15940 a hub, and which community is it in?" Look for Community 19766 and a `read_neo4j_cypher` span.
@@ -140,7 +138,7 @@ Ask each question with the `invoke` command from step 6 of [Deploy and try](#dep
 
 Run the agent on your laptop with memory on. This path uses two terminal windows, because the server keeps running.
 
-1. **Install and sign in:** Do step 1 of [Deploy and try](#deploy-and-try).
+1. **Install and sign in:** Do step 1 of [Quick start with make](#quick-start-with-make).
 2. **Set up the NAMS key:** Do steps 1 and 2 of [Set up the NAMS key](#set-up-the-nams-key).
 3. **Start the server (window 1):** Export `MEMORY_API_KEY` in this shell. `agentbricks dev` reads the NAMS key only from the shell, and it stops with an error if the key is missing.
 

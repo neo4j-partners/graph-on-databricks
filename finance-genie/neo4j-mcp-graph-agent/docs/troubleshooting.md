@@ -46,7 +46,7 @@
      -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}'
    ```
 
-4. **Invoke the agent:** Run the `agentbricks endpoint invoke` command from step 6 of [Deploy and try](../README.md#deploy-and-try) again. The app reads the service on every request, so it needs no redeploy.
+4. **Invoke the agent:** Run `make smoke` from step 7 of [Quick start with make](../README.md#quick-start-with-make) again. The app reads the service on every request, so it needs no redeploy.
 
 **Notes:**
 - **Repeat after each fresh stack:** Every fresh MCP server stack has a new gateway ID and OAuth client, so repeat these steps each time. A redeploy onto the existing stack needs none of them.

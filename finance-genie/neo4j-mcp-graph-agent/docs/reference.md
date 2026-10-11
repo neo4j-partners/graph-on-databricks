@@ -1,5 +1,53 @@
 # Reference
 
+## What the make targets run
+
+Each make target wraps the commands below. Run them from `neo4j-mcp-graph-agent/` with `DATABRICKS_CONFIG_PROFILE` exported in your shell. The make targets read it from `.env` instead.
+
+- **`make secrets`:** This target runs `setup_secrets.sh`. The script creates the secret scope `nams` if needed and writes `MEMORY_API_KEY` from `.env` as the key `memory-api-key`.
+
+  ```bash
+  ./setup_secrets.sh --profile "$DATABRICKS_CONFIG_PROFILE"
+  ```
+
+- **`make deploy`:** This target deploys the app and shows its status. The deploy name `neo4j-graph-agent` becomes the app `agent-bricks-neo4j-graph-agent`, because Agent Bricks adds the `agent-bricks-` prefix. App names can have at most 30 characters, and the prefix uses 13, so the deploy name can have at most 17. Then `scripts/attach_nams_key.py` adds the `nams-api-key` resource if the app lacks it. The script exits with code 3 when it adds the resource, and the app is deployed again so it picks up the key. Later deploys skip that second deploy.
+
+  ```bash
+  agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deploy neo4j-graph-agent
+  uv run python scripts/attach_nams_key.py --profile "$DATABRICKS_CONFIG_PROFILE" \
+    --app agent-bricks-neo4j-graph-agent      # exit code 3 means it added the resource
+  agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deploy neo4j-graph-agent   # only after exit code 3
+  agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deployments get agent-bricks-neo4j-graph-agent
+  export APP_URL=$(databricks apps get agent-bricks-neo4j-graph-agent \
+    -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .url)
+  ```
+
+  `make deploy` prints the app URL but does not export `APP_URL`. `make traffic` looks the URL up on its own.
+- **`make grant-genie`:** This target runs `scripts/grant_genie.py`. The script reads the Genie space id from the `genie` tool block in `agent.toml`. It grants the app's service principal `CAN_USE` on the space's SQL warehouse. It also grants `USE_CATALOG`, `USE_SCHEMA`, and `SELECT` on the schema that holds the space's tables. It prints each grant and skips a grant the principal already has. `DRY_RUN=1` adds `--dry-run`, which only prints the grants.
+
+  ```bash
+  uv run python scripts/grant_genie.py --profile "$DATABRICKS_CONFIG_PROFILE" \
+    --app agent-bricks-neo4j-graph-agent
+  ```
+
+- **`make smoke`:** This target asks the app one question in a new session. Use a new `id` for every request. Reuse `session_id` to continue a conversation.
+
+  ```bash
+  SESSION_ID=$(uuidgen)
+  agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" endpoint invoke agent-bricks-neo4j-graph-agent \
+    --path /api/invocations --routing-key "$SESSION_ID" \
+    --json '{"id":"'$(uuidgen)'","session_id":"'$SESSION_ID'","input":[{"role":"user","content":"What does the SIMILAR_TO relationship mean?"}]}'
+  ```
+
+- **`make logs`:** This target streams the app logs until you press Ctrl-C.
+
+  ```bash
+  agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deployments logs agent-bricks-neo4j-graph-agent
+  ```
+
+- **`make traffic`:** This target runs the laptop traffic in [Generate traffic](traffic.md#run-it-from-your-laptop), without the dry run. Change the size with `USERS=`, `SESSIONS=`, and `TURNS=`.
+- **Ontology targets:** `make export`, `replay`, `snapshot LABEL=`, `apply-ontology`, and `compare` run the steps in [Run the ontology example](ontology-experiment.md#run-the-before-and-after-comparison). Each step there shows its raw command.
+
 ## Configuration
 
 | Setting | Where to change it | Default |
@@ -71,7 +119,7 @@ runtime/            DurableAgentServer entrypoint, adapter, and memory identity 
 tests/              guardrail, runtime and identity, memory, ontology, and drift check tests
 traffic/            synthetic analyst traffic CLI and its Databricks Job bundle
 ontology/           NAMS ontology, loader, measurement, and transcript replay scripts
-scripts/            drift check of the prompt and scenarios against the live graph
+scripts/            drift check, NAMS key attach, and Genie grants
 ```
 
 ## Notes

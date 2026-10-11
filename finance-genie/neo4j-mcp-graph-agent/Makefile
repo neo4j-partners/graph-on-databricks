@@ -1,4 +1,4 @@
-# One-command wrappers around the commands in README.md and docs/traffic.md.
+# One-command wrappers. docs/reference.md lists the raw command behind each target.
 # Set DATABRICKS_CONFIG_PROFILE in .env or in your shell. A shell value wins.
 
 ifndef DATABRICKS_CONFIG_PROFILE
