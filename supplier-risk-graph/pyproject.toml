@@ -16,7 +16,7 @@ dependencies = [
     # combination the client never claimed to support.
     "neo4j>=5.28,<7",
     "python-dotenv>=1.1",
-    "graphdatascience>=1.12,<2",
+    "graphdatascience>=1.12,<3",
     "pandas>=2.0",
     "databricks-sdk>=0.20",
 ]
