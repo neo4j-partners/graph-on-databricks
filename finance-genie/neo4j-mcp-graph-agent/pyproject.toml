@@ -28,6 +28,7 @@ dev = [
 ]
 
 [tool.uv]
+exclude-newer = "7 days"
 default-groups = ["dev"]
 
 [tool.pytest.ini_options]

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 900" font-family="'Inter','Segoe UI','Helvetica Neue',Arial,sans-serif">
+  <defs>
+    <marker id="ah-dark" markerWidth="12" markerHeight="12" refX="8.5" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <marker id="ah-purple" markerWidth="12" markerHeight="12" refX="8.5" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b34c4"/>
+    </marker>
+    <marker id="ah-gray" markerWidth="12" markerHeight="12" refX="8.5" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8f98"/>
+    </marker>
+    <marker id="ah-orange" markerWidth="12" markerHeight="12" refX="8.5" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e0850f"/>
+    </marker>
+    <filter id="softshadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#101828" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1560" height="900" fill="#ffffff"/>
+
+  <!-- ===================== legend (top) ===================== -->
+  <rect x="465" y="44" width="630" height="84" rx="12" fill="#ffffff" stroke="#d0d5dd" stroke-width="1.5" filter="url(#softshadow)"/>
+  <!-- node color key -->
+  <circle cx="575" cy="68" r="11" fill="#7fd6a0" stroke="#2f9e57" stroke-width="2"/>
+  <text x="593" y="74" font-size="17" fill="#475467">Short-Term</text>
+  <circle cx="739" cy="68" r="11" fill="#f7c65a" stroke="#e0850f" stroke-width="2"/>
+  <text x="757" y="74" font-size="17" fill="#475467">Long-Term</text>
+  <circle cx="889" cy="68" r="11" fill="#c9aef2" stroke="#8b34c4" stroke-width="2"/>
+  <text x="907" y="74" font-size="17" fill="#475467">Reasoning</text>
+  <!-- edge style key -->
+  <line x1="485" y1="104" x2="515" y2="104" stroke="#333" stroke-width="2.5"/>
+  <text x="523" y="110" font-size="15" fill="#475467">Sequence</text>
+  <line x1="615" y1="104" x2="645" y2="104" stroke="#8b34c4" stroke-width="2.8"/>
+  <text x="653" y="110" font-size="15" fill="#475467">Reasoning</text>
+  <line x1="755" y1="104" x2="785" y2="104" stroke="#8a8f98" stroke-width="2.2" stroke-dasharray="9 6"/>
+  <text x="793" y="110" font-size="15" fill="#475467">Reference</text>
+  <line x1="895" y1="104" x2="925" y2="104" stroke="#e0850f" stroke-width="2.4" stroke-dasharray="2 6" stroke-linecap="round"/>
+  <text x="933" y="110" font-size="15" fill="#475467">Attribute</text>
+
+  <!-- ===================== Neo4j Agent Memory graph ===================== -->
+  <g transform="translate(0,70)">
+    <!-- ===== section headers ===== -->
+    <text x="34" y="252" font-size="27" font-weight="600" fill="#2e9e57">Short-Term Memory</text>
+    <text x="1526" y="58" text-anchor="end" font-size="27" font-weight="600" fill="#e0850f">Long-Term Memory</text>
+    <text x="720" y="798" text-anchor="middle" font-size="27" font-weight="600" fill="#8b34c4">Reasoning Memory</text>
+
+    <!-- ===== edges ===== -->
+    <!-- FIRST_MESSAGE: Conversation -> MessageA -->
+    <line x1="262" y1="330" x2="376" y2="330" stroke="#333" stroke-width="2.5" marker-end="url(#ah-dark)"/>
+    <text x="319" y="316" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#475467">FIRST_MESSAGE</text>
+    <!-- NEXT_MESSAGE: MessageA -> MessageB -->
+    <line x1="582" y1="330" x2="698" y2="330" stroke="#333" stroke-width="2.5" marker-end="url(#ah-dark)"/>
+    <text x="640" y="316" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#475467">NEXT_MESSAGE</text>
+    <!-- NEXT_MESSAGE: MessageB -> MessageC -->
+    <line x1="902" y1="330" x2="978" y2="330" stroke="#333" stroke-width="2.5" marker-end="url(#ah-dark)"/>
+    <text x="940" y="392" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#475467">NEXT_MESSAGE</text>
+
+    <!-- TRIGGERED: MessageA -> ReasoningTrace -->
+    <line x1="452" y1="371" x2="410" y2="596" stroke="#8b34c4" stroke-width="2.8" marker-end="url(#ah-purple)"/>
+    <text x="360" y="490" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#8b34c4">TRIGGERED</text>
+    <!-- HAS_STEP: ReasoningTrace -> ReasoningStep -->
+    <line x1="502" y1="640" x2="618" y2="640" stroke="#333" stroke-width="2.5" marker-end="url(#ah-dark)"/>
+    <text x="560" y="626" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#475467">HAS_STEP</text>
+    <!-- USED_TOOL: ReasoningStep -> ToolCall -->
+    <line x1="822" y1="640" x2="938" y2="640" stroke="#333" stroke-width="2.5" marker-end="url(#ah-dark)"/>
+    <text x="880" y="626" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#475467">USED_TOOL</text>
+    <!-- CALL_OF: ToolCall -> Tool -->
+    <line x1="1138" y1="656" x2="1252" y2="704" stroke="#333" stroke-width="2.5" marker-end="url(#ah-dark)"/>
+    <text x="1200" y="660" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#475467">CALL_OF</text>
+
+    <!-- MENTIONED_IN: Person -> MessageB (dashed) -->
+    <line x1="1156" y1="158" x2="888" y2="298" stroke="#8a8f98" stroke-width="2.2" stroke-dasharray="9 6" marker-end="url(#ah-gray)"/>
+    <text x="1012" y="192" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#667085">MENTIONED_IN</text>
+    <!-- WORKS_AT: Person -> Organization (dotted orange) -->
+    <line x1="1268" y1="170" x2="1322" y2="284" stroke="#e0850f" stroke-width="2.4" stroke-dasharray="2 6" stroke-linecap="round" marker-end="url(#ah-orange)"/>
+    <text x="1338" y="228" font-size="15" letter-spacing="0.4" fill="#c9740a">WORKS_AT</text>
+    <!-- RETRIEVED: ToolCall -> Organization (dashed) -->
+    <line x1="1122" y1="608" x2="1298" y2="370" stroke="#8a8f98" stroke-width="2.2" stroke-dasharray="9 6" marker-end="url(#ah-gray)"/>
+    <text x="1178" y="465" text-anchor="middle" font-size="15" letter-spacing="0.4" fill="#667085">RETRIEVED</text>
+
+    <!-- ===== nodes ===== -->
+    <!-- Short-term (green) -->
+    <g filter="url(#softshadow)">
+      <ellipse cx="160" cy="330" rx="100" ry="42" fill="#7fd6a0" stroke="#2f9e57" stroke-width="2.5"/>
+      <ellipse cx="480" cy="330" rx="100" ry="42" fill="#7fd6a0" stroke="#2f9e57" stroke-width="2.5"/>
+      <ellipse cx="800" cy="330" rx="100" ry="42" fill="#7fd6a0" stroke="#2f9e57" stroke-width="2.5"/>
+      <ellipse cx="1080" cy="330" rx="100" ry="42" fill="#7fd6a0" stroke="#2f9e57" stroke-width="2.5"/>
+    </g>
+    <text x="160" y="337" text-anchor="middle" font-size="20" font-weight="500" fill="#14432a">Conversation</text>
+    <text x="480" y="337" text-anchor="middle" font-size="20" font-weight="500" fill="#14432a">Message</text>
+    <text x="800" y="337" text-anchor="middle" font-size="20" font-weight="500" fill="#14432a">Message</text>
+    <text x="1080" y="337" text-anchor="middle" font-size="20" font-weight="500" fill="#14432a">Message</text>
+
+    <!-- Long-term (orange) -->
+    <g filter="url(#softshadow)">
+      <ellipse cx="1240" cy="130" rx="104" ry="42" fill="#f7c65a" stroke="#e0850f" stroke-width="2.5"/>
+      <ellipse cx="1330" cy="330" rx="112" ry="44" fill="#f7c65a" stroke="#e0850f" stroke-width="2.5"/>
+    </g>
+    <text x="1240" y="137" text-anchor="middle" font-size="18" font-weight="500" fill="#5a3800">Entity:Person</text>
+    <text x="1330" y="337" text-anchor="middle" font-size="18" font-weight="500" fill="#5a3800">Entity:Organization</text>
+
+    <!-- Reasoning (purple) -->
+    <g filter="url(#softshadow)">
+      <ellipse cx="400" cy="640" rx="100" ry="42" fill="#c9aef2" stroke="#8b34c4" stroke-width="2.5"/>
+      <ellipse cx="720" cy="640" rx="100" ry="42" fill="#c9aef2" stroke="#8b34c4" stroke-width="2.5"/>
+      <ellipse cx="1040" cy="640" rx="100" ry="42" fill="#c9aef2" stroke="#8b34c4" stroke-width="2.5"/>
+      <ellipse cx="1350" cy="710" rx="106" ry="44" fill="#c9aef2" stroke="#8b34c4" stroke-width="2.5"/>
+    </g>
+    <text x="400" y="647" text-anchor="middle" font-size="20" font-weight="500" fill="#3a1f5c">ReasoningTrace</text>
+    <text x="720" y="647" text-anchor="middle" font-size="20" font-weight="500" fill="#3a1f5c">ReasoningStep</text>
+    <text x="1040" y="647" text-anchor="middle" font-size="20" font-weight="500" fill="#3a1f5c">ToolCall</text>
+    <text x="1350" y="717" text-anchor="middle" font-size="20" font-weight="500" fill="#3a1f5c">Tool</text>
+  </g>
+</svg>

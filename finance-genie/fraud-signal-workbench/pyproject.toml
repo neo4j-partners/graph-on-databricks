@@ -53,3 +53,6 @@ version = "{version}"
 [tool.hatch.build]
 artifacts = ["src/graph_fraud_analyst/__dist__", "src/graph_fraud_analyst/_metadata.py"]
 exclude = ["src/graph_fraud_analyst/ui"]
+
+[tool.uv]
+exclude-newer = "7 days"

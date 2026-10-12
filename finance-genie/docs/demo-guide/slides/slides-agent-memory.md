@@ -68,13 +68,22 @@ table {
 
 # Agents That Remember What the Team Learned
 
-Agent Bricks, Neo4j, Genie, and Neo4j Agent Memory
+**Databricks:** Agent Bricks, Genie, Databricks Apps, and MLflow Tracing
+
+**Neo4j:** AuraDB, the Neo4j MCP server, and the Neo4j Agent Memory Service
 
 <!--
-The fraud graph answers structure. Genie answers values. Memory
-carries findings from one analyst to the next. That is the whole
-talk in three sentences. The rest of the deck shows each part
-working and then shows what an ontology changes about the memory.
+The talk builds and deploys an Agent Bricks agent that reads the
+fraud graph through the Neo4j MCP service and remembers through the
+Neo4j Agent Memory Service, NAMS for short. That gives two graphs: a
+domain graph and a memory graph. Once both exist, Genie One can use
+the same two MCP servers to answer natural language questions. The
+ontology section at the end shows what typing the memory graph
+changes.
+
+Product names were checked in October 2026. Genie Agents were called
+Genie Spaces until July 2026, so say "Genie Agent" on stage even
+though the repo and the API still say "space".
 -->
 
 ---
@@ -89,7 +98,8 @@ working and then shows what an ontology changes about the memory.
 
 <!--
 Set up the problem in human terms before any architecture. The
-Monday and Wednesday analysts come back on slide 11, where the
+Monday and Wednesday analysts come back on the slide "Demo: One
+Analyst's Finding Reaches Another", where the
 second analyst gets the first analyst's finding without re-running
 it. Hold the last line: session history and team knowledge are
 different things, and this deck is about the second one.
@@ -97,100 +107,188 @@ different things, and this deck is about the second one.
 
 ---
 
-## Recap: The Fraud Graph and the Gold Columns
+## Demo Use Case: A Fraud Graph
 
-- Accounts connect through transfers, merchants, phones, and addresses.
-- Neo4j GDS writes `risk_score`, `community_id`, and `similarity_score` into Gold tables.
-- Genie queries those columns like any other dimension.
-- The new module adds an agent on top of both the graph and the Gold tables.
+- **A synthetic banking network.** Accounts, customers, merchants, phones, and addresses.
+- **Money moves between accounts.** `TRANSFERRED_TO` carries the amount.
+- **Customers link to phones and addresses.** A shared one ties identities together.
+- **A fraud ring is a dense community of accounts.** Graph analysis scores each account with `community_id` and `risk_score`.
+
+```
+(Customer)-[:OWNS]->(Account)-[:TRANSFERRED_TO]->(Account)
+(Customer)-[:HAS_PHONE]->(Phone)   (Account)-[:TRANSACTED_WITH]->(Merchant)
+```
 
 <!--
-One slide of recap for people who have not seen the enrichment
-deck. The full pipeline is in slides.md and slides-15min.md in
-this folder. The point to land: the graph and the Gold tables
-already exist, and the agent is a new consumer of both.
+The audience has not seen the other finance-genie decks, so this
+is the only introduction to the data. Stay on the graph model: five
+node labels and the relationships that connect them. There is no
+fraud label. A ring candidate is a community of 50 to 200 accounts
+with a high average risk score, and the agent treats that as a
+signal, not a verdict. The pipeline that builds the graph and
+writes the scores is in slides.md, and it is not needed here.
 -->
 
 ---
 
 ## Architecture
 
-![bg right:58% contain](./architecture.svg)
-
-- A Databricks App runs the agent on Agent Bricks.
-- The agent reads Neo4j through a Unity Catalog MCP service.
-- The agent asks a Genie space for values over the Gold Delta tables.
+- **A Databricks App runs the agent on Agent Bricks.** The Agent Bricks CLI deploys it.
+- **The agent reads the fraud graph through a Unity Catalog MCP service.** The service wraps the Neo4j MCP server and allows read-only Cypher.
+- **The agent asks a Genie Agent for values over the Gold Delta tables.**
+- **An AI Gateway model writes the answer.** Any chat model can be set.
+- **The Neo4j Agent Memory Service stores each turn.** It keeps conversations, reasoning traces, and entities.
+- **Agent Bricks keeps the session history and the MLflow traces.** Every model call and tool call is recorded.
 
 <!--
-The diagram carries the rest: NAMS stores conversations, reasoning
-traces, and entities, and MLflow tracing records every model call
-and tool call. The agent itself is an OpenAI Agents SDK loop with
-two read-only graph tools and the Genie tools. The NAMS key lives
-in a secret scope that the app reads as MEMORY_API_KEY.
+The agent itself is an OpenAI Agents SDK loop with two read-only
+graph tools, get_neo4j_schema and read_neo4j_cypher, and the Genie
+tools. The Genie tools are OpenAI Agents SDK function tools built
+by genie_tools() in agent/agent.py, not MCP tools, so the Cypher
+guardrails and the MCP allowlist do not apply to them. They run
+with auth = "app", so Genie executes its SQL as the app's service
+principal, not as the analyst. The caller sends messages, and in the deployed app the
+identity comes from the Databricks Apps proxy. The NAMS key lives
+in the secret scope nams, and the app reads it as MEMORY_API_KEY.
+The next slide is the diagram of the same parts.
 -->
 
 ---
 
-## Structure to the Graph, Values to Genie
-
-<div class="columns">
-<div>
-
-- **Structure questions go to read-only Cypher.** An example is "Which customers share this phone number?"
-- **Value questions go to Genie.** An example is "What is the average balance by region?"
-- **Mixed questions use both in order.** The graph finds the account ids, and Genie gets those ids in its question.
-- **The MLflow trace shows each call.** A `read_neo4j_cypher` span covers the graph, and a `genie_ask` span covers Genie.
-
-</div>
-<div class="placeholder">
-<strong>PLACEHOLDER: MLflow trace screenshot</strong>
-Demo step 5. One trace with a span ending in <code>read_neo4j_cypher</code> followed by a <code>genie_ask</code> span. Replace with <code>./mlflow-trace-step5.png</code>.
-</div>
-</div>
+![bg contain](./architecture.svg)
 
 <!--
-This routing is what makes the two sources better together. The
-system prompt tells the agent which kind of question goes where.
-Demo step 5 is the mixed case: which phone numbers are shared by
-more than one customer, and what are the balances and 30-day
-transaction counts of those accounts. The Genie question names the
-account ids that the graph found. The Gateway adds a prefix to the
-tool name, so the full span name ends in read_neo4j_cypher.
+Walk it left to right. The caller sends a question to the app. The
+app recalls memory from NAMS, runs the agent, and the agent reads
+the graph through the MCP service and the Gold tables through the
+Genie Agent. The answer goes back to the caller, and then the app
+writes the turn to NAMS. Agent Bricks keeps the session store and
+the MLflow traces on its own.
 -->
 
 ---
 
-## Two Kinds of Memory, One Turn
+## What the Agent Shows
 
-![bg left:45% contain](./nams-flow.svg)
+- **Build an agent on Agent Bricks and deploy it as a Databricks App.**
+- **Give it the fraud graph through the Neo4j MCP service.** Unity Catalog governs the read-only Cypher.
+- **Give it memory through the Neo4j Agent Memory Service.** Every turn is saved and recalled.
+- **Route structure to the graph and values to Genie.** The system prompt sends totals and averages to the Genie Agent.
+- **The result is two graphs.** One holds the domain, and one holds the memory.
 
-- **Short-term memory is one analyst's stored conversations.** The app reads the two latest before each turn.
-- **Long-term memory is the entity graph in NAMS.** Every analyst's conversations feed it.
+<!--
+This is the point of the module, and it is the point to land
+before any demo. The agent is the vehicle for showing how an Agent
+Bricks agent gets a graph through an MCP service and gets memory
+through NAMS. Genie answers the value questions. The system prompt
+in agent/prompt.py sends communities, paths, hubs, and shared
+phones to the graph tools, and totals, averages, counts, and
+breakdowns to Genie. A mixed question finds the ids in the graph
+first, then asks Genie about those ids. The story is that the
+agent ends up with two graphs, and the next slide puts them side
+by side.
+-->
+
+---
+
+## Two Graphs: Domain and Memory
+
+| | Domain graph | Memory graph |
+|---|---|---|
+| **Holds** | Accounts, customers, merchants, phones, addresses | Conversations, reasoning traces, entities |
+| **Built by** | The enrichment pipeline and Neo4j GDS | NAMS, from what the agent saves |
+| **Reached through** | The Neo4j MCP service | The NAMS API, or NAMS as an MCP service |
+| **Answers** | Who connects to whom | What the team already found |
+
+<!--
+The domain graph was modeled and loaded on purpose. The memory
+graph was not modeled at all. It fell out of storing conversations,
+and NAMS extracted the entities on its own servers. Both are Neo4j
+graphs, and both are reachable through MCP. Backup slide B5 shows
+NAMS registered as a Unity Catalog MCP service, which is what lets
+Genie One reach the memory graph later in the deck. The ontology
+section at the end is about typing the memory graph.
+-->
+
+---
+
+![bg contain](./neo4j-agent-memory-diagram.svg)
+
+<!--
+The diagram labels its own three parts, so this slide has no title.
+Say them: short-term memory is each conversation as a chain of
+messages, long-term memory is the entities extracted from those
+messages with links back to them, and reasoning memory is a trace
+of the agent's steps and tool calls. All three live in one graph,
+so a message links to the entities it mentions and to the reasoning
+it triggered. The next slide is what this app does with each part.
+
+Source: https://github.com/neo4j-labs/agent-memory
+-->
+
+---
+
+## How the Agent Uses Each Part
+
+- **Short-term memory belongs to one analyst.** Before each turn, the app reads that analyst's two latest conversations.
+- **Long-term memory belongs to the team.** Every analyst's conversations feed the entity graph, and the app searches it for the entities a prompt names.
+- **Reasoning memory is written, not read.** A turn with tool calls saves one trace with a step per tool call.
 - **Agent Bricks keeps one session's history.** NAMS holds what outlives the session.
-- **Recall goes into the agent's instructions, not its input.** The session store does not save it again.
-- **After the reply, the app writes the turn to NAMS.** One conversation holds two messages and, when tools ran, a reasoning trace.
 
 <!--
-Walk the diagram left to right. Recall first: the app lists the
-analyst's conversations and reads the latest two, and it searches
-the entity graph for the terms the prompt names. Then the agent
-runs with that text in its instructions as background. Then the
-app answers the caller. Then it writes the turn to NAMS. Agent
-Bricks keeps the session history and the MLflow traces on its own,
-which is why recall stays out of the message input.
+The diagram before this showed what NAMS stores. This slide is what
+the app does with each part, and the new point is scope. Short-term
+recall is filtered to one analyst. Long-term recall reads a graph
+that every analyst's conversations built. Reasoning traces are
+saved for the NAMS console and are not recalled by the agent. The
+session store and the MLflow traces stay with Agent Bricks, so NAMS
+only holds what has to outlive the session.
+-->
+
+---
+
+## Memory Flow in One Turn
+
+1. **Recall:** The app reads the analyst's recent conversations and the matching entities from NAMS.
+2. **Run:** The agent runs with the recalled text in its instructions, not in its input.
+3. **Reply:** The caller gets the answer before any memory write.
+4. **Write:** The app saves the turn as one conversation with two messages and a reasoning trace.
+
+- **A slow or missing NAMS never blocks the answer.**
+
+<!--
+Recall goes into the instructions because Agent Bricks saves the
+message input to its session store, and the recalled text should
+not be saved twice. The write happens after the reply, so the
+caller never waits on NAMS. Recall waits at most 10 seconds and
+adds at most 2000 characters. A recovery run reads memory but does
+not write, so a replayed turn is not saved twice. The next slide
+is the sequence diagram of the same four steps.
+-->
+
+---
+
+![bg contain](./nams-flow.svg)
+
+<!--
+Walk the diagram top to bottom. The caller sends the question and
+the user id. The TurnMemory lists the analyst's conversations in
+NAMS and reads the latest two. The agent runs with that text. The
+app returns the answer, then flushes the buffered tool calls and
+answer to NAMS as a conversation, two messages, and a trace.
 -->
 
 ---
 
 ## What Gets Saved, and What Does Not
 
-<div class="columns">
+<div class="columns small">
 <div>
 
 - **The stored answer drops Cypher code fences and MCP tool names.** Without that cleanup, NAMS would extract them as entities.
 - **The reasoning trace keeps one plain-sentence step per tool call.** The query text stays out.
 - **The MLflow trace keeps the full Cypher.** That is where debugging happens.
-- **The system prompt fixes the id format.** Ids are written as "Account <id>" and "Community <id>", so extracted names stay consistent.
+- **The system prompt fixes the id format.** Extracted names stay consistent.
 
 </div>
 <div class="placeholder">
@@ -203,7 +301,8 @@ One analyst's conversations, one reasoning trace, and the entities NAMS found. R
 NAMS extracts entities from whatever it stores, so what the app
 writes decides what the memory graph contains. A trace step reads
 like "The agent queried the graph database." Ids, scores, and
-counts stay in the answer text. The NAMS console on the right is
+counts stay in the answer text, and the prompt writes them as
+"Account <id>" and "Community <id>" every time. The NAMS console on the right is
 what an analyst sees: each question as its own conversation, with
 its messages, its trace, and the entities extracted from it.
 -->
@@ -320,6 +419,8 @@ to. Backup slide B3 shows the full list.
 
 ## Each Type Says What It Is and What It Is Not
 
+**The Community type:**
+
 > A Louvain community of accounts found by graph analysis, identified by a numeric id such as 'Community 24683'. Not an organization, a team, or an identity cluster.
 
 - **A Customer is an account holder.** It is not an analyst and not the bank's own staff.
@@ -386,9 +487,7 @@ B2 has the rest of the rows.
 
 ## What the Ontology Changes in Long-Term Memory
 
-- **Recall finds an entity by name with or without the ontology.**
-- **What changes is what comes back with it.** It returns the type, and the description the extractor wrote under that type's guidance.
-- **"Community 3040 (Community)" with a description of the investigation tells the model more than "Community 3040 (Object)".**
+- **Recall finds an entity by name either way. The ontology changes what comes back with it.** It returns the type, and the description the extractor wrote under that type's guidance.
 - **Fewer type conflicts mean fewer cases where one name is split across types.** That split is what makes a keyword search return the wrong node.
 - **Typed relationships make the memory graph queryable by people.** A person can ask who investigates a community, or which team an analyst is on.
 - **The agent's recall sees names, types, and descriptions.** It does not see relationships.
@@ -397,7 +496,9 @@ B2 has the rest of the rows.
 This is the honest version of "why the ontology matters". It does
 not make recall find more. It changes what a found entity says
 about itself, and it makes the graph legible to a human running a
-query. The typed relationships are read through GET
+query. The example to say aloud: "Community 3040 (Community)" with
+a description of the investigation tells the model more than
+"Community 3040 (Object)". The typed relationships are read through GET
 /v1/entities/graph, which ontology/measure_ingestion.py uses for
 the gold rel typed rows. The who-shares query does not need them.
 Duplicates got worse in the reference run. The comparison shows
@@ -416,9 +517,30 @@ change, not cause.
 <!--
 NAMS entity search matches keywords, so the app pulls short terms
 such as "Community 3040" out of the prompt instead of searching
-the full sentence. The duplicates are why slide 10 uses make
-who-shares to find the merged entity instead of searching by name. The async lag is why turn 1 of that demo runs before the
-talk.
+the full sentence. The duplicates are why "The Entity Graph
+Belongs to the Team" uses make who-shares to find the merged
+entity instead of searching by name. The async lag is why turn 1
+of that demo runs before the talk.
+-->
+
+---
+
+## Genie One Asks the Same Two Graphs
+
+- **Both graphs are Unity Catalog MCP services.** The Neo4j MCP service exists, and backup slide B5 adds NAMS as one.
+- **Genie One calls MCP services as tools.** A business user asks in plain English with no agent code.
+- **The domain graph answers structure.** Which customers share a phone, and which community is an account in?
+- **The memory graph answers history.** What was I investigating last time?
+- **Unity Gateway governs both.** Each MCP call is logged like any other tool.
+
+<!--
+This is the payoff of building two graphs. The agent was the first
+consumer. Once both graphs sit behind Unity Catalog MCP services,
+Genie One can reach them without the agent. The Neo4j MCP server
+has been added to Genie One before. NAMS with Genie One was marked
+untested in the Databricks overview deck, so test it before the
+talk, or show the NAMS tools through the Playground as backup
+slide B5 describes.
 -->
 
 ---
@@ -428,7 +550,7 @@ talk.
 <div class="columns">
 <div>
 
-- **The agent sends structure to the graph and values to Genie.** Every call shows in MLflow.
+- **One agent on Agent Bricks reads two graphs.** The domain graph comes through the Neo4j MCP service, and the memory graph through NAMS.
 - **Short-term memory carries one analyst across sessions.**
 - **Long-term memory is a graph.** It carries findings across analysts.
 - **An ontology types that graph.** It adds finance types and relationships.
@@ -464,7 +586,7 @@ The following slides cover the demo steps, the metric definitions, the full onto
 | 1. Shared phone | Which customers share phone 312-555-0142, and which community are their accounts in? | Accounts 368, 927, 1033, and 1696, then Community 8174. A span ending in `read_neo4j_cypher`. |
 | 2. Hub | Is Account 15940 a hub, and which community is it in? | Community 19766. A span ending in `read_neo4j_cypher`. |
 | 3. Recall | What was I looking at last time? | Account 15940, in a new session. |
-| 4. Genie value | Average balance by region and account type. | A `genie_ask` span, then a `genie_query_result` span. |
+| 4. Genie value | What is the average balance by region and account type? | A `genie_ask` span, then a `genie_query_result` span. |
 | 5. Graph and Genie | Which phones are shared, and what are those accounts' balances and 30-day counts? | A `read_neo4j_cypher` span, then a `genie_ask` span that names the account ids. |
 
 <!--
@@ -504,8 +626,8 @@ latest traces and check the spans yourself.
 
 <!--
 Left column: the definitions from "What the metrics mean" in
-ontology-experiment.md. Right column: the rows that slide 15
-leaves out. All numbers are from the one reference run.
+ontology-experiment.md. Right column: the rows that the results
+slide leaves out. All numbers are from the one reference run.
 -->
 
 ---

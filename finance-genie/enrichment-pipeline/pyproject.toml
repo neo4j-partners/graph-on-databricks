@@ -16,6 +16,7 @@ dependencies = [
 ]
 
 [tool.uv]
+exclude-newer = "7 days"
 package = false
 
 [tool.uv.sources]
@@ -23,4 +24,4 @@ package = false
 # provision_genie_spaces.py for Genie Space / Data Room REST calls that the
 # public Databricks SDK does not expose (table_identifiers, sample_questions,
 # instructions). Not on PyPI — installed from the ai-dev-kit GitHub repo.
-databricks-tools-core = { git = "https://github.com/databricks-solutions/ai-dev-kit", subdirectory = "databricks-tools-core" }
+databricks-tools-core = { git = "https://github.com/databricks-solutions/ai-dev-kit", rev = "b059fd017a2c5743c31a0ff30dc8a618723aae4f", subdirectory = "databricks-tools-core" }

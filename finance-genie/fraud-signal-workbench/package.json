@@ -13,7 +13,7 @@
         "@tanstack/react-query": "5.90.16",
         "@tanstack/react-router": "1.169.2",
         "@tanstack/react-table": "^8.21.3",
-        "axios": "1.15.2",
+        "axios": "1.20.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "2.1.1",
         "cytoscape": "3.33.3",
@@ -38,7 +38,7 @@
         "@types/react": "19.2.7",
         "@types/react-dom": "19.2.3",
         "@vitejs/plugin-react": "^6.1.1",
-        "smol-toml": "1.6.1",
+        "smol-toml": "1.9.0",
         "typescript": "5.9.3",
         "vite": "^8.3.0"
     },

@@ -22,8 +22,8 @@ env:
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_LAKEBASE_BRANCH
   value: projects/databricks-internal-custom-agents/branches/production
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_DATABASE
-  value: runtime-agent-bricks-neo4j-ba0e42a8-6794-4e9d-9779-7eb4e2a8d23b
+  value: runtime-agent-bricks-neo4j-17209007-8195-4ff0-9350-5dda64a64ce6
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_USERNAME
-  value: 01a2116c-1593-4fb6-b8a7-6725bf25403e
+  value: 3d67aec7-961c-44fc-9a0f-85dd5dbaf046
 - name: DATABRICKS_AGENTBRICKS_RUNTIME_STORE_SCHEMA
   value: databricks_agentkit_runtime

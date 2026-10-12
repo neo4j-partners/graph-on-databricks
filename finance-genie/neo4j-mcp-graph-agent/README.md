@@ -203,9 +203,34 @@ To deploy again after a cleanup, start at step 3 of [Quick start cloud with make
 
 ## Demo script
 
-Five steps show the graph, Genie, and memory working together. One script asks the questions and prints each answer. The evidence is the ids in the answer and the spans in the MLflow trace. The exact answer text changes from run to run.
+The demo script asks six questions in five steps and prints each answer. The steps show the graph, Genie, and memory working together. The evidence is the ids in each answer and the spans in the MLflow trace. The exact answer text changes from run to run.
 
-Run from `neo4j-mcp-graph-agent/`.
+### The steps
+
+Each step lists the question the script asks, the ids the answer should name, and the spans the MLflow trace should show.
+
+- **1. Shared phone:** This step asks two questions. It asks which customers share phone 312-555-0142 and which accounts they own, then which community those accounts are in.
+  - **Answer:** The first answer names Accounts 368, 927, 1033, and 1696. The second answer names Community 8174.
+  - **Trace:** The trace has a span ending in `read_neo4j_cypher`. The Gateway adds a prefix, so the full name is `neo4j-mcp-server-target___read_neo4j_cypher`.
+- **2. Hub:** This step asks whether Account 15940 is a hub and which community it is in.
+  - **Answer:** The answer names Community 19766.
+  - **Trace:** The trace has a span ending in `read_neo4j_cypher`.
+- **3. Recall:** This step starts a new session and asks "What was I looking at last time?"
+  - **Answer:** The answer names Account 15940, although this session never did. The agent found it in NAMS.
+  - **Note:** Recall reads only your two latest conversations, so run step 2 right before this step.
+- **4. Genie value question:** This step asks for the average account balance by region and account type.
+  - **Trace:** The trace has a `genie_ask` span, then a `genie_query_result` span.
+- **5. Graph and Genie:** This step asks which phone numbers are shared by more than one customer, and what the balances and 30-day transaction counts of those accounts are.
+  - **Trace:** The trace has a span ending in `read_neo4j_cypher`, then a `genie_ask` span. The Genie question names the account ids that the graph found.
+- **ring (optional):** This step asks whether Community 3040 is a fraud ring candidate. The default run skips it. Run it with `--step ring` after step 3.
+  - **Answer:** The answer names Community 3040.
+  - **Trace:** The trace has a span ending in `read_neo4j_cypher`.
+
+Steps 1 and 2 share one session. Step 3 starts a new session, and steps 4 and 5 stay in it.
+
+### Run the script
+
+Run from `neo4j-mcp-graph-agent/`. The script prints each question, the answer, and a **You should see** list for the step. It cannot read MLflow, so open the latest traces and check the spans yourself.
 
 - **Local:** Start `make dev` in another terminal, as in the [local quick start](#quick-start-local-with-make). Then run the script.
 
@@ -219,32 +244,19 @@ Run from `neo4j-mcp-graph-agent/`.
   uv run scripts/demo.py --cloud
   ```
 
-The script prints each question, the answer, and a **You should see** list for the step. It cannot read MLflow, so open the latest traces and check the spans yourself.
+### Run one step or your own question
 
-### Run one step
+- **`--step`:** This flag runs only the steps you name. Steps 2 and 3 are the memory demo. Run them back to back, because recall reads only your two latest conversations.
 
-Pass the step numbers to run only those steps. Steps 2 and 3 are the memory demo. Run them back to back, because recall reads only your two latest conversations.
+  ```bash
+  uv run scripts/demo.py --step 2 3
+  ```
 
-```bash
-uv run scripts/demo.py --step 2 3
-```
+- **`--ask`:** This flag asks one question of your own instead of the steps.
 
-To ask your own question, use `--ask`.
-
-```bash
-uv run scripts/demo.py --ask "Which community is Account 15940 in?"
-```
-
-### The steps
-
-- **1. Shared phone:** Asks which customers share phone 312-555-0142 and which accounts they own, then which community those accounts are in. The answers name Accounts 368, 927, 1033, and 1696, then Community 8174. The trace has a span ending in `read_neo4j_cypher`. The Gateway adds a prefix, so the full name is `neo4j-mcp-server-target___read_neo4j_cypher`.
-- **2. Hub:** Asks whether Account 15940 is a hub and which community it is in. The answer names Community 19766. The trace has a span ending in `read_neo4j_cypher`.
-- **3. Recall:** Starts a new session and asks "What was I looking at last time?" The answer names Account 15940, although this session never did.
-- **4. Genie value question:** Asks for the average account balance by region and account type. The trace has a `genie_ask` span followed by a `genie_query_result` span.
-- **5. Graph and Genie:** Asks which phone numbers are shared by more than one customer, and what the balances and 30-day transaction counts of those accounts are. The trace has a span ending in `read_neo4j_cypher`, then a `genie_ask` span. The Genie question names the account ids that the graph found.
-- **ring (optional):** Asks whether Community 3040 is a fraud ring candidate. Run it with `--step ring` after step 3. The answer names Community 3040.
-
-Steps 1 and 2 share one session. Step 3 starts a new session, and steps 4 and 5 stay in it.
+  ```bash
+  uv run scripts/demo.py --ask "Which community is Account 15940 in?"
+  ```
 
 ### See the memory in NAMS
 

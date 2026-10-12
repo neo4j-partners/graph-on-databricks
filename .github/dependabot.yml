@@ -1,31 +1,83 @@
+# Dependency updates for every project in this repo.
+#
+# Version updates: one grouped PR per project per month, only for releases at
+# least 7 days old (cooldown). Security updates are not subject to the
+# cooldown and arrive as soon as an alert opens, grouped per project.
+#
+# The uv projects also set `exclude-newer = "7 days"` in pyproject.toml and the
+# Bun apps set `minimumReleaseAge` in bunfig.toml, so manual `uv lock` and
+# `bun install` runs follow the same 7-day rule.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-
-  - package-ecosystem: "npm"
-    directory: "/finance-genie/docs/demo-guide/slides"
-    schedule:
-      interval: "weekly"
-
-  - package-ecosystem: "uv"
-    directory: "/finance-genie/enrichment-pipeline"
-    schedule:
-      interval: "weekly"
-    ignore:
-      - dependency-name: "databricks-tools-core"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
     groups:
-      uv-graph:
+      actions:
         patterns:
           - "*"
 
   - package-ecosystem: "uv"
-    directory: "/finance-genie/neo4j-mcp-demo"
+    directories:
+      - "/agentic-commerce"
+      - "/agentic-commerce/demo-client"
+      - "/finance-genie/enrichment-pipeline"
+      - "/finance-genie/fraud-signal-workbench"
+      - "/finance-genie/neo4j-mcp-graph-agent"
+      - "/finance-genie/neo4j-mcp-graph-agent/traffic"
+      - "/finance-genie/semantic-investigation-copilot"
+      - "/finance-genie/virtual-graph-demo"
+      - "/supplier-risk-graph"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    ignore:
+      # Pinned to a git commit in enrichment-pipeline; bump the rev by hand.
+      - dependency-name: "databricks-tools-core"
     groups:
-      uv-graph:
+      uv-version:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      uv-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: "bun"
+    directories:
+      - "/agentic-commerce/demo-client"
+      - "/finance-genie/fraud-signal-workbench"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      bun-version:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      bun-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/finance-genie/docs/demo-guide/slides"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      npm-version:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      npm-security:
+        applies-to: security-updates
         patterns:
           - "*"

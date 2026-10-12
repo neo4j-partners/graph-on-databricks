@@ -48,3 +48,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["retail_agent"]
+
+[tool.uv]
+exclude-newer = "7 days"

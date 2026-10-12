@@ -52,3 +52,6 @@ version = "{version}"
 [tool.hatch.build]
 artifacts = ["src/agentic_commerce/__dist__", "src/agentic_commerce/_metadata.py"]
 exclude = ["src/agentic_commerce/ui"]
+
+[tool.uv]
+exclude-newer = "7 days"
