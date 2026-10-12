@@ -59,6 +59,11 @@ const decks = {
     source: "slides-agent-memory.md",
     description: "Fraud analyst agent with graph, Genie, and Neo4j Agent Memory.",
   },
+  "agent-memory-15min": {
+    title: "Agent Memory, 15-Minute Talk",
+    source: "slides-15min-agent-memory.md",
+    description: "Shorter agent memory version for a 15-minute slot.",
+  },
 };
 
 // These decks set their own theme in front matter, so each builds once.
@@ -130,6 +135,10 @@ if (requested === "all") {
   copyFileSync(
     join("build", outputFile("agent-memory", "finance")),
     join("build", "slides-agent-memory.html"),
+  );
+  copyFileSync(
+    join("build", outputFile("agent-memory-15min", "finance")),
+    join("build", "slides-15min-agent-memory.html"),
   );
   writeFileSync(join("build", "index.html"), renderIndex());
 }

@@ -48,6 +48,11 @@ const decks = [
         text: "Open slide deck",
         href: "./slides-agent-memory.html",
       },
+      {
+        text: "Open 15-minute deck",
+        href: "./slides-15min-agent-memory.html",
+        variant: "secondary",
+      },
     ],
   },
   {

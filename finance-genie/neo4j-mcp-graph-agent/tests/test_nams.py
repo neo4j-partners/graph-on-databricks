@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -9,10 +9,12 @@ from agent.nams import (
     ENTITY_RECALL_HEADER,
     RECALL_CONVERSATIONS,
     RECALL_ENTITIES,
+    RECALL_ENTITY_SEARCH_LIMIT,
     RECALL_MAX_CHARS,
     TurnMemory,
     extract_entity_terms,
     format_entities,
+    names_a_finding,
     nams_enabled,
     recall_instructions,
     safe_scope_id,
@@ -99,7 +101,7 @@ class FakeMemory:
 
 
 def conversation(conv_id, age_minutes, user_id=None):
-    created = datetime(2026, 1, 1, tzinfo=timezone.utc) - timedelta(minutes=age_minutes)
+    created = datetime(2026, 1, 1, tzinfo=UTC) - timedelta(minutes=age_minutes)
     metadata = {"user_id": user_id} if user_id else {}
     return SimpleNamespace(id=conv_id, created_at=created, metadata=metadata)
 
@@ -253,7 +255,7 @@ async def test_recall_adds_long_term_entities_after_conversations(nams_key):
     assert "- Community 3040 (Community): 61 accounts, two flagged" in recalled
     search = next(c for c in memory.calls if c[0] == "search_entities")
     assert search[1] == "Community 3040"
-    assert search[2] == {"limit": RECALL_ENTITIES}
+    assert search[2] == {"limit": RECALL_ENTITY_SEARCH_LIMIT}
 
 
 async def test_recall_returns_entities_when_there_are_no_conversations(nams_key):
@@ -273,16 +275,63 @@ async def test_recall_skips_entity_search_when_the_prompt_names_no_entity(nams_k
     assert "search_entities" not in names(memory)
 
 
-async def test_recall_searches_each_term_once_and_dedupes_entities_by_name(nams_key):
+async def test_recall_searches_each_term_once_and_dedupes_entities_by_description(nams_key):
     memory = FakeMemory(
-        entities=[entity("Community 3040"), entity("Account 7890"), entity("community 3040")]
+        entities=[
+            entity("Community 3040", description="126 members"),
+            entity("Account 7890", description="hub account"),
+            entity("community 3040", description="126  Members"),
+            entity("Community 3040", description="ring candidate"),
+            entity("Community 3040"),
+        ]
     )
     prompt = "Did Account 7890 touch Community 3040? Account 7890 matters."
     async with turn_memory(memory, prompt=prompt) as turn:
         recalled = await turn.recall()
     searches = [c[1] for c in memory.calls if c[0] == "search_entities"]
     assert searches == ["Account 7890", "Community 3040"]
-    assert recalled.count("ommunity 3040 (Object)") == 1
+    assert recalled == (
+        f"{ENTITY_RECALL_HEADER}\n"
+        "- Community 3040 (Object): 126 members\n"
+        "- Account 7890 (Object): hub account\n"
+        "- Community 3040 (Object): ring candidate"
+    )
+
+
+async def test_recall_keeps_at_most_the_entity_limit(nams_key):
+    memory = FakeMemory(
+        entities=[entity("Community 3040", description=f"finding {i}") for i in range(10)]
+    )
+    async with turn_memory(memory, prompt="What about Community 3040?") as turn:
+        recalled = await turn.recall()
+    assert recalled.count("- Community 3040") == RECALL_ENTITIES
+
+
+async def test_recall_puts_entities_with_findings_first(nams_key):
+    memory = FakeMemory(
+        entities=[
+            entity("Community 3040", description="A community identified by the ID 3040."),
+            entity("Community 3040", description="Investigated in CASE-4001."),
+            entity("Community 3040", description="A Louvain community."),
+            entity("Community 3040", description="126 members, average risk 2.72."),
+        ]
+    )
+    async with turn_memory(memory, prompt="What about Community 3040?") as turn:
+        recalled = await turn.recall()
+    assert recalled.splitlines()[1:] == [
+        "- Community 3040 (Object): Investigated in CASE-4001.",
+        "- Community 3040 (Object): 126 members, average risk 2.72.",
+        "- Community 3040 (Object): A community identified by the ID 3040.",
+        "- Community 3040 (Object): A Louvain community.",
+    ]
+
+
+def test_names_a_finding_ignores_the_entitys_own_id():
+    assert not names_a_finding(entity("Community 3040", description="Numeric ID 3040."))
+    assert not names_a_finding(entity("Community 3040", description="A Louvain community."))
+    assert names_a_finding(entity("Community 3040", description="Has 126 members."))
+    assert names_a_finding(entity("Community 3040", description="Linked to Community 30401."))
+    assert names_a_finding(entity("Account 7890", description="Sends to Account 7891."))
 
 
 async def test_entity_recall_failure_keeps_conversation_recall(nams_key):

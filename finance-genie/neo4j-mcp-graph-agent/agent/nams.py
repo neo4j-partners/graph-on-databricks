@@ -18,7 +18,7 @@ import random
 import re
 from dataclasses import dataclass, field
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
 from neo4j_agent_memory import MemoryClient
 
@@ -39,6 +39,9 @@ RECALL_MAX_CHARS = 2000
 # across one user's sessions.
 RECALL_ENTITIES = 5
 RECALL_ENTITY_TERMS = 3
+# Extraction often leaves one node per mention, so one name can match many entities. Each
+# search fetches more than RECALL_ENTITIES so dedupe by description still leaves enough.
+RECALL_ENTITY_SEARCH_LIMIT = 20
 
 ENTITY_RECALL_HEADER = "Entities known from earlier investigations by any analyst:"
 
@@ -146,7 +149,7 @@ class TurnMemory:
     _tool_calls: list[_ToolCall] = field(default_factory=list, init=False, repr=False)
     _answer: str = field(default="", init=False, repr=False)
 
-    async def __aenter__(self) -> TurnMemory:
+    async def __aenter__(self) -> Self:
         if not nams_enabled():
             return self
         # NAMS sometimes answers the connect probe with a transient 424 external_database_error
@@ -159,7 +162,7 @@ class TurnMemory:
                     await memory.connect()
                 self._memory = memory
                 return self
-            except Exception:  # noqa: BLE001 - NAMS must never break an answer
+            except Exception:  # NAMS must never break an answer
                 logger.warning(
                     "NAMS connect failed (attempt %d of %d)",
                     attempt + 1,
@@ -183,12 +186,12 @@ class TurnMemory:
             if self.write:
                 async with asyncio.timeout(WRITE_TIMEOUT_SECONDS):
                     await self._flush(failed=exc is not None)
-        except Exception:  # noqa: BLE001 - NAMS must never break an answer
+        except Exception:  # NAMS must never break an answer
             logger.warning("NAMS write failed", exc_info=True)
         finally:
             try:
                 await self._memory.close()
-            except Exception:  # noqa: BLE001
+            except Exception:  # NAMS must never break an answer
                 logger.warning("NAMS close failed", exc_info=True)
 
     def add_tool_call(self, name: str, arguments: dict[str, Any] | None) -> None:
@@ -233,7 +236,7 @@ class TurnMemory:
                     for c in recent
                 ]
             blocks = [task.result() for task in tasks]
-        except Exception:  # noqa: BLE001 - NAMS must never break an answer
+        except Exception:  # NAMS must never break an answer
             logger.warning("NAMS conversation recall failed", exc_info=True)
             return ""
         return "\n\n".join(b.strip() for b in blocks if b and b.strip())
@@ -251,21 +254,27 @@ class TurnMemory:
             async with asyncio.TaskGroup() as group:
                 tasks = [
                     group.create_task(
-                        self._memory.long_term.search_entities(term, limit=RECALL_ENTITIES)
+                        self._memory.long_term.search_entities(
+                            term, limit=RECALL_ENTITY_SEARCH_LIMIT
+                        )
                     )
                     for term in terms
                 ]
-        except Exception:  # noqa: BLE001 - entity recall must not lose conversation recall
+        except Exception:  # entity recall must not lose conversation recall
             logger.warning("NAMS entity recall failed", exc_info=True)
             return ""
+        # Same-named entities hold different findings in their descriptions, so dedupe by
+        # description. An entity without a description carries no finding to recall.
         entities = []
         seen = set()
         for task in tasks:
             for entity in task.result():
-                key = (getattr(entity, "name", "") or "").lower()
+                key = " ".join((getattr(entity, "description", None) or "").split()).lower()
                 if key and key not in seen:
                     seen.add(key)
                     entities.append(entity)
+        # The sort is stable, so NAMS search order holds within each group.
+        entities.sort(key=lambda entity: not names_a_finding(entity))
         text = format_entities(entities[:RECALL_ENTITIES])
         return f"{ENTITY_RECALL_HEADER}\n{text}" if text else ""
 
@@ -324,6 +333,19 @@ def extract_entity_terms(prompt: str, limit: int = RECALL_ENTITY_TERMS) -> list[
         if len(terms) >= limit:
             break
     return terms
+
+
+def names_a_finding(entity: Any) -> bool:
+    """Return True when an entity's description names a number or id beyond its own.
+
+    Extraction writes some descriptions that only restate the entity, such as "A community
+    identified by the numeric ID 3040". A description that carries a finding names another
+    value, such as "126 members", "average risk score of 2.72", or "CASE-4001".
+    """
+    description = getattr(entity, "description", None) or ""
+    for own_id in re.findall(r"\d+", getattr(entity, "name", "") or ""):
+        description = re.sub(rf"(?<!\d){own_id}(?!\d)", "", description)
+    return bool(re.search(r"\d", description))
 
 
 def format_entities(entities: list[Any]) -> str:

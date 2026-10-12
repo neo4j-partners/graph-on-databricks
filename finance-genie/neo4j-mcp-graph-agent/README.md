@@ -317,9 +317,9 @@ This section shows long-term memory: memory that all analysts share. The demo ab
 
 Do these two pages in this order:
 
-1. [Show long-term memory](docs/longterm.md): Do this first, because it is the main point. The page turns on the finance ontology, then runs traffic from six made-up analysts so NAMS has conversations to read. Then it shows two things:
-   - **Demo 1:** The NAMS console shows one entity that several analysts talked about.
-   - **Demo 2:** The agent answers a new analyst with another analyst's findings.
+1. [Show long-term memory](docs/longterm.md): Do this first, because it is the main point. Every step runs against the deployed app. The page turns on the finance ontology, then runs traffic from six made-up analysts so NAMS has conversations to read. Then it has two parts:
+   - **Part 1, show the entity graph:** `make who-shares` finds an entity that several analysts talked about, such as Community 3040. The Aura Query tab draws it with the conversations of each analyst behind it.
+   - **Part 2, show the agent using the graph:** Analyst A investigates Community 3040. Then analyst B asks about it in a new session, and the answer opens with findings from earlier analysts.
 2. [Run the ontology example](docs/ontology-experiment.md): This page is optional. Do it second, because it goes deeper and it erases your NAMS data. It runs the same 24 conversations through NAMS twice and compares what NAMS pulled out.
    - **Trial 1:** This trial uses the generic NAMS Default ontology.
    - **Trial 2:** This trial uses the finance ontology.
@@ -387,7 +387,7 @@ databricks api delete /api/2.0/agents/runtime-stores/agent-bricks-neo4j-graph-ag
 ## Documentation
 
 - [How memory works](docs/how-memory-works.md): This page walks through one turn and shows what NAMS saves and recalls.
-- [Long-term memory](docs/longterm.md): Two demos show the NAMS entity graph and the agent recalling it across analysts.
+- [Long-term memory](docs/longterm.md): Two parts show the NAMS entity graph and the agent recalling it across analysts.
 - [Generate traffic](docs/traffic.md): The traffic generator runs from your laptop or as a Databricks Job.
 - [Run the ontology example](docs/ontology-experiment.md): Two trials, with the generic default and with the finance ontology, show how the ontology drives the schema.
 - [Add NAMS as a Databricks MCP service](docs/nams-mcp-service.md): Other agents, such as the Playground, can use the NAMS tools.

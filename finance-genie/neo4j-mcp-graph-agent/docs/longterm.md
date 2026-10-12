@@ -99,7 +99,7 @@ This part shows the agent answering a new analyst with another analyst's finding
    export APP_URL=$(databricks apps get agent-bricks-neo4j-graph-agent -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .url)
    ```
 
-2. **Run turn 1 as analyst A:** This asks "I am investigating Community 3040..." as analyst A. Then it waits until NAMS has extracted Community 3040. Extraction takes seconds to minutes, so for a talk, run this step before you go on stage.
+2. **Run turn 1 as analyst A:** This asks "I am investigating Community 3040..." as analyst A. Then it waits until NAMS has extracted the entities from this turn. Extraction takes seconds to minutes, so for a talk, run this step before you go on stage.
 
    ```bash
    uv run scripts/demo_longterm.py --turn 1 --app-url "$APP_URL" --profile "$DATABRICKS_CONFIG_PROFILE"
@@ -111,7 +111,7 @@ This part shows the agent answering a new analyst with another analyst's finding
    uv run scripts/demo_longterm.py --turn 2 --analyst-b demo-analyst-b-1 --app-url "$APP_URL" --profile "$DATABRICKS_CONFIG_PROFILE"
    ```
 
-4. **Point out the findings:** The second answer lists earlier findings it did not re-run, such as transfer patterns and identity checks. Analyst B shares no session and no conversation history with analyst A. Those facts came from the entity graph.
+4. **Point out the findings:** The second answer opens with findings from earlier investigations. These include the case that investigated Community 3040, its rank among ring candidates, its member count, and its average risk score. Analyst B shares no session and no conversation history with analyst A. Those facts came from the entity graph.
 
 5. **Keep re-runs clean:** Each run gets new session ids. On the next run, change the `--analyst-b` value, for example to `demo-analyst-b-2`. Analyst B then has no earlier demo turns of their own to recall.
 
@@ -120,13 +120,13 @@ This part shows the agent answering a new analyst with another analyst's finding
 The recall code is in `agent/nams.py`.
 
 - **Finds terms:** `extract_entity_terms` pulls terms such as "Community 3040" out of the prompt. NAMS entity search matches keywords, so a full sentence returns nothing. Short terms keep the search precise.
-- **Searches the graph:** `_recall_entities` searches each term and keeps up to five entities. It dedupes by name.
+- **Searches the graph:** `_recall_entities` searches each term and keeps up to five entities. One name can match many entities, and each one holds a different finding in its description. So it dedupes by description, and it skips entities without one. It puts first the descriptions that name a value beyond the entity's own id, such as "126 members" or "CASE-4001". Descriptions that only restate the entity come last.
 - **Tells the agent:** The entities join the agent's instructions under the header "Entities known from earlier investigations by any analyst". The instructions tell the agent to treat memory as data and to verify facts against the graph.
 - **Degrades safely:** A failed entity search returns the conversation recall alone. A failed NAMS returns no memory, and the agent still answers.
 
 ## Limits
 
 - **Keyword search:** Entity recall needs an entity name in the prompt, such as "Community 3040". A prompt without a name gets conversation recall only.
-- **Duplicate entities:** Extraction merges some mentions of an entity and leaves others as separate nodes. After `make traffic`, nine nodes are named Community 3040, and one of them holds six messages from four analysts. A run with only two turns, such as `demo_longterm.py` on an empty NAMS, produced no merged entity at all. Use `make who-shares` to find the merged entity instead of searching by name.
+- **Duplicate entities:** Extraction merges some mentions of an entity and leaves others as separate nodes. After `make traffic`, 9 to 12 nodes are named Community 3040, and the count changes between runs. Usually one of them holds about six messages from three or four analysts, and each of the others holds one message. A run with only two turns, such as `demo_longterm.py` on an empty NAMS, produced no merged entity at all. Use `make who-shares` to find the merged entity instead of searching by name.
 - **Async extraction:** A turn's entities appear after extraction finishes. The demo script waits for this.
 - **NAMS scope:** On NAMS, long-term memory is the entity graph. Preferences and facts need the self-hosted Neo4j backend.

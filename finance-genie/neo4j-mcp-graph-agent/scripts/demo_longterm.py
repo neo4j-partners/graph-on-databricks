@@ -6,7 +6,7 @@
 """Run the long-term memory demo: one analyst's finding reaches another analyst.
 
 Step 1 asks the app a question as analyst A. Step 2 waits until NAMS has extracted the
-entity from that turn. Step 3 asks a follow-up as analyst B, a different user in a new
+entities from that turn. Step 3 asks a follow-up as analyst B, a different user in a new
 session. Analyst B shares no conversation history with analyst A, so anything the second
 answer knows about the entity came from the long-term entity graph.
 
@@ -42,6 +42,10 @@ LOCAL_URL = "http://localhost:8000"
 EXTRACTION_TIMEOUT = 300.0
 TURN_TIMEOUT = 300.0
 POLL_INTERVAL = 5.0
+# Per-message extraction statuses that mean NAMS is still working on a message.
+NONTERMINAL_STATUSES = frozenset({"pending", "processing", "running", "in_progress", "queued"})
+# NAMS lists conversations newest first, so the turn just sent is near the top.
+CONVERSATION_LOOKBACK = 20
 
 TURN_ONE = (
     "I am investigating Community {community}. Which accounts belong to it, "
@@ -89,21 +93,44 @@ def ask(http: httpx.Client, headers: dict[str, str], user_id: str, session_id: s
     return texts[-1] if texts else json.dumps(result)[:500]
 
 
-def wait_for_entity(name: str, api_key: str, endpoint: str) -> bool:
-    """Poll NAMS entity search until the named entity exists or the deadline passes."""
-    deadline = time.monotonic() + EXTRACTION_TIMEOUT
+def wait_for_turn_extraction(session_id: str, api_key: str, endpoint: str) -> bool:
+    """Poll NAMS until every message of the turn sent in this session is extracted.
+
+    The app stores the caller's session id as client_session_id in the conversation
+    metadata. Waiting on that conversation, not on an entity name, matters because the
+    entity usually exists already from earlier traffic.
+    """
+    base = endpoint.rstrip("/")
     headers = {"Authorization": f"Bearer {api_key}"}
+    deadline = time.monotonic() + EXTRACTION_TIMEOUT
+    conversation_id = None
     while time.monotonic() < deadline:
-        response = httpx.post(
-            f"{endpoint.rstrip('/')}/v1/entities/search",
-            json={"query": name, "limit": 5},
-            headers=headers,
-            timeout=15.0,
-        )
-        response.raise_for_status()
-        entities = response.json().get("entities", [])
-        if any(e.get("name", "").lower() == name.lower() for e in entities):
-            return True
+        if conversation_id is None:
+            response = httpx.get(
+                f"{base}/v1/conversations",
+                params={"limit": CONVERSATION_LOOKBACK},
+                headers=headers,
+                timeout=15.0,
+            )
+            response.raise_for_status()
+            conversation_id = next(
+                (
+                    c["id"]
+                    for c in response.json().get("conversations", [])
+                    if (c.get("metadata") or {}).get("client_session_id") == session_id
+                ),
+                None,
+            )
+        if conversation_id is not None:
+            response = httpx.get(
+                f"{base}/v1/conversations/{conversation_id}/extraction-status",
+                headers=headers,
+                timeout=15.0,
+            )
+            response.raise_for_status()
+            summary = response.json().get("summary") or {}
+            if summary and not any(summary.get(s, 0) for s in NONTERMINAL_STATUSES):
+                return True
         time.sleep(POLL_INTERVAL)
     return False
 
@@ -144,9 +171,9 @@ def main() -> int:
                         TURN_ONE.format(community=args.community))
             print(first, "\n")
 
-            print(f"=== Waiting for NAMS to extract {entity_name!r} ===")
-            if wait_for_entity(entity_name, api_key, endpoint):
-                print(f"{entity_name!r} is in the entity graph.\n")
+            print(f"=== Waiting for NAMS to extract the turn from session {session_a} ===")
+            if wait_for_turn_extraction(session_a, api_key, endpoint):
+                print("NAMS has extracted the entities from turn 1.\n")
             elif run_two:
                 print(f"Timed out after {EXTRACTION_TIMEOUT:.0f}s; asking anyway.\n")
             else:
