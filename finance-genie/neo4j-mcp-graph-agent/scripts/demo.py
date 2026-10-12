@@ -22,16 +22,21 @@ neo4j-mcp-graph-agent/.env, finds the app URL, and signs in with that profile. T
 local server takes the user from the request, so the script sends the user
 "demo-analyst" there. The deployed app takes the user from your login, so the script
 sends none.
+
+With MEMORY_API_KEY set, the script also prints where NAMS stored each question: the NAMS
+user and the conversation id to open at https://memory.neo4jlabs.com/.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 import textwrap
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -43,6 +48,11 @@ LOCAL_URL = "http://localhost:8000"
 LOCAL_USER = "demo-analyst"
 APP_NAME = "agent-bricks-neo4j-graph-agent"
 TURN_TIMEOUT = 300.0
+NAMS_URL = "https://memory.neo4jlabs.com"
+# Recent conversations to scan for the one a question was just stored in.
+NAMS_LOOKBACK = 50
+NAMS_WAIT_SECONDS = 15.0
+NAMS_POLL_SECONDS = 2.0
 RULE = "=" * 72
 DETAIL_WIDTH = 100
 
@@ -90,6 +100,14 @@ class Turn:
 
     answer: str
     calls: tuple[ToolCall, ...]
+
+
+@dataclass(frozen=True)
+class Stored:
+    """Where NAMS stored one question: the memory user and the NAMS conversation id."""
+
+    user: str
+    conversation: str
 
 
 STEPS = (
@@ -324,6 +342,69 @@ def cloud_connection(profile: str, app_url: str | None) -> tuple[str, dict[str, 
     return url, workspace.config.authenticate()
 
 
+def nams_client(api_key: str) -> contextlib.AbstractContextManager[httpx.Client | None]:
+    """Return a NAMS client, or a stand-in for None when no key is set."""
+    if not api_key:
+        return contextlib.nullcontext()
+    return httpx.Client(
+        base_url=(os.environ.get("MEMORY_ENDPOINT") or NAMS_URL).rstrip("/"),
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=30.0,
+    )
+
+
+def find_stored(
+    nams: httpx.Client,
+    session_id: str,
+    seen: set[str],
+    *,
+    wait_seconds: float = NAMS_WAIT_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Stored | None:
+    """Return the NAMS conversation of this session that no earlier question claimed.
+
+    The app stores each question as its own conversation and keeps the session id in its
+    ``client_session_id`` metadata. ``seen`` holds the ids already claimed, so the second
+    question of a session finds its own conversation. Polls briefly in case the write lags.
+    """
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        response = nams.get("/v1/conversations", params={"limit": NAMS_LOOKBACK})
+        response.raise_for_status()
+        for conversation in response.json().get("conversations") or []:
+            metadata = conversation.get("metadata") or {}
+            conversation_id = conversation.get("id")
+            if (
+                conversation_id
+                and conversation_id not in seen
+                and metadata.get("client_session_id") == session_id
+            ):
+                seen.add(conversation_id)
+                user = metadata.get("user_id") or conversation.get("userId") or "unknown"
+                return Stored(user, conversation_id)
+        if time.monotonic() >= deadline:
+            return None
+        sleep(NAMS_POLL_SECONDS)
+
+
+def print_stored(nams: httpx.Client | None, session_id: str, seen: set[str]) -> None:
+    """Print the NAMS user and conversation id for the question just asked."""
+    if nams is None:
+        return
+    try:
+        stored = find_stored(nams, session_id, seen)
+    except httpx.HTTPError as error:
+        print(f"\nIn NAMS: could not check ({error})")
+        return
+    if stored is None:
+        print(
+            f"\nIn NAMS: no conversation for session {session_id} yet. Memory is best "
+            "effort, so check the app logs for a NAMS warning."
+        )
+        return
+    print(f"\nIn NAMS: user {stored.user}, conversation {stored.conversation}")
+
+
 def _wrap(label: str, text: str) -> str:
     indent = " " * (len(label) + 1)
     return textwrap.fill(
@@ -398,12 +479,15 @@ def run_steps(
     http: httpx.Client,
     auth: dict[str, str],
     user_id: str | None,
+    nams: httpx.Client | None = None,
 ) -> list[tuple[Step, tuple[str, ...]]]:
     """Ask every question in order and return each step's route.
 
-    A step with new_session starts a new session.
+    A step with new_session starts a new session. With a NAMS client, each question also
+    prints where NAMS stored it.
     """
     rows = []
+    seen: set[str] = set()
     session_id = f"demo-{time.strftime('%H%M%S')}-{uuid.uuid4().hex[:4]}"
     for index, step in enumerate(steps):
         if step.new_session and index > 0:
@@ -413,6 +497,7 @@ def run_steps(
         for question in step.questions:
             turn = ask(http, auth, question, session_id, user_id)
             print_turn(question, turn)
+            print_stored(nams, session_id, seen)
             calls.extend(turn.calls)
         took = route_of(calls)
         print_step_footer(step, took)
@@ -451,9 +536,15 @@ def main() -> int:
 
     print(f"Agent: {base_url}")
     print_sources()
+    api_key = os.environ.get("MEMORY_API_KEY", "").strip()
+    if not api_key:
+        print("\nSet MEMORY_API_KEY to print where NAMS stores each question.")
     try:
-        with httpx.Client(base_url=base_url.rstrip("/"), timeout=TURN_TIMEOUT) as http:
-            rows = run_steps(steps, http, auth, user_id)
+        with (
+            httpx.Client(base_url=base_url.rstrip("/"), timeout=TURN_TIMEOUT) as http,
+            nams_client(api_key) as nams,
+        ):
+            rows = run_steps(steps, http, auth, user_id, nams)
     except httpx.ConnectError:
         sys.exit(f"Cannot reach {base_url}. Start the server with `make dev`.")
     except httpx.HTTPStatusError as error:
@@ -463,7 +554,8 @@ def main() -> int:
     if not args.ask:
         print(
             "\nNext: open MLflow to see the same calls as spans, and open NAMS at "
-            "https://memory.neo4jlabs.com/ to see each question as a conversation."
+            "https://memory.neo4jlabs.com/ to see each question as a conversation. "
+            "The \"In NAMS\" line under each answer names the user and conversation id."
         )
     return 0
 

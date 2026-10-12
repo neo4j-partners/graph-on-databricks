@@ -66,13 +66,18 @@ table {
 }
 </style>
 
-# Agents That Remember What the Team Learned
+# Agents That Remember: Databricks + Neo4j
 
-**Databricks:** Agent Bricks, Genie, Databricks Apps, and MLflow Tracing
+**Databricks:** Agent Bricks, Genie, Databricks Apps, Unity Gateway, and MLflow Tracing
 
-**Neo4j:** AuraDB, the Neo4j MCP server, and the Neo4j Agent Memory Service
+**Neo4j:** AuraDB, Neo4j GDS, the Neo4j MCP server, and the Neo4j Agent Memory Service
 
 <!--
+This is a joint story. Databricks builds, runs, and governs the agent.
+Neo4j holds the domain graph the agent reasons over and the memory
+graph the agent builds as it works. Neither side does the other's
+job, and the talk shows where the line sits.
+
 The talk builds and deploys an Agent Bricks agent that reads the
 fraud graph through the Neo4j MCP service and remembers through the
 Neo4j Agent Memory Service, NAMS for short. That gives two graphs: a
@@ -81,9 +86,175 @@ the same two MCP servers to answer natural language questions. The
 ontology section at the end shows what typing the memory graph
 changes.
 
+The order is: the joint architecture, two slides on the Databricks
+half, the problem in human terms, then the Neo4j half and the demos.
+
 Product names were checked in October 2026. Genie Agents were called
 Genie Spaces until July 2026, so say "Genie Agent" on stage even
-though the repo and the API still say "space".
+though the repo and the API still say "space". AI Gateway became
+Unity Gateway in August 2026. The diagram and the app config still
+say AI Gateway for the model route.
+-->
+
+---
+
+## Databricks + Neo4j: One Architecture for Agents That Remember
+
+<div class="columns">
+<div>
+
+**Databricks runs and governs the agent**
+
+- **Agent Bricks:** The CLI deploys the agent to a Databricks App.
+- **Unity Catalog MCP service:** It allows read-only Cypher on the graph.
+- **Genie Agent:** It answers value questions over the Gold tables.
+- **AI Gateway model:** Any chat model writes the answer.
+- **MLflow and sessions:** Every model call and tool call is recorded.
+
+</div>
+<div>
+
+**Neo4j holds what it knows and remembers**
+
+- **AuraDB:** It holds the fraud graph.
+- **Neo4j GDS:** Its scores are written back to the Gold tables.
+- **Neo4j MCP server:** It sits behind the MCP service.
+- **NAMS:** It stores conversations, reasoning traces, and entities.
+
+</div>
+</div>
+
+<!--
+Read the two column headers first. They are the whole talk in two
+lines. Databricks runs and governs the agent. Neo4j holds what the
+agent knows and what it remembers.
+
+The agent itself is an OpenAI Agents SDK loop with two read-only
+graph tools, get_neo4j_schema and read_neo4j_cypher, and the Genie
+tools. The Genie tools are OpenAI Agents SDK function tools built
+by genie_tools() in agent/agent.py, not MCP tools, so the Cypher
+guardrails and the MCP allowlist do not apply to them. They run
+with auth = "app", so Genie executes its SQL as the app's service
+principal, not as the analyst. The caller sends messages, and in
+the deployed app the identity comes from the Databricks Apps proxy.
+The NAMS key lives in the secret scope nams, and the app reads it
+as MEMORY_API_KEY.
+
+The next slide is the diagram of the same parts. After it come two
+slides on the Databricks half, then the problem, then the Neo4j
+half.
+-->
+
+---
+
+![bg contain](./images/architecture.svg)
+
+<!--
+Walk it by platform, not left to right. The blue app box and the
+grey boxes on the right are Databricks: the app, the AI Gateway
+model, the Unity Catalog MCP service, the Genie Agent, and the
+session store with the MLflow traces. The green NAMS box is Neo4j,
+and so is the graph behind the MCP service, which the diagram does
+not draw.
+
+Then walk the numbers. The caller sends a question to the app. The
+app recalls memory from NAMS, runs the agent, and the agent reads
+the graph through the MCP service and the Gold tables through the
+Genie Agent. The answer goes back to the caller, and then the app
+writes the turn to NAMS. Agent Bricks keeps the session store and
+the MLflow traces on its own.
+
+The "Durable server" box is the Agent Bricks DurableAgentServer. It
+wraps the agent loop in an HTTP server, serves the invocation API,
+and recovers runs after a crash or restart.
+-->
+
+---
+
+## Agent Bricks Is the Databricks Agent Developer Platform
+
+- **One platform:** Agent Bricks builds, deploys, and governs agents on Databricks.
+- **Any model, any harness:** Unity Gateway serves the models. Agent Runtime hosts any framework.
+- **Managed builders:** Knowledge Assistant, Supervisor Agent, and Genie Agents need no code.
+- **Code-first path:** The Agent Bricks CLI deploys your own agent to a Databricks App.
+- **Tools:** Agents call Unity Catalog functions, Genie Agents, and MCP services.
+- **Observability and governance:** MLflow traces every call. Unity Gateway governs it.
+
+<!--
+The Databricks docs open with one sentence: "Agent Bricks is the
+Databricks agent developer platform." That is a wider meaning than
+the 2025 launch, which was a set of no-code builders. Databricks
+repositioned it at Data + AI Summit 2026 around three words: choice
+of model, context from the data, and control over governance and
+cost. The same blog says "the core agent loop is just 1% of the
+work" and counts over 100,000 agents built since launch.
+
+Status, checked October 12, 2026:
+- Knowledge Assistant reached GA on February 16, 2026. Supervisor
+  Agent reached GA in February 2026 and was called Multi-Agent
+  Supervisor before that. Genie Agents were Genie Spaces until
+  July 8, 2026.
+- The Agent Bricks CLI entered Beta on September 29, 2026. It has
+  init, dev, and deploy commands, and the generated project runs on
+  the DurableAgentServer.
+- Databricks recommends Databricks Apps for new custom agents. The
+  MLflow AgentServer and the Model Serving path are the older
+  route, with a migration guide.
+- Unity Gateway reached GA in August 2026. The docs describe Agent
+  Runtime as hosting "any framework or harness". The summit blog
+  names LangGraph, Agno, CrewAI, the Claude Agent SDK, and the
+  OpenAI Agents SDK.
+
+Sources:
+- https://docs.databricks.com/aws/en/agents/
+- https://www.databricks.com/blog/agent-bricks-dais-2026
+- https://docs.databricks.com/aws/en/release-notes/product/2026/september
+- https://docs.databricks.com/aws/en/agents/deploy/agent-server
+-->
+
+---
+
+## What Agent Bricks Gives This Agent
+
+- **Deploy:** One `agentbricks deploy` puts the agent on a Databricks App.
+- **Identity:** The Apps proxy forwards who is asking.
+- **Model choice:** One variable picks any chat model on AI Gateway.
+- **Governed tools:** The Neo4j MCP service and the Genie Agent are Unity Catalog objects.
+- **Observability:** Every model call and tool call lands in an MLflow trace.
+- **Memory on Lakebase:** Managed sessions and managed memory are both in Beta.
+
+**Managed memory stores entries per actor and searches by keyword. Team findings are a graph.**
+
+<!--
+This is the Databricks half applied to the agent in this repo.
+Deploy is make deploy in the README, which runs the Agent Bricks
+CLI. Identity comes from the X-Forwarded-Email header the Apps
+proxy adds, and backup slide B4 has the rules. The model is
+LLM_MODEL in the app config, and the route is the one the diagram
+calls AI Gateway. The MCP service and the Genie Agent are Unity
+Catalog objects, so grants and audit work like any other tool.
+Every run lands in MLflow Tracing, and the demos open those traces.
+
+Managed sessions and managed memory entered Beta on September 16,
+2026. Sessions hold the short-term conversation state. Managed
+memory is "durable, long-term memory that persists across
+conversations", stored in Lakebase. An entry is keyed by actor_id,
+an optional session_id, and a path, and search ranks entries by
+BM25 full-text relevance. It works with any framework through the
+databricks-agentbricks package or the REST API. The docs warn that
+actor_id separates memories but "is not an access control".
+
+The last line is the handoff. Managed memory holds text entries
+per actor and finds them by keyword. That reading of the docs is
+ours. The team's findings are entities and relationships that
+merge across analysts, and that is a graph. This app uses the
+Agent Bricks session store and NAMS, and not managed memory. The
+next slide is the problem in human terms. The one after is the
+Neo4j half.
+
+Sources:
+- https://docs.databricks.com/aws/en/agents/agent-memory/managed-memory
+- https://docs.databricks.com/aws/en/release-notes/product/2026/september
 -->
 
 ---
@@ -97,12 +268,41 @@ though the repo and the API still say "space".
 - **Chat history belongs to one session.** Investigations belong to the team.
 
 <!--
-Set up the problem in human terms before any architecture. The
-Monday and Wednesday analysts come back on the slide "Demo: One
-Analyst's Finding Reaches Another", where the
-second analyst gets the first analyst's finding without re-running
-it. Hold the last line: session history and team knowledge are
-different things, and this deck is about the second one.
+The Databricks half is done. Set up the problem in human terms
+before the Neo4j half. The Monday and Wednesday analysts come back
+on the slide "Demo: One Analyst's Finding Reaches Another", where
+the second analyst gets the first analyst's finding without
+re-running it. Hold the last line: session history and team
+knowledge are different things, and the rest of this deck is about
+the second one.
+-->
+
+---
+
+## Where Neo4j Comes In: Two Graphs
+
+- **Domain graph:** The agent reads the fraud graph through the Neo4j MCP service.
+- **Memory graph:** NAMS saves every turn and extracts the entities.
+- **Routing:** Structure goes to the graph. Totals and averages go to Genie.
+- **Shared by design:** Entities merge across analysts, and people can query them with Cypher.
+- **The result is two graphs.** One holds the domain, and one holds the memory.
+
+<!--
+This is the Neo4j half in one slide, and it is the point to land
+before any demo. The agent is the vehicle for showing how an Agent
+Bricks agent gets a graph through an MCP service and gets memory
+through NAMS. Genie answers the value questions. The system prompt
+in agent/prompt.py sends communities, paths, hubs, and shared
+phones to the graph tools, and totals, averages, counts, and
+breakdowns to Genie. A mixed question finds the ids in the graph
+first, then asks Genie about those ids.
+
+The "shared by design" line is the contrast with the previous
+Databricks slide. NAMS extracts entities from every analyst's
+conversations and merges the mentions, so the memory graph is the
+team's and not one actor's. The next two slides introduce the
+fraud data. Then "Two Graphs: Domain and Memory" puts the two
+graphs side by side.
 -->
 
 ---
@@ -141,74 +341,14 @@ full version is in slides.md.
 
 <!--
 This is the one slide on the enrichment pipeline, and it is here
-because the Genie Agent the agent calls reads these Gold tables.
-Four steps: load the Silver tables into Aura, run GDS, pull the
-scores back through the Neo4j Spark Connector and join them to
-Silver, and write Gold. The graph analysis runs once per pipeline
-cycle, and every downstream consumer reads the results as columns.
-The finance-genie main deck covers this in depth, and this
+because the Genie Agent from the architecture slide reads these
+Gold tables. Four steps: load the Silver tables into Aura, run GDS,
+pull the scores back through the Neo4j Spark Connector and join
+them to Silver, and write Gold. The graph analysis runs once per
+pipeline cycle, and every downstream consumer reads the results as
+columns. The finance-genie main deck covers this in depth, and this
 audience only needs to know that the values Genie returns already
 carry the graph scores.
--->
-
----
-
-## Architecture
-
-- **A Databricks App runs the agent on Agent Bricks.** The Agent Bricks CLI deploys it.
-- **The agent reads the fraud graph through a Unity Catalog MCP service.** The service wraps the Neo4j MCP server and allows read-only Cypher.
-- **The agent asks a Genie Agent for values over the Gold Delta tables.**
-- **An AI Gateway model writes the answer.** Any chat model can be set.
-- **The Neo4j Agent Memory Service stores each turn.** It keeps conversations, reasoning traces, and entities.
-- **Agent Bricks keeps the session history and the MLflow traces.** Every model call and tool call is recorded.
-
-<!--
-The agent itself is an OpenAI Agents SDK loop with two read-only
-graph tools, get_neo4j_schema and read_neo4j_cypher, and the Genie
-tools. The Genie tools are OpenAI Agents SDK function tools built
-by genie_tools() in agent/agent.py, not MCP tools, so the Cypher
-guardrails and the MCP allowlist do not apply to them. They run
-with auth = "app", so Genie executes its SQL as the app's service
-principal, not as the analyst. The caller sends messages, and in the deployed app the
-identity comes from the Databricks Apps proxy. The NAMS key lives
-in the secret scope nams, and the app reads it as MEMORY_API_KEY.
-The next slide is the diagram of the same parts.
--->
-
----
-
-![bg contain](./images/architecture.svg)
-
-<!--
-Walk it left to right. The caller sends a question to the app. The
-app recalls memory from NAMS, runs the agent, and the agent reads
-the graph through the MCP service and the Gold tables through the
-Genie Agent. The answer goes back to the caller, and then the app
-writes the turn to NAMS. Agent Bricks keeps the session store and
-the MLflow traces on its own.
--->
-
----
-
-## What the Agent Shows
-
-- **Build an agent on Agent Bricks and deploy it as a Databricks App.**
-- **Give it the fraud graph through the Neo4j MCP service.** Unity Catalog governs the read-only Cypher.
-- **Give it memory through the Neo4j Agent Memory Service.** Every turn is saved and recalled.
-- **Route structure to the graph and values to Genie.** The system prompt sends totals and averages to the Genie Agent.
-- **The result is two graphs.** One holds the domain, and one holds the memory.
-
-<!--
-This is the point of the module, and it is the point to land
-before any demo. The agent is the vehicle for showing how an Agent
-Bricks agent gets a graph through an MCP service and gets memory
-through NAMS. Genie answers the value questions. The system prompt
-in agent/prompt.py sends communities, paths, hubs, and shared
-phones to the graph tools, and totals, averages, counts, and
-breakdowns to Genie. A mixed question finds the ids in the graph
-first, then asks Genie about those ids. The story is that the
-agent ends up with two graphs, and the next slide puts them side
-by side.
 -->
 
 ---
@@ -256,7 +396,7 @@ Source: https://github.com/neo4j-labs/agent-memory
 - **The app keys it to the identity Databricks forwards.** Nobody loads another analyst's history by sending a different user id.
 - **Long-term memory is the entity graph, and it belongs to the team.** Every analyst's conversations feed it, and recall reads it no matter who asks.
 - **Reasoning memory is written, not read.** The app writes each tool call as a step in a trace, and nothing reads it back.
-- **Agent Bricks keeps one session's history.** NAMS holds what outlives the session.
+- **Agent Bricks keeps the session.** NAMS holds the team's graph.
 
 <!--
 The diagram before this showed what NAMS stores. This slide is
@@ -266,7 +406,9 @@ so short-term recall is filtered to the caller's identity, and the
 deployed app takes that identity from the Databricks Apps proxy
 rather than from the request body. The findings are shared, so
 long-term recall searches a graph that every analyst's
-conversations built. Reasoning traces are saved for the NAMS
+conversations built. Databricks managed memory, in Beta, is keyed
+per actor, so it would hold one analyst's entries rather than the
+team's merged graph. Reasoning traces are saved for the NAMS
 console and are not recalled by the agent. If NAMS is slow or
 down, the agent answers without memory. The local server honors a
 body user_id, and so does the deployed app for callers listed in
@@ -559,6 +701,8 @@ slide B5 describes.
 - **Short-term memory carries one analyst across sessions.**
 - **Long-term memory is a graph.** It carries findings across analysts.
 - **An ontology types that graph.** It adds finance types and relationships.
+
+**Databricks runs the agent. Neo4j remembers for the team.**
 
 </div>
 <div>

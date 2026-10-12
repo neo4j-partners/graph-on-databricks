@@ -169,3 +169,29 @@ def test_route_check_compares_sources_and_the_first_one():
     assert demo.route_result(by_key["5"], (demo.GRAPH,)) == "different"
     assert demo.route_result(by_key["4"], (demo.GRAPH,)) == "different"
     assert demo.route_result(by_key["3"], ()) == "not checked"
+
+
+def _nams(conversations):
+    def handler(request):
+        assert request.url.path == "/v1/conversations"
+        return httpx.Response(200, json={"conversations": conversations})
+
+    return httpx.Client(base_url="https://nams", transport=httpx.MockTransport(handler))
+
+
+def test_each_question_of_a_session_finds_its_own_nams_conversation():
+    nams = _nams([
+        {"id": "c2", "metadata": {"client_session_id": "s1", "user_id": "me@x.com"}},
+        {"id": "c1", "metadata": {"client_session_id": "s1", "user_id": "me@x.com"}},
+        {"id": "c0", "metadata": {"client_session_id": "other", "user_id": "me@x.com"}},
+    ])
+    seen = {"c1"}
+
+    assert demo.find_stored(nams, "s1", seen) == demo.Stored("me@x.com", "c2")
+    assert seen == {"c1", "c2"}
+
+
+def test_missing_nams_conversation_returns_none_after_the_wait():
+    nams = _nams([{"id": "c0", "metadata": {"client_session_id": "other"}}])
+
+    assert demo.find_stored(nams, "s1", set(), wait_seconds=0, sleep=lambda _: None) is None
