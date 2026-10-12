@@ -24,7 +24,8 @@ local server takes the user from the request, so the script sends the user
 sends none.
 
 With MEMORY_API_KEY set, the script also prints where NAMS stored each question: the NAMS
-user and the conversation id to open at https://memory.neo4jlabs.com/.
+user, the conversation id, and a Cypher query to paste into the Query Console at
+https://memory.neo4jlabs.com/. The Memory Browser shows only entities, not conversations.
 """
 
 from __future__ import annotations
@@ -53,6 +54,13 @@ NAMS_URL = "https://memory.neo4jlabs.com"
 NAMS_LOOKBACK = 50
 NAMS_WAIT_SECONDS = 15.0
 NAMS_POLL_SECONDS = 2.0
+# Draws one stored question in the NAMS Query Console: its messages, steps, and tool calls.
+CONVERSATION_QUERY = (
+    "MATCH (c:Conversation {{id: '{id}'}}) "
+    "OPTIONAL MATCH (c)-[:HAS_MESSAGE]->(m:Message) "
+    "OPTIONAL MATCH (c)-[:HAS_STEP]->(s:AgentStep)-[:USED_TOOL]->(t:ToolCall) "
+    "RETURN c, m, s, t"
+)
 RULE = "=" * 72
 DETAIL_WIDTH = 100
 
@@ -403,6 +411,7 @@ def print_stored(nams: httpx.Client | None, session_id: str, seen: set[str]) -> 
         )
         return
     print(f"\nIn NAMS: user {stored.user}, conversation {stored.conversation}")
+    print(f"  Query Console: {CONVERSATION_QUERY.format(id=stored.conversation)}")
 
 
 def _wrap(label: str, text: str) -> str:
@@ -553,9 +562,9 @@ def main() -> int:
     print_summary(rows)
     if not args.ask:
         print(
-            "\nNext: open MLflow to see the same calls as spans, and open NAMS at "
-            "https://memory.neo4jlabs.com/ to see each question as a conversation. "
-            "The \"In NAMS\" line under each answer names the user and conversation id."
+            "\nNext: open MLflow to see the same calls as spans. To see a stored question "
+            "in NAMS, open the Query Console at https://memory.neo4jlabs.com/ and paste the "
+            "query under that answer."
         )
     return 0
 

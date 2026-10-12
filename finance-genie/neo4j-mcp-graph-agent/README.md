@@ -6,7 +6,7 @@ What you'll see:
 
 - **Graph and Genie answers:** The agent answers connection questions with read-only Cypher and number questions with Genie. Each MLflow trace shows which source it called and what it asked.
 - **Memory across sessions:** A new session picks up what the same analyst asked before.
-- **Memory you can inspect:** NAMS shows each analyst's conversations, reasoning traces, and the entities it found.
+- **Memory you can inspect:** NAMS stores each analyst's conversations, reasoning traces, and the entities it found.
 
 ## Table of contents
 
@@ -288,11 +288,28 @@ The agent picks its route on every run. A result of `different` is worth a look 
 
 ### See the memory in NAMS
 
-Open your NAMS workspace at https://memory.neo4jlabs.com/ and find your user.
+Open your NAMS workspace at https://memory.neo4jlabs.com/.
 
 - **User:** The deployed app uses your Databricks email. The local server uses `demo-analyst`.
-- **Conversations:** Each question is its own conversation, with its messages and a reasoning trace.
-- **Entities:** Entities such as Account 15940 and Community 19766 appear after NAMS extracts them. They lag the write by seconds to minutes.
+- **Conversations:** Each question is its own conversation, with its messages and a reasoning trace. The Memory Browser does not show conversations, because it shows only entities. Open the Query Console instead. With `MEMORY_API_KEY` set, the demo prints an `In NAMS` line under each answer. That line names the user and the conversation id, and the line after it is a query to paste into the Query Console. The query draws the conversation with its messages, reasoning steps, and tool calls:
+
+  ```cypher
+  MATCH (c:Conversation {id: '<conversation id>'})
+  OPTIONAL MATCH (c)-[:HAS_MESSAGE]->(m:Message)
+  OPTIONAL MATCH (c)-[:HAS_STEP]->(s:AgentStep)-[:USED_TOOL]->(t:ToolCall)
+  RETURN c, m, s, t
+  ```
+
+  To list every conversation from a demo run, query by user instead. This query returns the latest 20 questions for one user, newest first. The `metadata` column holds the demo session id as `client_session_id`:
+
+  ```cypher
+  MATCH (c:Conversation)-[:HAS_MESSAGE]->(m:Message {role: 'user'})
+  WHERE c.userId = '<your user>'
+  RETURN c.id, c.metadata, m.content, c.createdAt
+  ORDER BY c.createdAt DESC LIMIT 20
+  ```
+
+- **Entities:** Entities such as Account 15940 and Community 19766 appear in the Memory Browser after NAMS extracts them. They lag the write by seconds to minutes.
 
 ## Long-term memory and the ontology
 

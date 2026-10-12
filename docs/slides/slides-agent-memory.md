@@ -109,7 +109,7 @@ say AI Gateway for the model route.
 - **Unity Catalog MCP service:** It allows read-only Cypher on the graph.
 - **Genie Agent:** It answers value questions over the Gold tables.
 - **AI Gateway model:** Any chat model writes the answer.
-- **MLflow and sessions:** Every model call and tool call is recorded.
+- **MLflow and sessions:** Every call is recorded.
 
 </div>
 <div>
@@ -406,9 +406,10 @@ so short-term recall is filtered to the caller's identity, and the
 deployed app takes that identity from the Databricks Apps proxy
 rather than from the request body. The findings are shared, so
 long-term recall searches a graph that every analyst's
-conversations built. Databricks managed memory, in Beta, is keyed
-per actor, so it would hold one analyst's entries rather than the
-team's merged graph. Reasoning traces are saved for the NAMS
+conversations built. Databricks managed memory, in Beta, stores
+text entries under an actor key. A team can share one key, but the
+entries stay flat text found by keyword search, not a merged graph
+of entities. Reasoning traces are saved for the NAMS
 console and are not recalled by the agent. If NAMS is slow or
 down, the agent answers without memory. The local server honors a
 body user_id, and so does the deployed app for callers listed in
@@ -702,14 +703,14 @@ slide B5 describes.
 - **Long-term memory is a graph.** It carries findings across analysts.
 - **An ontology types that graph.** It adds finance types and relationships.
 
-**Databricks runs the agent. Neo4j remembers for the team.**
-
 </div>
 <div>
 
 - **Project:** [neo4j-mcp-graph-agent on GitHub](https://github.com/neo4j-partners/graph-on-databricks/tree/main/finance-genie/neo4j-mcp-graph-agent)
 - **Quick start:** The README runs the agent locally with `make dev` or deploys it with `make deploy`.
 - **Memory console:** [memory.neo4jlabs.com](https://memory.neo4jlabs.com/)
+
+**Databricks runs the agent. Neo4j remembers for the team.**
 
 </div>
 </div>
