@@ -83,11 +83,12 @@ fraud graph through the Neo4j MCP service and remembers through the
 Neo4j Agent Memory Service, NAMS for short. That gives two graphs: a
 domain graph and a memory graph. Once both exist, Genie One can use
 the same two MCP servers to answer natural language questions. The
-ontology section at the end shows what typing the memory graph
-changes.
+ontology slides are in the backup, for questions about what typing
+the memory graph changes.
 
-The order is: the joint architecture, two slides on the Databricks
-half, the problem in human terms, then the Neo4j half and the demos.
+The order is: the joint architecture, the fraud data, the Neo4j
+half on agent memory and its demo, then the Databricks half and its
+demo.
 
 Product names were checked in October 2026. Genie Agents were called
 Genie Spaces until July 2026, so say "Genie Agent" on stage even
@@ -141,8 +142,8 @@ The NAMS key lives in the secret scope nams, and the app reads it
 as MEMORY_API_KEY.
 
 The next slide is the diagram of the same parts. After it come
-three slides on agent memory and NAMS, the memory demo, two slides
-on the Databricks half, and the Databricks demo.
+the fraud data, three slides on agent memory and NAMS, the memory
+demo, two slides on the Databricks half, and the Databricks demo.
 -->
 
 ---
@@ -167,6 +168,32 @@ the MLflow traces on its own.
 The "Durable server" box is the Agent Bricks DurableAgentServer. It
 wraps the agent loop in an HTTP server, serves the invocation API,
 and recovers runs after a crash or restart.
+-->
+
+---
+
+## Demo Use Case: A Fraud Graph
+
+- **A synthetic banking network.** Accounts, customers, merchants, phones, and addresses.
+- **Money moves between accounts.** `TRANSFERRED_TO` carries the amount.
+- **Customers link to phones and addresses.** A shared one ties identities together.
+- **A fraud ring is a dense community of accounts.** Graph analysis scores each account with `community_id` and `risk_score`.
+
+```
+(Customer)-[:OWNS]->(Account)-[:TRANSFERRED_TO]->(Account)
+(Customer)-[:HAS_PHONE]->(Phone)   (Account)-[:TRANSACTED_WITH]->(Merchant)
+```
+
+<!--
+The audience has not seen the other finance-genie decks, so this
+is the only introduction to the data. Stay on the graph model: five
+node labels and the relationships that connect them. There is no
+fraud label. A ring candidate is a community of 50 to 200 accounts
+with a high average risk score, and the agent treats that as a
+signal, not a verdict. The pipeline that builds the graph and
+writes the scores is the backup slide "Graph Scores Become Gold
+Columns", and the full version is in slides.md. The next slide
+starts the agent memory half.
 -->
 
 ---
@@ -257,36 +284,10 @@ steps that register NAMS as a Unity Catalog MCP service.
 -->
 ---
 
-## Demo Use Case: A Fraud Graph
-
-- **A synthetic banking network.** Accounts, customers, merchants, phones, and addresses.
-- **Money moves between accounts.** `TRANSFERRED_TO` carries the amount.
-- **Customers link to phones and addresses.** A shared one ties identities together.
-- **A fraud ring is a dense community of accounts.** Graph analysis scores each account with `community_id` and `risk_score`.
-
-```
-(Customer)-[:OWNS]->(Account)-[:TRANSFERRED_TO]->(Account)
-(Customer)-[:HAS_PHONE]->(Phone)   (Account)-[:TRANSACTED_WITH]->(Merchant)
-```
-
-<!--
-The audience has not seen the other finance-genie decks, so this
-is the only introduction to the data. Stay on the graph model: five
-node labels and the relationships that connect them. There is no
-fraud label. A ring candidate is a community of 50 to 200 accounts
-with a high average risk score, and the agent treats that as a
-signal, not a verdict. The pipeline that builds the graph and
-writes the scores is the backup slide "Graph Scores Become Gold
-Columns", and the full version is in slides.md. The next slide is
-the demo.
--->
-
----
-
 ## Demo: Memory in the Agent, Then in Genie One
 
 1. **The agent remembers the analyst.** A new session recalls the hub account the analyst looked at last time.
-2. **NAMS holds that memory.** The stored conversation shows the question, the answer, and every tool call.
+2. **Optional: NAMS holds that memory.** The stored conversation shows the question, the answer, and every tool call.
 3. **The agent remembers the team.** A new analyst asks about Community 3040 and gets findings that other analysts made.
 4. **NAMS shows who shared it.** One conversation id leads to every analyst who talked about Community 3040.
 5. **Ask Genie One** "What was I investigating last time?"
@@ -305,16 +306,18 @@ the answer names Community 19766. Step 3 starts a new session and
 asks what the analyst was looking at last time. The answer names
 Account 15940, and this session never did. Step 5 goes to the
 graph, then to Genie. Point to the ids, not the wording, because
-the answer text changes from run to run. Then paste the step 2
-conversation id into the NAMS Query Console. It draws the
-conversation that step 3 recalled.
+the answer text changes from run to run. The short-term view in
+the NAMS Query Console is optional. If there is time, paste the
+step 2 conversation id into it. It draws the conversation that
+step 3 recalled. Skip it when time is short, because the long-term
+view below makes the main point.
 
 Then long-term memory. Run turn 2 as a new analyst B, who asks
 what is already known about Community 3040. The answer opens with
 notes from earlier investigations, such as the case that investigated
 Community 3040 and its rank among ring candidates. Analyst B
 shares no session with anyone. Then paste analyst A's conversation
-id into the second query. It lists every analyst, from different
+id into the long-term query in the NAMS Query Console. It lists every analyst, from different
 teams, whose conversations mentioned Community 3040. That is the
 entity graph NAMS built from storing conversations.
 
@@ -354,10 +357,7 @@ around it. Then hand over.
 
 - **One platform:** Agent Bricks builds, deploys, and governs agents on Databricks.
 - **Any model, any harness:** Unity Gateway serves the models. Agent Runtime hosts any framework.
-- **Managed builders:** Knowledge Assistant, Supervisor Agent, and Genie Agents need no code.
 - **Code-first path:** The Agent Bricks CLI deploys your own agent to a Databricks App.
-- **Tools:** Agents call Unity Catalog functions, Genie Agents, and MCP services.
-- **Observability and governance:** MLflow traces every call. Unity Gateway governs it.
 
 <!--
 The Databricks docs open with one sentence: "Agent Bricks is the
@@ -397,10 +397,8 @@ Sources:
 
 - **Deploy:** One `agentbricks deploy` puts the agent on a Databricks App.
 - **Identity:** The Apps proxy forwards who is asking.
-- **Model choice:** One variable picks any chat model on AI Gateway.
 - **Governed tools:** The Neo4j MCP service and the Genie Agent are Unity Catalog objects.
 - **Observability:** Every model call and tool call lands in an MLflow trace.
-- **Memory on Lakebase:** Managed sessions and managed memory are both in Beta.
 
 <!--
 This is the Databricks half applied to the agent in this repo.
@@ -410,7 +408,7 @@ proxy adds, and backup slide B4 has the rules. The model is
 LLM_MODEL in the app config, and the route is the one the diagram
 calls AI Gateway. The MCP service and the Genie Agent are Unity
 Catalog objects, so grants and audit work like any other tool.
-Every run lands in MLflow Tracing, and the demos open those traces.
+Every run lands in MLflow Tracing, and the Databricks demo opens one.
 
 Managed sessions and managed memory entered Beta on September 16,
 2026. Sessions hold the short-term conversation state. Managed
@@ -424,7 +422,7 @@ actor_id separates memories but "is not an access control".
 Say the managed memory contrast only if someone asks. Managed
 memory holds text entries per actor and finds them by keyword.
 That reading of the docs is ours. The team's findings are entities
-and relationships that merge across analysts, and that is a graph.
+that every analyst's conversations feed, and that is a graph.
 This app uses the Agent Bricks session store and NAMS, and not
 managed memory. The next slide is the Databricks demo.
 
@@ -479,9 +477,9 @@ repeats agent questions, it will feel like the same demo twice.
 </div>
 
 <!--
-The README quick start comes first. The ontology example and the
-long-term memory demo follow, in that order, from the README's
-"Ontology and long-term memory" section. The last bullet is the
+The README quick start comes first. The long-term memory demo and
+the ontology example follow, in that order, from the README's
+"Long-term memory and the ontology" section. The last bullet is the
 demo's payoff, said once more: the memory left the agent, and
 Genie One read it through the NAMS MCP server.
 -->
@@ -490,7 +488,7 @@ Genie One read it through the NAMS MCP server.
 
 # Backup
 
-The numbered slides cover the demo steps, the metric definitions, the full ontology, the recall limits, the NAMS MCP service, the experiment caveats, and the memory limits. The slides after them are the detail that the 30-minute talk skips: the two graphs, the enrichment pipeline, how the app uses each memory type, the long-term memory demo, and the ontology experiment.
+The numbered slides cover the demo steps, the metric definitions, the full ontology, the recall limits, the NAMS MCP service, the experiment caveats, and the memory limits. The slides after them are the detail that this talk skips: the two graphs, the enrichment pipeline, how the app uses each memory type, the long-term memory demo, and the ontology experiment.
 
 ---
 
@@ -666,8 +664,7 @@ of that demo runs before the talk.
 - **Chat history belongs to one session.** Investigations belong to the team.
 
 <!--
-The Databricks half is done. Set up the problem in human terms
-before the Neo4j half. The Monday and Wednesday analysts come back
+This is the problem in human terms. The Monday and Wednesday analysts come back
 on the slide "Demo: One Analyst's Finding Reaches Another", where
 the second analyst gets the first analyst's finding without
 re-running it. Hold the last line: session history and team
@@ -695,12 +692,12 @@ phones to the graph tools, and totals, averages, counts, and
 breakdowns to Genie. A mixed question finds the ids in the graph
 first, then asks Genie about those ids.
 
-The "shared by design" line is the contrast with the previous
-Databricks slide. NAMS extracts entities from every analyst's
-conversations, and the whole team shares them, so the memory
-graph is the team's and not one actor's. The next two slides introduce the
-fraud data. Then "Two Graphs: Domain and Memory" puts the two
-graphs side by side.
+The "shared by design" line is the contrast with Databricks
+managed memory, which keeps text entries per actor. NAMS extracts
+entities from every analyst's conversations, and the whole team
+shares them, so the memory graph is the team's and not one
+actor's. The next slide is the enrichment pipeline. Then "Two
+Graphs: Domain and Memory" puts the two graphs side by side.
 -->
 
 ---
@@ -741,8 +738,8 @@ graph was not modeled at all. It fell out of storing conversations,
 and NAMS extracted the entities on its own servers. Both are Neo4j
 graphs, and both are reachable through MCP. Backup slide B5 shows
 NAMS registered as a Unity Catalog MCP service, which is what lets
-Genie One reach the memory graph later in the deck. The ontology
-section at the end is about typing the memory graph.
+Genie One reach the memory graph in the demo. The ontology slides
+at the end of the backup are about typing the memory graph.
 -->
 
 ---
@@ -756,7 +753,7 @@ section at the end is about typing the memory graph.
 - **Agent Bricks keeps the session.** NAMS holds the team's graph.
 
 <!--
-The diagram before this showed what NAMS stores. This slide is
+The memory diagram in the talk showed what NAMS stores. This slide is
 what the app does with each part, and the point is scope. The two
 scopes are deliberate. An analyst's working context stays theirs,
 so short-term recall is filtered to the caller's identity, and the
@@ -765,8 +762,8 @@ rather than from the request body. The findings are shared, so
 long-term recall searches a graph that every analyst's
 conversations built. Databricks managed memory, in Beta, stores
 text entries under an actor key. A team can share one key, but the
-entries stay flat text found by keyword search, not a merged graph
-of entities. Reasoning traces are saved for the NAMS
+entries stay flat text found by keyword search, not a graph of
+entities. Reasoning traces are saved for the NAMS
 console and are not recalled by the agent. If NAMS is slow or
 down, the agent answers without memory. The local server honors a
 body user_id, and so does the deployed app for callers listed in
@@ -835,9 +832,9 @@ short-term memory. The next three slides move to long-term memory.
 This is the bridge from one analyst's turn to the team's graph.
 Nothing in the app builds the entity graph. NAMS extracts on its
 own servers from the text the app saved, which is why the cleanup
-on the previous slide matters. An entity carries a name, a type,
-and a description, and the ontology section later changes the
-type and the description. The merge is best effort. Some mentions
+on "What the App Saves" matters. An entity carries a name, a type,
+and a description, and the ontology slides later in the backup
+show how the ontology changes the type and the description. The merge is best effort. Some mentions
 merge and others stay as duplicates, so make who-shares finds the
 merged entity instead of a name search. The lag is why turn 1 of
 the team demo runs before the talk.
@@ -1020,8 +1017,7 @@ change, not cause.
 This is the payoff of building two graphs. The agent was the first
 consumer. Once both graphs sit behind Unity Catalog MCP services,
 Genie One can reach them without the agent. The Neo4j MCP server
-has been added to Genie One before. NAMS with Genie One was marked
-untested in the Databricks overview deck, so test it before the
-talk, or show the NAMS tools through the Playground as backup
-slide B5 describes.
+has been added to Genie One before. NAMS with Genie One was tested,
+and the memory demo uses it. If it stalls, show the NAMS tools
+through the Playground as backup slide B5 describes.
 -->

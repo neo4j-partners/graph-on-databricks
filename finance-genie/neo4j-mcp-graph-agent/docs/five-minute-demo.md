@@ -68,7 +68,9 @@ Do these steps before the talk. They are not part of the five minutes.
    - **Step 3, Recall:** A new session asks "What was I looking at last time?" The answer names Account 15940, although this session never did. The app read it from your earlier conversation in NAMS.
    - **Step 5, Graph, then lakehouse:** The agent asks the graph which phones are shared. Then it asks Genie for the balances of those accounts.
 
-### 2. Short-term memory in NAMS (about 30 seconds)
+### 2. Short-term memory in NAMS (optional, about 30 seconds)
+
+Skip this step when time is short. Step 4 shows long-term memory in NAMS, which makes the main point.
 
 1. **Copy the conversation id from step 2:** Under the step 2 answer, the script prints a line like `In NAMS: user <your email>, conversation <id>`. Copy that id.
 
