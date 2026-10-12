@@ -38,6 +38,14 @@ updates:
     ignore:
       # Pinned to a git commit in enrichment-pipeline; bump the rev by hand.
       - dependency-name: "databricks-tools-core"
+      # supplier-risk-graph excludes 2.x on purpose: gds.py is written against
+      # the v1 API. See the comment in supplier-risk-graph/pyproject.toml.
+      - dependency-name: "graphdatascience"
+        update-types: ["version-update:semver-major"]
+      # Pinned in agentic-commerce/pyproject.toml and again in the serving
+      # pip_requirements in retail_agent/deployment/deploy_agent.py; bump both
+      # by hand.
+      - dependency-name: "neo4j-agent-memory"
     groups:
       uv-version:
         applies-to: version-updates
@@ -56,6 +64,11 @@ updates:
       interval: "monthly"
     cooldown:
       default-days: 7
+    ignore:
+      # Neither app has a CI build, so major bumps (TypeScript 7, motion 14,
+      # react-table 9) are taken by hand after a local build.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       bun-version:
         applies-to: version-updates
