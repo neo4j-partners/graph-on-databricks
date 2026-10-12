@@ -49,6 +49,27 @@ def _is_trusted(headers: dict[str, str]) -> bool:
     return any(headers.get(name, "").strip() in trusted for name in _TRUSTED_CALLER_HEADERS)
 
 
+def _untrusted_user_id_error(
+    payload: dict[str, Any], headers: dict[str, str], caller: tuple[str, str]
+) -> dict[str, str] | None:
+    """Return an error when a caller outside the allowlist asks to act as another user.
+
+    Rejecting the request, instead of quietly saving the turn under the caller, makes a missing
+    MEMORY_TRUSTED_CALLERS entry show up on the first turn. The message names the value to add.
+    """
+    value = payload.get("input", [])
+    body_user = value.get("user_id") if isinstance(value, dict) else None
+    if not body_user or body_user == caller[1] or _is_trusted(headers):
+        return None
+    return {
+        "code": "MEMORY_CALLER_NOT_TRUSTED",
+        "message": (
+            f"The caller {caller[1]} sent a user_id, but it is not in MEMORY_TRUSTED_CALLERS. "
+            f"Add {caller[1]} to MEMORY_TRUSTED_CALLERS in app.yaml, then deploy again."
+        ),
+    }
+
+
 def _bind(
     payload: dict[str, Any], headers: dict[str, str], caller: tuple[str, str] | None
 ) -> None:
@@ -114,6 +135,7 @@ class MemoryIdentityMiddleware:
     Only ``POST /api/invocations`` is touched, and only on the request side, so streaming and
     status responses pass through unchanged. A client-supplied ``memory_user_id`` is discarded.
     A body ``user_id`` is honored only locally or from a caller in ``MEMORY_TRUSTED_CALLERS``.
+    Any other caller that sends a ``user_id`` other than its own gets a 403.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -151,6 +173,10 @@ class MemoryIdentityMiddleware:
             payload = None
         # Anything the route would reject anyway passes through so it returns its normal 422.
         if isinstance(payload, dict) and isinstance(payload.get("input", []), list | dict):
+            if caller is not None and (error := _untrusted_user_id_error(payload, headers, caller)):
+                logger.warning("memory identity rejected: %s", error["message"])
+                await JSONResponse({"error": error}, status_code=403)(scope, receive, send)
+                return
             _bind(payload, headers, caller)
             body = json.dumps(payload).encode()
             scope = _with_content_length(scope, len(body))

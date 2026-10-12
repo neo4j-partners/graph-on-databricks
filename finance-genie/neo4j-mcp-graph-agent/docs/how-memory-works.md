@@ -30,7 +30,7 @@ How one turn flows:
 - **Conversations:** Before the agent runs, the app lists the user's latest conversations and reads the last two.
 - **Entities:** The app pulls terms such as "Community 3040" out of the prompt and searches the long-term entity graph for each one. NAMS builds this graph from every analyst's conversations, so entities carry findings across users. The NAMS entity search matches keywords, so the app searches short terms instead of the full prompt. [Long-term memory](longterm.md) shows two demos of this.
 - **Where recall goes:** The recalled text goes into the agent instructions as background. It stays out of the message input, because Agent Bricks saves input to the session store.
-- **User:** In a deployed app, the user is the caller's `X-Forwarded-Email` header, or `X-Forwarded-User` when the email is missing. The app ignores a `user_id` in the request body, unless the caller is listed in `MEMORY_TRUSTED_CALLERS`. A request without a forwarded identity gets a 401. Locally, send `user_id` next to `messages`. Without it, the app uses `session_id` as the user, and recall finds only turns from that session.
+- **User:** In a deployed app, the user is the caller's `X-Forwarded-Email` header, or `X-Forwarded-User` when the email is missing. The app accepts a `user_id` in the request body only from a caller listed in `MEMORY_TRUSTED_CALLERS`. Any other caller that sends a `user_id` gets a 403, and the error names the value to add. A request without a forwarded identity gets a 401. Locally, send `user_id` next to `messages`. Without it, the app uses `session_id` as the user, and recall finds only turns from that session.
 - **Limits:** Recall waits at most 10 seconds and adds at most 2000 characters.
 
 ## When NAMS is not available

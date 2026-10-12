@@ -72,42 +72,51 @@ The local server runs the same code as the deployed app. It needs no secret scop
    make secrets
    ```
 
-4. **Deploy:** This deploys the app `agent-bricks-neo4j-graph-agent` and prints its URL. On the first deploy, it adds the app resource `nams-api-key`, which points at the secret `nams/memory-api-key` with `READ` permission, and deploys again. To check it, open the app's Resources tab.
+4. **Trust your user:** Some tools act as several made-up analysts, so NAMS gets memory from more than one person. `make traffic` and the long-term memory demo work this way. Each request names its analyst in a `user_id` field. The app accepts that field only from callers listed in `MEMORY_TRUSTED_CALLERS` in `app.yaml`. This rule stops one user from reading another user's memory. Add yourself to the list now, before the first deploy. The app reads `app.yaml` only when it deploys, so a later change needs another deploy.
 
-   ```bash
-   make deploy
-   ```
-
-5. **Grant Genie access:** This grants the app what Genie needs to run its SQL. Run it once after the first deploy. It is safe to run again, and `make grant-genie DRY_RUN=1` only prints the grants.
-
-   ```bash
-   make grant-genie
-   ```
-
-6. **Test (optional):** `make smoke` asks the app one question in a new session. `make logs` streams the app logs until you press Ctrl-C. Set another question with `make smoke QUESTION="..."`.
-
-   ```bash
-   make smoke
-   make logs
-   ```
-
-7. **Fill NAMS with traffic (optional):** This sends 24 fake analyst turns through the app. [Generate traffic](docs/traffic.md) covers larger runs and the Databricks Job. When the run ends, it checks that NAMS stored every turn, which needs `MEMORY_API_KEY` in your shell or in `.env`. Laptop traffic calls the app as you, and the app honors the synthetic analyst ids only from callers listed in `MEMORY_TRUSTED_CALLERS`. Otherwise it saves every turn under your own user. So first add your Databricks user email to that entry in `app.yaml`. The checked-in values belong to this repo's workspace, so replace them with your own. The first command prints your email.
+   This command prints your Databricks user name, which is usually your email:
 
    ```bash
    databricks current-user me -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .userName
    ```
+
+   Put that value in `app.yaml`. Replace the values that are there now, because they belong to this repo's workspace. The match is exact, so copy the value as printed.
 
    ```yaml
    - name: MEMORY_TRUSTED_CALLERS
      value: <your-email>
    ```
 
-   The match is exact, so copy the email as printed. If you also run traffic as a Databricks Job, add the job's service principal application id too, comma-separated. [Generate traffic](docs/traffic.md) creates that principal and prints the id. Then deploy again and run the traffic.
+   The list can hold more than one value, separated by commas. You need a second value only if you run traffic as a Databricks Job. [Run it as a Databricks Job](docs/traffic.md#run-it-as-a-databricks-job) covers that.
+
+   If you skip this step, the other steps still work. Only the tools that send a `user_id` fail. Their first request gets a 403 error, and the error names the exact value to add. Add it, run `make deploy`, then run the tool again.
+
+5. **Deploy:** This deploys the app `agent-bricks-neo4j-graph-agent` and prints its URL. On the first deploy, it adds the app resource `nams-api-key`, which points at the secret `nams/memory-api-key` with `READ` permission, and deploys again. To check it, open the app's Resources tab.
 
    ```bash
    make deploy
+   ```
+
+6. **Grant Genie access:** This grants the app what Genie needs to run its SQL. Run it once after the first deploy. It is safe to run again, and `make grant-genie DRY_RUN=1` only prints the grants.
+
+   ```bash
+   make grant-genie
+   ```
+
+7. **Test (optional):** `make smoke` asks the app one question in a new session. `make logs` streams the app logs until you press Ctrl-C. Set another question with `make smoke QUESTION="..."`.
+
+   ```bash
+   make smoke
+   make logs
+   ```
+
+8. **Fill NAMS with traffic (optional):** This sends 24 questions from 6 made-up analysts through the app, so NAMS has memory to show. It needs your user in `MEMORY_TRUSTED_CALLERS` from step 4. When the run ends, it checks that NAMS stored every turn. That check needs `MEMORY_API_KEY` in your shell or in `.env`. [Generate traffic](docs/traffic.md) covers larger runs and running it as a Databricks Job.
+
+   ```bash
    make traffic
    ```
+
+   If the first turn fails with a 403, your user is missing from the list. The error names the value to add. Add it to `MEMORY_TRUSTED_CALLERS` in `app.yaml`, run `make deploy`, then run `make traffic` again.
 
 ## Architecture
 

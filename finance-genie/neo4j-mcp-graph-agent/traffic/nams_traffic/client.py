@@ -74,6 +74,10 @@ class AppClient:
             response.raise_for_status()
             status_url = response.json()["status_url"]
             return self._wait(status_url, stop)
+        except httpx.HTTPStatusError as error:
+            # The body carries the app's reason, such as which caller to add to the allowlist.
+            response = error.response
+            raise TurnFailed(f"HTTP {response.status_code}: {response.text}") from error
         except (httpx.HTTPError, KeyError, ValueError) as error:
             raise TurnFailed(f"{type(error).__name__}: {error}") from error
 

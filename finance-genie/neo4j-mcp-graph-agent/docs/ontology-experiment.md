@@ -61,7 +61,7 @@ Confirm which baseline ran from the `ontology_version_id` and `ontology_name` in
 
 Run trial 1 with the baseline you set above. As run, this was the generic default (`--baseline default`). Step 3 records which version actually ran.
 
-1. **Run the traffic:** The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be trusted before the deploy, as step 7 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains. Otherwise all 24 turns land under your own user.
+1. **Run the traffic:** The run sends 24 turns. It needs 6 users, because users 1 and 6 investigate the same community, Community 3040, from different teams. That shows one entity shared across analysts. Your user must be in `MEMORY_TRUSTED_CALLERS`, as step 4 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains. Otherwise the first turn fails with a 403.
 
    ```bash
    cd traffic

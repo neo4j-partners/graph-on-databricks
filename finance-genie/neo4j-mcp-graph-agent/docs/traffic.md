@@ -35,9 +35,9 @@ Or run `make traffic` from `neo4j-mcp-graph-agent/`. It runs the same live run w
 
 The dry run prints the plan and calls nothing. The second command signs in with your profile. This run is 24 turns. The setting `--users 6` is the smallest run that shows one community shared by two analysts.
 
-The run calls the app as you. Your user must be trusted before the deploy, as step 7 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains.
+The run calls the app as you. Your user must be in `MEMORY_TRUSTED_CALLERS`, as step 4 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains. If it is not, the first turn fails with a 403, and the error names the value to add.
 
-**Check NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`. Then check the app logs. Open the app's Logs tab, or run `agentbricks deployments logs agent-bricks-neo4j-graph-agent`. The shortcut is `make logs`. Each line that starts with `memory identity bound:` should show `user=nams-load-...` and a `trusted caller` source. If it shows `user=<your email>` instead, your email is missing from `MEMORY_TRUSTED_CALLERS`. Fix it as step 7 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains, then deploy again.
+**Check NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`. Then check the app logs. Open the app's Logs tab, or run `agentbricks deployments logs agent-bricks-neo4j-graph-agent`. The shortcut is `make logs`. Each line that starts with `memory identity bound:` should show `user=nams-load-...` and a `trusted caller` source.
 
 | Option | What it sets | Default |
 | --- | --- | --- |
@@ -96,7 +96,7 @@ The Databricks Apps proxy returns a 401 for the token that a job gets from its o
      --json '{"access_control_list":[{"service_principal_name":"'"$SP_CLIENT_ID"'","permission_level":"CAN_USE"}]}'
    ```
 
-4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Add the principal's application id to that entry in `app.yaml`, then run `agentbricks deploy neo4j-graph-agent` again. Or run `make deploy`. The checked-in entry holds the `nams-traffic-runner` application id and a user from this repo's workspace. If you created a new principal, replace the id with `$SP_CLIENT_ID`. Separate the values with commas. Keep your own user email there for laptop runs, as step 7 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains. If the principal is missing, the app ignores the synthetic users and saves every traffic turn under the principal itself.
+4. **Trust the principal's user ids:** The app honors the `user_id` in a request only from callers listed in `MEMORY_TRUSTED_CALLERS`. Add the principal's application id to that entry in `app.yaml`, then run `agentbricks deploy neo4j-graph-agent` again. Or run `make deploy`. The checked-in entry holds the `nams-traffic-runner` application id and a user from this repo's workspace. If you created a new principal, replace the id with `$SP_CLIENT_ID`. Separate the values with commas. Keep your own user email there for laptop runs, as step 4 of [Quick start cloud with make](../README.md#quick-start-cloud-with-make) explains. If the principal is missing, the job's first turn fails with a 403, and the error names the value to add.
 
    ```yaml
    - name: MEMORY_TRUSTED_CALLERS
@@ -126,13 +126,13 @@ To check a run:
 
 - **Job output:** Open the run URL that `bundle run` prints. The log ends with `done ok=N failed=0`.
 - **NAMS:** Open your NAMS workspace and look for users named `nams-load-<run-id>-user-NNNN`. The run id is in the first log line.
-- **Bound identity:** After deploy, check the logs for the bound principal of a traffic turn. Open the app's Logs tab and find a line that starts with `memory identity bound:`. A traffic turn should show `user=nams-load-...` and a `trusted caller` source that names the header and the principal. If it shows `user=<the principal>` instead, the principal is missing from `MEMORY_TRUSTED_CALLERS`, or the proxy sends it in a different header.
+- **Bound identity:** After deploy, check the logs for the bound principal of a traffic turn. Open the app's Logs tab and find a line that starts with `memory identity bound:`. A traffic turn should show `user=nams-load-...` and a `trusted caller` source that names the header and the principal.
 
 If something fails:
 
 - **401 from the app:** The principal lacks `CAN_USE` on the app, or the credentials in the scope are wrong.
 - **`no value assigned to required variable app_url`:** Add `--var app_url=...` to the command.
 - **No data in NAMS:** Check that the `nams-api-key` resource is still attached to the app.
-- **All turns under one user in NAMS:** The principal is not in `MEMORY_TRUSTED_CALLERS`. See step 4.
+- **403 from the app:** The principal is not in `MEMORY_TRUSTED_CALLERS`. The error names the value to add. See step 4.
 
 The app is not part of this bundle. `agentbricks deploy` provisions its runtime store, session store, and MCP grants, and a bundle app resource would conflict with that.

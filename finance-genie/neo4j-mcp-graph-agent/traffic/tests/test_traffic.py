@@ -238,3 +238,21 @@ def test_service_principal_client_reads_credentials_from_the_scope(monkeypatch):
         "client_secret": "the-secret",
         "auth_type": "oauth-m2m",
     }
+
+
+def test_an_http_error_reports_the_apps_reason():
+    from types import SimpleNamespace
+
+    import httpx
+    from nams_traffic.client import AppClient
+
+    reason = '{"error": {"message": "Add me@example.com to MEMORY_TRUSTED_CALLERS"}}'
+    workspace = SimpleNamespace(config=SimpleNamespace(authenticate=dict))
+    client = AppClient("https://app", workspace)
+    client._http = httpx.Client(
+        base_url="https://app",
+        transport=httpx.MockTransport(lambda request: httpx.Response(403, text=reason)),
+    )
+    [request] = build_requests(1, 1, 1, "r1")
+    with pytest.raises(TurnFailed, match="HTTP 403: .*Add me@example.com"):
+        client.invoke(request, threading.Event())

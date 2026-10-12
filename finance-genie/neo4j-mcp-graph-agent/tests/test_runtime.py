@@ -151,11 +151,26 @@ def _request(user_id: str | None = None, **extra) -> dict:
     return {"id": str(uuid.uuid4()), "session_id": "s-1", "input": payload}
 
 
-async def test_untrusted_caller_cannot_spoof_user_id(deployed):
-    body = _request("analyst-b@example.com", memory_user_id="analyst-b@example.com")
+async def test_untrusted_caller_user_id_is_rejected_with_the_fix(deployed):
+    body = _request("analyst-b@example.com")
+    scope, _, sent = await _call({"X-Forwarded-Email": ANALYST}, body)
+    assert scope is None
+    assert sent[0]["status"] == 403
+    error = json.loads(sent[1]["body"])["error"]
+    assert error["code"] == "MEMORY_CALLER_NOT_TRUSTED"
+    assert f"Add {ANALYST} to MEMORY_TRUSTED_CALLERS" in error["message"]
+
+
+async def test_untrusted_caller_cannot_spoof_memory_user_id(deployed):
+    body = _request(memory_user_id="analyst-b@example.com")
     scope, seen, _ = await _call({"X-Forwarded-Email": ANALYST}, body)
     assert _bound_input(seen)[MEMORY_USER_FIELD] == ANALYST
     assert dict(scope["headers"])[b"content-length"] == str(len(seen)).encode()
+
+
+async def test_untrusted_caller_may_send_its_own_user_id(deployed):
+    _, seen, _ = await _call({"X-Forwarded-Email": ANALYST}, _request(ANALYST))
+    assert _bound_input(seen)[MEMORY_USER_FIELD] == ANALYST
 
 
 async def test_allowlisted_caller_user_id_is_honored(deployed):
@@ -183,12 +198,12 @@ async def test_allowlist_matches_any_identity_header_after_strip(deployed, heade
 async def test_allowlist_is_an_exact_match(deployed, monkeypatch):
     monkeypatch.setenv(TRUSTED_CALLERS_ENV, "sp-id")
     for principal in ("sp-id-extra", "sp-i", "xsp-id"):
-        _, seen, _ = await _call({"X-Forwarded-Email": principal}, _request("victim"))
-        assert _bound_input(seen)[MEMORY_USER_FIELD] == principal
+        _, _, sent = await _call({"X-Forwarded-Email": principal}, _request("victim"))
+        assert sent[0]["status"] == 403
 
 
 async def test_principal_falls_back_to_forwarded_user(deployed):
-    _, seen, _ = await _call({"X-Forwarded-User": "12345@6789"}, _request("victim"))
+    _, seen, _ = await _call({"X-Forwarded-User": "12345@6789"}, _request())
     assert _bound_input(seen)[MEMORY_USER_FIELD] == "12345@6789"
 
 
@@ -227,7 +242,7 @@ async def test_missing_input_binds_the_callers_own_identity(deployed):
 
 
 async def test_body_split_across_chunks_is_reassembled(deployed):
-    body = _request("victim")
+    body = _request()
     _, seen, _ = await _call({"X-Forwarded-Email": ANALYST}, body, chunks=2)
     bound = _bound_input(seen)
     assert bound[MEMORY_USER_FIELD] == ANALYST
@@ -254,7 +269,7 @@ async def test_unparseable_body_passes_through(deployed):
 async def test_bound_identity_is_logged_without_the_token(deployed, caplog):
     headers = {"X-Forwarded-Email": ANALYST, "X-Forwarded-Access-Token": "secret-token"}
     with caplog.at_level(logging.INFO, logger="runtime.identity"):
-        await _call(headers, _request("victim"))
+        await _call(headers, _request())
     [record] = [r for r in caplog.records if r.name == "runtime.identity"]
     assert ANALYST in record.getMessage()
     assert "x-forwarded-email" in record.getMessage()
@@ -283,7 +298,7 @@ def test_recovery_keeps_the_identity_bound_at_request_time(deployed, monkeypatch
     async def _invoke(value, context):
         return {"output": [], "status": "completed"}
 
-    body = _request("analyst-b@example.com")
+    body = _request()
     with TestClient(server) as client:
         response = client.post(
             "/api/invocations", json=body, headers={"X-Forwarded-Email": ANALYST}
