@@ -25,7 +25,7 @@ Memory stored as a graph becomes shared knowledge. An ontology shapes how that k
 
 ## Where it fits
 
-- **Source file:** The deck lives at `finance-genie/docs/demo-guide/slides/slides-agent-memory.md`, next to the other Marp decks. This proposal stays in `docs/demo-guide/proposals/`.
+- **Source file:** The deck lives at `docs/slides/slides-agent-memory.md` at the repo root, next to the other Marp decks. This proposal stays in `docs/demo-guide/proposals/`.
 - **Slide build:** The deck uses the `finance` theme, so it joins the `decks` object in `scripts/build-theme-gallery.mjs`, next to `slides.md` and `slides-15min.md`. That object builds every theme variant. The `standaloneDecks` array is the wrong place, because it builds each deck once with the theme from its own front matter.
 - **Build script details:** The general case in `outputFile` already names the variant files. The `requested === "all"` block needs one more `copyFileSync` line, so the build emits `slides-agent-memory.html` as the recommended finance build.
 - **Gallery page:** `renderIndex` in the same script has hardcoded buttons for the two existing decks. A third button for the new deck goes there.

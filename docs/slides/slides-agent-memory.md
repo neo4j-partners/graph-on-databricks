@@ -177,7 +177,7 @@ The next slide is the diagram of the same parts.
 
 ---
 
-![bg contain](./architecture.svg)
+![bg contain](./images/architecture.svg)
 
 <!--
 Walk it left to right. The caller sends a question to the app. The
@@ -234,7 +234,7 @@ section at the end is about typing the memory graph.
 
 ---
 
-![bg contain](./neo4j-agent-memory-diagram.svg)
+![bg contain](./images/neo4j-agent-memory-diagram.svg)
 
 <!--
 The diagram labels its own three parts, so this slide has no title.
@@ -293,7 +293,7 @@ not be saved twice. The write happens after the reply, so the
 caller never waits on NAMS. Recall waits at most 10 seconds and
 adds at most 2000 characters. A recovery run reads memory but does
 not write, so a replayed turn is not saved twice. The sequence
-diagram of these four steps is nams-flow.svg in this folder, if a
+diagram of these four steps is images/nams-flow.svg in this folder, if a
 question calls for it.
 -->
 
@@ -483,7 +483,7 @@ sizes.
 
 <div class="columns">
 <div>
-<img src="./ontology-before-after.png" alt="Entity counts by type for trial 1 and trial 2" style="width: 100%;">
+<img src="./images/ontology-before-after.png" alt="Entity counts by type for trial 1 and trial 2" style="width: 100%;">
 </div>
 <div>
 

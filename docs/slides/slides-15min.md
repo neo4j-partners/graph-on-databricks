@@ -40,7 +40,7 @@ recovery.
 
 ---
 
-![bg contain](./graph_use_cases.png)
+![bg contain](./images/graph_use_cases.png)
 
 <!--
 Graph databases model the data in a wide variety of industries as
@@ -52,7 +52,7 @@ financial crime in transactions, as a worked example.
 
 ---
 
-![bg contain](./what_is_graph.png)
+![bg contain](./images/what_is_graph.png)
 
 <!--
 The graph makes it easy to find hidden patterns. Three kinds of
@@ -238,7 +238,7 @@ slide shows the pull direction.
 
 ---
 
-![w:900 center](./pipeline-architecture.svg)
+![w:900 center](./images/pipeline-architecture.svg)
 <!--
 The pull direction matters. Neo4j does not write to Unity Catalog
 directly; Databricks pulls from Neo4j via the Spark Connector in
@@ -302,7 +302,7 @@ architecture, the payoff. Close on expansion framing.
 
 ---
 
-![bg contain](./graph_ai.png)
+![bg contain](./images/graph_ai.png)
 
 <!--
 This is just one of many examples of how Neo4j works with GenAI.
@@ -320,7 +320,7 @@ The following slides apply when running the demo live or fielding detailed quest
 
 ---
 
-![bg contain](./silver-data-model.svg)
+![bg contain](./images/silver-data-model.svg)
 
 <!--
 Backup: the Silver data model. Show if the audience wants to see

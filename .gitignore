@@ -120,9 +120,9 @@ worklog/
 # Node
 node_modules/
 package-lock.json
-!finance-genie/docs/demo-guide/slides/package-lock.json
-finance-genie/docs/demo-guide/slides/*.pdf
-finance-genie/docs/demo-guide/slides/*.html
+!docs/slides/package-lock.json
+docs/slides/*.pdf
+docs/slides/*.html
 
 # Generated log files
 finance-genie/enrichment-pipeline/logs/

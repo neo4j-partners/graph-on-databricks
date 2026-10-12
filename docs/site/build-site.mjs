@@ -2,7 +2,6 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
-  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -12,11 +11,7 @@ import { fileURLToPath } from "node:url";
 const SITE_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SITE_DIR, "..", "..");
 const BUILD_DIR = join(SITE_DIR, "build");
-const FINANCE_BUILD = join(
-  REPO_ROOT,
-  "finance-genie/docs/demo-guide/slides/build",
-);
-const FINANCE_PATH = "finance-genie";
+const SLIDES_BUILD = join(REPO_ROOT, "docs/slides/build");
 
 const REPO_URL = "https://github.com/neo4j-partners/graph-on-databricks";
 
@@ -27,10 +22,10 @@ const featured = {
     "Neo4j Graph Data Science enriches Databricks Lakehouse tables with network features. PageRank, Louvain communities, and node similarity land in Gold Delta tables as plain columns. Genie can then answer questions about fraud-ring structure and risk communities.",
   tags: ["Fraud", "Graph Data Science", "Genie", "Delta"],
   actions: [
-    { text: "Open full slide deck", href: `./${FINANCE_PATH}/slides.html` },
+    { text: "Open full slide deck", href: "./slides.html" },
     {
       text: "Open 15-minute deck",
-      href: `./${FINANCE_PATH}/slides-15min.html`,
+      href: "./slides-15min.html",
       variant: "secondary",
     },
     {
@@ -51,7 +46,7 @@ const decks = [
     actions: [
       {
         text: "Open slide deck",
-        href: `./${FINANCE_PATH}/slides-agent-memory.html`,
+        href: "./slides-agent-memory.html",
       },
     ],
   },
@@ -64,7 +59,7 @@ const decks = [
     actions: [
       {
         text: "Open slide deck",
-        href: `./${FINANCE_PATH}/databricks-overview.html`,
+        href: "./databricks-overview.html",
       },
     ],
   },
@@ -157,10 +152,10 @@ const related = [
   },
 ];
 
-if (!existsSync(join(FINANCE_BUILD, "index.html"))) {
-  console.error(`Finance Genie build not found at ${FINANCE_BUILD}`);
+if (!existsSync(join(SLIDES_BUILD, "index.html"))) {
+  console.error(`Slides build not found at ${SLIDES_BUILD}`);
   console.error(
-    "Run `npm ci && npm run build:all` in finance-genie/docs/demo-guide/slides first.",
+    "Run `npm ci && npm run build:all` in docs/slides first.",
   );
   process.exit(1);
 }
@@ -168,42 +163,13 @@ if (!existsSync(join(FINANCE_BUILD, "index.html"))) {
 rmSync(BUILD_DIR, { force: true, recursive: true });
 mkdirSync(BUILD_DIR, { recursive: true });
 
-cpSync(FINANCE_BUILD, join(BUILD_DIR, FINANCE_PATH), { recursive: true });
+// The decks publish at the site root.
+cpSync(SLIDES_BUILD, BUILD_DIR, { recursive: true });
 
-// The home page carries the Finance Genie links, so its gallery page is not published.
-writeFileSync(join(BUILD_DIR, FINANCE_PATH, "index.html"), renderRedirect("../"));
-
-// Finance Genie used to publish at the site root. Keep its old deck URLs working.
-for (const file of readdirSync(FINANCE_BUILD)) {
-  if (file.endsWith(".html") && file !== "index.html") {
-    writeFileSync(
-      join(BUILD_DIR, file),
-      renderRedirect(`./${FINANCE_PATH}/${file}`),
-    );
-  }
-}
-
-writeFileSync(join(BUILD_DIR, ".nojekyll"), "");
+// The home page carries the deck links, so it replaces the Marp gallery page.
 writeFileSync(join(BUILD_DIR, "index.html"), renderIndex());
 
 console.log(`Site written to ${BUILD_DIR}`);
-
-function renderRedirect(target) {
-  const href = escapeHtml(target);
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Redirecting</title>
-    <link rel="canonical" href="${href}">
-    <meta http-equiv="refresh" content="0; url=${href}">
-  </head>
-  <body>
-    <p>This page moved to <a href="${href}">${href}</a>.</p>
-  </body>
-</html>
-`;
-}
 
 function renderIndex() {
   return `<!doctype html>

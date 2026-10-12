@@ -94,7 +94,7 @@ to make the structural patterns visible so analysts can investigate.
 
 ---
 
-![bg contain](./silver-data-model.svg)
+![bg contain](./images/silver-data-model.svg)
 
 ---
 
@@ -162,7 +162,7 @@ If nobody asks, offer it.
 
 ---
 
-![bg contain](./what_is_graph.png)
+![bg contain](./images/what_is_graph.png)
 
 ---
 
@@ -367,7 +367,7 @@ that barely interact get excluded.
 
 ---
 
-![w:900 center](./pipeline-architecture.svg)
+![w:900 center](./images/pipeline-architecture.svg)
 <!--
 The pull direction matters. Neo4j does not write to Unity Catalog
 directly; Databricks pulls from Neo4j via the Spark Connector in

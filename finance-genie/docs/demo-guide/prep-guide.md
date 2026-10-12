@@ -23,8 +23,8 @@ Gold answer second. Explain the architecture after the audience sees the gap.
 5. **Show the pipeline:** Silver data loads into Neo4j, GDS computes features, and Databricks writes them to Gold.
 6. **Close with the boundary:** The result is an investigation queue. Analysts make fraud decisions.
 
-Use the [current 15-minute slides](slides/slides-15min.md) for this sequence.
-Use the [full deck](slides/slides.md) when the session allows more detail.
+Use the [current 15-minute slides](../../../docs/slides/slides-15min.md) for this sequence.
+Use the [full deck](../../../docs/slides/slides.md) when the session allows more detail.
 
 ## What Each Platform Does
 

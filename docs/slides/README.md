@@ -1,6 +1,6 @@
-# Workshop Slides
+# Project Slides
 
-Presentation-ready slides formatted for [Marp](https://marp.app/).
+Project-wide slide decks for Graph on Databricks, formatted for [Marp](https://marp.app/).
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ Requires Node.js 22 LTS (`brew install node@22`) and a one-time `npm ci` in this
 
 ```bash
 export PATH="/opt/homebrew/opt/node@22/bin:$PATH"   # only if Node 22 came from Homebrew
-cd finance-genie/docs/demo-guide/slides
+cd docs/slides
 npm ci
 ./node_modules/.bin/marp --server --allow-local-files .
 ```
@@ -46,7 +46,7 @@ The GitHub Pages workflow publishes the full gallery.
 ## Export to PDF
 
 ```bash
-cd finance-genie/docs/demo-guide/slides
+cd docs/slides
 npx marp slides.md --pdf --theme-set themes/finance.css --theme finance
 ```
 

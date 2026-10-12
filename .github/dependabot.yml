@@ -67,7 +67,7 @@ updates:
           - "*"
 
   - package-ecosystem: "npm"
-    directory: "/finance-genie/docs/demo-guide/slides"
+    directory: "/docs/slides"
     schedule:
       interval: "monthly"
     cooldown:

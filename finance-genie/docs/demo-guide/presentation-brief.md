@@ -28,4 +28,4 @@ ring-candidate communities.
 - **Decision boundary:** Graph features identify investigation candidates. Analysts decide which cases need review.
 
 Use the [presenter preparation guide](prep-guide.md) for the full narrative and
-the [slides](slides/slides.md) for the current speaker notes.
+the [slides](../../../docs/slides/slides.md) for the current speaker notes.

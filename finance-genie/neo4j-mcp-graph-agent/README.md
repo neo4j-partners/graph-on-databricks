@@ -91,7 +91,7 @@ The local server runs the same code as the deployed app. It needs no secret scop
    make logs
    ```
 
-7. **Fill NAMS with traffic (optional):** This sends 24 fake analyst turns through the app. [Generate traffic](docs/traffic.md) covers larger runs and the Databricks Job. When the run ends, it checks that NAMS stored every turn, which needs `MEMORY_API_KEY` in your shell or in `.env`. Laptop traffic calls the app as you, and the app honors the synthetic analyst ids only from callers listed in `MEMORY_TRUSTED_CALLERS`. Otherwise it saves every turn under your own user. So first add your Databricks user email to that entry in `app.yaml`, and separate the values with commas. The checked-in values belong to this repo's workspace, so replace them with your own. The first command prints your email.
+7. **Fill NAMS with traffic (optional):** This sends 24 fake analyst turns through the app. [Generate traffic](docs/traffic.md) covers larger runs and the Databricks Job. When the run ends, it checks that NAMS stored every turn, which needs `MEMORY_API_KEY` in your shell or in `.env`. Laptop traffic calls the app as you, and the app honors the synthetic analyst ids only from callers listed in `MEMORY_TRUSTED_CALLERS`. Otherwise it saves every turn under your own user. So first add your Databricks user email to that entry in `app.yaml`. The checked-in values belong to this repo's workspace, so replace them with your own. The first command prints your email.
 
    ```bash
    databricks current-user me -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .userName
@@ -99,10 +99,10 @@ The local server runs the same code as the deployed app. It needs no secret scop
 
    ```yaml
    - name: MEMORY_TRUSTED_CALLERS
-     value: <SP_CLIENT_ID>,<your-email>
+     value: <your-email>
    ```
 
-   The match is exact, so copy the email as printed. Leave out `<SP_CLIENT_ID>` if you do not run traffic as a Databricks Job. Then deploy again and run the traffic.
+   The match is exact, so copy the email as printed. If you also run traffic as a Databricks Job, add the job's service principal application id too, comma-separated. [Generate traffic](docs/traffic.md) creates that principal and prints the id. Then deploy again and run the traffic.
 
    ```bash
    make deploy

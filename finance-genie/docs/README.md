@@ -16,10 +16,10 @@ task.
 - **Presenter preparation:** [Story, positioning, and difficult questions](demo-guide/prep-guide.md).
 - **Question script:** [Before, after, and follow-up Genie questions](demo-guide/genie-questions.md).
 - **Presentation brief:** [Short pitch, abstract, and talk summary](demo-guide/presentation-brief.md).
-- **Slides:** [Marp source, themes, and build instructions](demo-guide/slides/README.md).
+- **Slides:** [Marp source, themes, and build instructions](../../docs/slides/README.md) (repo-wide, lives at `docs/slides/`).
 
-The current presentation source is `demo-guide/slides/slides.md`. The 15-minute
-version is `demo-guide/slides/slides-15min.md`. Older drafts and planning notes
+The current presentation source is `docs/slides/slides.md` at the repo root.
+The 15-minute version is `docs/slides/slides-15min.md`. Older drafts and planning notes
 live in archive directories and are not active guidance.
 
 ## Images

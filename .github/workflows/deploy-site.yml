@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/deploy-finance-genie-slides.yml
-      - finance-genie/docs/demo-guide/slides/**
+      - .github/workflows/deploy-site.yml
+      - docs/slides/**
       - docs/site/**
   workflow_dispatch:
 
@@ -31,15 +31,15 @@ jobs:
           node-version: 22
 
       - name: Install Marp dependencies
-        working-directory: finance-genie/docs/demo-guide/slides
+        working-directory: docs/slides
         run: npm ci
 
       - name: Audit Marp dependencies
-        working-directory: finance-genie/docs/demo-guide/slides
+        working-directory: docs/slides
         run: npm audit --audit-level=high
 
       - name: Build slides
-        working-directory: finance-genie/docs/demo-guide/slides
+        working-directory: docs/slides
         run: npm run build:all
 
       - name: Build site
