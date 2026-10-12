@@ -41,4 +41,4 @@ How one turn flows:
 
 ## Try it
 
-Start the server with [Quick start local with make](../README.md#quick-start-local-with-make), then follow [Run locally](../README.md#run-locally). Its step 2 sends two questions as the same `user_id` in different sessions, and the second answer recalls the first.
+Start the server with [Quick start local with make](../README.md#quick-start-local-with-make), then do its step 5. That step sends two questions as the same `user_id` in different sessions, and the second answer recalls the first.

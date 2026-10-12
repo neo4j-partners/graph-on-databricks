@@ -10,16 +10,25 @@ What you'll see:
 
 ## Table of contents
 
+- [Prerequisites](#prerequisites)
 - [Quick start with make](#quick-start-with-make)
   - [Quick start local with make](#quick-start-local-with-make)
   - [Quick start cloud with make](#quick-start-cloud-with-make)
 - [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Ontology and long-term memory](#ontology-and-long-term-memory)
+- [Demo: short-term memory](#demo-short-term-memory)
+- [Long-term memory and the ontology](#long-term-memory-and-the-ontology)
 - [Clean up](#clean-up)
-- [Demo script](#demo-script)
-- [Run locally](#run-locally)
 - [Documentation](#documentation)
+
+## Prerequisites
+
+- **Tools:** You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), [jq](https://jqlang.org/), and the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/install).
+- **Agent Bricks CLI:** The CLI is in Beta. Install it with `uv tool install databricks-agentbricks`, or run it with `uvx --from databricks-agentbricks agentbricks ...`.
+- **Workspace:** The workspace needs Databricks Apps and Unity Catalog AI Gateway.
+- **MCP service:** The service `graph-on-databricks.finance_genie.finance_genie_mcp` must exist. It must expose the tools `get_neo4j_schema` and `read_neo4j_cypher`. [Create the finance-genie MCP service](docs/mcp-service.md) covers the setup.
+- **Grant right:** You must own the MCP service or have `MANAGE` on it. Deploy grants `EXECUTE` on it for the app.
+- **Genie space:** The agent asks the AFTER Genie space from finance-genie, which covers the gold tables. Set your own space id in the `genie` tool block of `agent.toml`. Deploy grants the app `CAN_RUN` on the space. Then `make grant-genie` grants the warehouse and table access that Genie needs.
+- **NAMS key:** You need a NAMS key from https://memory.neo4jlabs.com/. [Quick start with make](#quick-start-with-make) step 1 covers it.
 
 ## Quick start with make
 
@@ -62,7 +71,25 @@ The local server runs the same code as the deployed app. It needs no secret scop
    make smoke-local
    ```
 
-   [Run locally](#run-locally) shows memory recall across sessions on the local server.
+5. **See memory across sessions (terminal 2, optional):** The agent remembers each user's earlier questions, even in a new session. Locally, you choose the user by sending a `user_id` next to `messages`. This first question tells the agent what `analyst-7` focuses on:
+
+   ```bash
+   agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
+     --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":{"user_id":"analyst-7","messages":[{"role":"user","content":"I focus on hub accounts. Which accounts act as hubs?"}]}}'
+   ```
+
+   Now ask as the same user in a new session. The answer uses the hub focus from the first question, although this session never saw it.
+
+   ```bash
+   agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
+     --json '{"id":"'$(uuidgen)'","session_id":"demo-2","input":{"user_id":"analyst-7","messages":[{"role":"user","content":"What was I looking at last time?"}]}}'
+   ```
+
+   A body `user_id` works locally. A deployed app takes the user from the caller's identity, as [What gets recalled](docs/how-memory-works.md#what-gets-recalled) explains.
+
+If you start the server by hand instead of through make, export `MEMORY_API_KEY` first. `agentbricks dev` reads the NAMS key only from the shell, and it stops with an error if the key is missing.
+
+To run the tests and the CLI check, see [Develop and test](docs/reference.md#develop-and-test).
 
 ### Quick start cloud with make
 
@@ -136,81 +163,9 @@ The parts:
 
 [How memory works](docs/how-memory-works.md) walks through one turn step by step.
 
-## Prerequisites
+## Demo: short-term memory
 
-- **Tools:** You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), [jq](https://jqlang.org/), and the [Databricks CLI](https://docs.databricks.com/aws/en/dev-tools/cli/install).
-- **Agent Bricks CLI:** The CLI is in Beta. Install it with `uv tool install databricks-agentbricks`, or run it with `uvx --from databricks-agentbricks agentbricks ...`.
-- **Workspace:** The workspace needs Databricks Apps and Unity Catalog AI Gateway.
-- **MCP service:** The service `graph-on-databricks.finance_genie.finance_genie_mcp` must exist. It must expose the tools `get_neo4j_schema` and `read_neo4j_cypher`. [Create the finance-genie MCP service](docs/mcp-service.md) covers the setup.
-- **Grant right:** You must own the MCP service or have `MANAGE` on it. Deploy grants `EXECUTE` on it for the app.
-- **Genie space:** The agent asks the AFTER Genie space from finance-genie, which covers the gold tables. Set your own space id in the `genie` tool block of `agent.toml`. Deploy grants the app `CAN_RUN` on the space. Then `make grant-genie` grants the warehouse and table access that Genie needs.
-- **NAMS key:** You need a NAMS key from https://memory.neo4jlabs.com/. [Quick start with make](#quick-start-with-make) step 1 covers it.
-
-## Ontology and long-term memory
-
-NAMS reads each conversation it stores and pulls out entities. The entities form a graph. That graph is the long-term memory. Do these two pages after the quick start, in this order.
-
-1. [Run the ontology example](docs/ontology-experiment.md)
-   - **Ontology:** An ontology is a list of entity types. It tells NAMS what to look for.
-   - **What you do:** You run the same 24 conversations through NAMS twice and compare the results.
-   - **Trial 1:** This trial uses the NAMS Default ontology.
-   - **Trial 2:** This trial uses the finance ontology.
-   - **Warning:** The run resets your NAMS database. Use a database that holds nothing you want to keep.
-2. [Show long-term memory](docs/longterm.md)
-   - **Demo 1:** This demo shows the entity graph in the NAMS console.
-   - **Demo 2:** This demo shows the agent answering a new analyst with another analyst's findings.
-   - **Before you start:** The first step on that page turns on the finance ontology.
-
-## Clean up
-
-Run these from `neo4j-mcp-graph-agent/` with the variables from [Quick start with make](#quick-start-with-make) loaded. The first command also starts you over if a deploy fails and you want a fresh app.
-
-1. **Delete the app:** This deletes the app `agent-bricks-neo4j-graph-agent` and its Agent Bricks Runtime Store. The command asks you to confirm. Add `--yes` to skip the prompt.
-
-   ```bash
-   agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deployments delete agent-bricks-neo4j-graph-agent
-   ```
-
-   **If `deploy` or `delete` fails with "Runtime Store ... does not belong to this app identity":** A Runtime Store with the same name was left behind by an earlier app that was deleted outside `agentbricks`. The store belongs to a service principal that no longer exists, so the CLI refuses to reuse or delete it. To confirm, read the store. Its `owner.app.service_principal_id` differs from your app's `service_principal_client_id`.
-
-   ```bash
-   databricks api get /api/2.0/agents/runtime-stores/agent-bricks-neo4j-graph-agent -p "$DATABRICKS_CONFIG_PROFILE"
-   databricks apps get agent-bricks-neo4j-graph-agent -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .service_principal_client_id
-   ```
-
-   If the two ids differ and the old owner is gone, delete the orphaned store directly. This also deletes the store's database, and it skips the CLI's ownership check, so confirm the ids first. Then run `make deploy` again.
-
-   ```bash
-   databricks api delete /api/2.0/agents/runtime-stores/agent-bricks-neo4j-graph-agent -p "$DATABRICKS_CONFIG_PROFILE"
-   ```
-
-2. **Delete the NAMS secret:** This deletes the secret scope `nams`, which holds the NAMS key. Skip it if you plan to deploy again.
-
-   ```bash
-   databricks secrets delete-scope nams -p "$DATABRICKS_CONFIG_PROFILE"
-   ```
-
-3. **Delete the NAMS data:** The conversations from your runs stay in NAMS. Remove them in your NAMS workspace at https://memory.neo4jlabs.com/, or revoke the key there.
-
-4. **Reset the ontology to the default:** NAMS cannot remove an active ontology. You switch back to the NAMS Default ontology instead. Do this before you repeat the [ontology example](docs/ontology-experiment.md) or the [long-term memory demo](docs/longterm.md) from a clean start.
-
-   ```bash
-   uv run ontology/apply_ontology.py --reset
-   ```
-
-   Or run `make reset-ontology`. The command finds the NAMS Default ontology by name and activates its newest revision that has none of the finance types. It prints the activated version. It needs no saved file.
-
-5. **Clear the saved run files (optional):** The ontology scripts save transcripts and snapshots in `ontology/out/`. This deletes them so the next run starts empty. Git ignores this folder, so the files cannot be restored.
-
-   ```bash
-   rm -f ontology/out/*.json
-   ```
-
-To start the ontology example over, finish steps 3 to 5, then go to [Run the ontology example](docs/ontology-experiment.md).
-
-To deploy again after a cleanup, start at step 3 of [Quick start cloud with make](#quick-start-cloud-with-make). A new app has a new service principal, so run `make grant-genie` again after the deploy.
-
-## Demo script
+This demo shows short-term memory: one analyst's own earlier questions. In step 3, a new session asks "What was I looking at last time?", and the agent answers from that analyst's past conversations. The next section, [Long-term memory and the ontology](#long-term-memory-and-the-ontology), shows memory that is shared across all analysts. Run this demo first, because it needs only the quick start.
 
 The demo script asks six questions in five steps and prints each answer. The steps show the graph, Genie, and memory working together. The evidence is the ids in each answer and the spans in the MLflow trace. The exact answer text changes from run to run.
 
@@ -275,27 +230,78 @@ Open your NAMS workspace at https://memory.neo4jlabs.com/ and find your user.
 - **Conversations:** Each question is its own conversation, with its messages and a reasoning trace.
 - **Entities:** Entities such as Account 15940 and Community 19766 appear after NAMS extracts them. They lag the write by seconds to minutes.
 
-## Run locally
+## Long-term memory and the ontology
 
-[Quick start local with make](#quick-start-local-with-make) starts the server with `make dev`, which loads `.env` for you. This section shows memory recall on that server. Use a second terminal for the requests, because the server keeps running.
+This section shows long-term memory: memory that all analysts share. The demo above shows one analyst's own history. Here, NAMS reads every stored conversation and pulls out entities, such as Community 3040. Those entities form one graph for the whole team. So a new analyst can get findings that another analyst made. The ontology is the list of entity types that tells NAMS what to pull out.
 
-1. **Ask a question (terminal 2):** Export `DATABRICKS_CONFIG_PROFILE` in this shell, then send a request.
+Do these two pages in this order:
+
+1. [Show long-term memory](docs/longterm.md): Do this first, because it is the main point. The page turns on the finance ontology, then runs traffic from six made-up analysts so NAMS has conversations to read. Then it shows two things:
+   - **Demo 1:** The NAMS console shows one entity that several analysts talked about.
+   - **Demo 2:** The agent answers a new analyst with another analyst's findings.
+2. [Run the ontology example](docs/ontology-experiment.md): This page is optional. Do it second, because it goes deeper and it erases your NAMS data. It runs the same 24 conversations through NAMS twice and compares what NAMS pulled out.
+   - **Trial 1:** This trial uses the generic NAMS Default ontology.
+   - **Trial 2:** This trial uses the finance ontology.
+   - **Warning:** The run resets your NAMS database. Use a database that holds nothing you want to keep.
+
+## Clean up
+
+Run these from `neo4j-mcp-graph-agent/` with the variables from [Quick start with make](#quick-start-with-make) loaded.
+
+### Delete the app and its data
+
+The first command also starts you over if a deploy fails and you want a fresh app.
+
+1. **Delete the app:** This deletes the app `agent-bricks-neo4j-graph-agent` and its Agent Bricks Runtime Store. The command asks you to confirm. Add `--yes` to skip the prompt.
 
    ```bash
-   agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
-     --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":[{"role":"user","content":"Which communities look like fraud ring candidates?"}]}'
+   agentbricks --profile "$DATABRICKS_CONFIG_PROFILE" deployments delete agent-bricks-neo4j-graph-agent
    ```
 
-2. **See recall:** Send a `user_id` next to `messages`. Then send a second question with a new `session_id` and the same `user_id`. The second answer uses the hub focus from the first question. A body `user_id` works locally. A deployed app takes the user from the caller's identity, as [What gets recalled](docs/how-memory-works.md#what-gets-recalled) explains.
+2. **Delete the NAMS secret:** This deletes the secret scope `nams`, which holds the NAMS key. Skip it if you plan to deploy again.
 
    ```bash
-   agentbricks endpoint invoke --url http://localhost:8000 --path /api/invocations \
-     --json '{"id":"'$(uuidgen)'","session_id":"demo-1","input":{"user_id":"analyst-7","messages":[{"role":"user","content":"I focus on hub accounts. Which accounts act as hubs?"}]}}'
+   databricks secrets delete-scope nams -p "$DATABRICKS_CONFIG_PROFILE"
    ```
 
-If you start the server by hand instead of through make, export `MEMORY_API_KEY` first: `agentbricks dev` reads the NAMS key only from the shell, and it stops with an error if the key is missing.
+3. **Delete the NAMS data:** The conversations from your runs stay in NAMS. Remove them in your NAMS workspace at https://memory.neo4jlabs.com/, or revoke the key there.
 
-To run the tests and the CLI check, see [Develop and test](docs/reference.md#develop-and-test).
+To deploy again after a cleanup, start at step 3 of [Quick start cloud with make](#quick-start-cloud-with-make). A new app has a new service principal, so run `make grant-genie` again after the deploy.
+
+### Start the ontology example over
+
+Do these after you delete the NAMS data in step 3 above.
+
+1. **Reset the ontology to the default:** NAMS cannot remove an active ontology. You switch back to the NAMS Default ontology instead. Do this before you repeat the [ontology example](docs/ontology-experiment.md) or the [long-term memory demo](docs/longterm.md) from a clean start.
+
+   ```bash
+   uv run ontology/apply_ontology.py --reset
+   ```
+
+   Or run `make reset-ontology`. The command finds the NAMS Default ontology by name and activates its newest revision that has none of the finance types. It prints the activated version. It needs no saved file.
+
+2. **Clear the saved run files (optional):** The ontology scripts save transcripts and snapshots in `ontology/out/`. This deletes them so the next run starts empty. Git ignores this folder, so the files cannot be restored.
+
+   ```bash
+   rm -f ontology/out/*.json
+   ```
+
+Then go to [Run the ontology example](docs/ontology-experiment.md).
+
+### Fix a Runtime Store that blocks deploy or delete
+
+If `deploy` or `delete` fails with "Runtime Store ... does not belong to this app identity", this is the fix. A Runtime Store with the same name was left behind by an earlier app that was deleted outside `agentbricks`. The store belongs to a service principal that no longer exists, so the CLI refuses to reuse or delete it. To confirm, read the store. Its `owner.app.service_principal_id` differs from your app's `service_principal_client_id`.
+
+```bash
+databricks api get /api/2.0/agents/runtime-stores/agent-bricks-neo4j-graph-agent -p "$DATABRICKS_CONFIG_PROFILE"
+databricks apps get agent-bricks-neo4j-graph-agent -p "$DATABRICKS_CONFIG_PROFILE" -o json | jq -r .service_principal_client_id
+```
+
+If the two ids differ and the old owner is gone, delete the orphaned store directly. This also deletes the store's database, and it skips the CLI's ownership check, so confirm the ids first. Then run `make deploy` again.
+
+```bash
+databricks api delete /api/2.0/agents/runtime-stores/agent-bricks-neo4j-graph-agent -p "$DATABRICKS_CONFIG_PROFILE"
+```
 
 ## Documentation
 
