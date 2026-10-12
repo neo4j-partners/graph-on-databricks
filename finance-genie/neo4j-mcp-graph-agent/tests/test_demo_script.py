@@ -92,11 +92,80 @@ def test_ask_sends_the_routing_key_and_returns_the_answer():
     with httpx.Client(
         base_url="http://agent", transport=httpx.MockTransport(handler)
     ) as http:
-        answer = demo.ask(http, {"Authorization": "Bearer t"}, "q", "s1", None)
+        turn = demo.ask(http, {"Authorization": "Bearer t"}, "q", "s1", None)
 
-    assert answer == "ok"
+    assert turn.answer == "ok"
+    assert turn.calls == ()
     assert seen == {
         "routing_key": "s1",
         "auth": "Bearer t",
         "path": "/api/invocations",
     }
+
+
+GRAPH_THEN_GENIE = {
+    "output": {
+        "output": [
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "name": "neo4j-mcp-server-target___read_neo4j_cypher",
+                        "args": {"query": "MATCH (p:Phone)<-[:HAS_PHONE]-(c) RETURN c"},
+                    }
+                ],
+            },
+            {"role": "tool", "name": "read_neo4j_cypher", "content": "[...]"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "name": "genie_ask",
+                        "args": {"question": "Balances of 368 and 927?"},
+                    },
+                    {"name": "genie_poll", "args": {}},
+                ],
+            },
+            {"role": "assistant", "content": "Accounts 368 and 927 ..."},
+        ]
+    }
+}
+
+
+def test_tool_calls_are_labeled_with_their_source_in_order():
+    calls = demo.extract_tool_calls(GRAPH_THEN_GENIE)
+
+    assert [(call.source, call.name) for call in calls] == [
+        (demo.GRAPH, "read_neo4j_cypher"),
+        (demo.LAKEHOUSE, "genie_ask"),
+        (demo.LAKEHOUSE, "genie_poll"),
+    ]
+    assert calls[0].detail == "MATCH (p:Phone)<-[:HAS_PHONE]-(c) RETURN c"
+    assert calls[1].detail == '"Balances of 368 and 927?"'
+
+
+def test_answer_skips_the_empty_tool_call_messages():
+    assert demo.extract_answer(GRAPH_THEN_GENIE) == "Accounts 368 and 927 ..."
+
+
+def test_route_collapses_repeated_sources():
+    calls = demo.extract_tool_calls(GRAPH_THEN_GENIE)
+
+    assert demo.route_of(calls) == (demo.GRAPH, demo.LAKEHOUSE)
+    assert demo.format_route(demo.route_of(calls)) == "Graph -> Lakehouse"
+    assert demo.format_route(()) == "no tools"
+
+
+def test_route_check_compares_sources_and_the_first_one():
+    by_key = {step.key: step for step in demo.STEPS}
+
+    assert demo.route_result(by_key["5"], (demo.GRAPH, demo.LAKEHOUSE)) == "as expected"
+    assert (
+        demo.route_result(by_key["5"], (demo.GRAPH, demo.LAKEHOUSE, demo.GRAPH))
+        == "as expected"
+    )
+    assert demo.route_result(by_key["5"], (demo.GRAPH,)) == "different"
+    assert demo.route_result(by_key["4"], (demo.GRAPH,)) == "different"
+    assert demo.route_result(by_key["3"], ()) == "not checked"

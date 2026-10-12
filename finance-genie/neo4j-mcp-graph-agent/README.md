@@ -1,10 +1,10 @@
 # neo4j-mcp-graph-agent
 
-This is a fraud analyst agent built on Agent Bricks. It reads the finance-genie fraud graph in Neo4j through a Unity Catalog MCP service. It asks a Genie space for values over the gold Delta tables. The agent sends structure questions to the graph and value questions to Genie, and that routing is what makes the two better together. It remembers each analyst's earlier questions in NAMS, the hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/). MLflow tracing records every model call and tool call, so you can see how each answer was found.
+This is a fraud analyst agent built on Agent Bricks. It reads the finance-genie fraud graph in Neo4j through a Unity Catalog MCP service. It asks a Genie space for values over the gold Delta tables. The agent sends connection questions to the graph and number questions to Genie, and that routing is what makes the two better together. It remembers each analyst's earlier questions in NAMS, the hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/). MLflow tracing records every model call and tool call, so you can see how each answer was found.
 
 What you'll see:
 
-- **Graph and Genie answers:** The agent answers structure questions with read-only Cypher and value questions with Genie. Each MLflow trace shows which source it called and what it asked.
+- **Graph and Genie answers:** The agent answers connection questions with read-only Cypher and number questions with Genie. Each MLflow trace shows which source it called and what it asked.
 - **Memory across sessions:** A new session picks up what the same analyst asked before.
 - **Memory you can inspect:** NAMS shows each analyst's conversations, reasoning traces, and the entities it found.
 
@@ -15,7 +15,7 @@ What you'll see:
   - [Quick start local with make](#quick-start-local-with-make)
   - [Quick start cloud with make](#quick-start-cloud-with-make)
 - [Architecture](#architecture)
-- [Demo: short-term memory](#demo-short-term-memory)
+- [Demo: graph, Genie, and short-term memory](#demo-graph-genie-and-short-term-memory)
 - [Long-term memory and the ontology](#long-term-memory-and-the-ontology)
 - [Clean up](#clean-up)
 - [Documentation](#documentation)
@@ -157,44 +157,56 @@ The parts:
 - **TurnMemory:** This class in `agent/nams.py` recalls memory before a turn and writes the turn to NAMS after it.
 - **AI Gateway model:** This model writes the answer. The default is `claude-sonnet-5-5`.
 - **MCP service:** The Unity Catalog service `finance_genie_mcp` runs read-only Cypher on Neo4j.
-- **Genie space:** The Genie space answers value questions over the gold Delta tables.
+- **Genie space:** The Genie space answers number questions over the gold Delta tables.
 - **NAMS:** NAMS stores conversations, messages, reasoning traces, and entities.
 - **Secret scope `nams`:** This scope holds the NAMS key, which the app reads as `MEMORY_API_KEY`.
 
 [How memory works](docs/how-memory-works.md) walks through one turn step by step.
 
-## Demo: short-term memory
+## Demo: graph, Genie, and short-term memory
 
-This demo shows short-term memory: one analyst's own earlier questions. In step 3, a new session asks "What was I looking at last time?", and the agent answers from that analyst's past conversations. The next section, [Long-term memory and the ontology](#long-term-memory-and-the-ontology), shows memory that is shared across all analysts. Run this demo first, because it needs only the quick start.
+This demo shows how the agent picks a source for each question, and it shows short-term memory: one analyst's own earlier questions. The next section, [Long-term memory and the ontology](#long-term-memory-and-the-ontology), shows memory that all analysts share. Run this demo first, because it needs only the quick start.
 
-The demo script asks six questions in five steps and prints each answer. The steps show the graph, Genie, and memory working together. The evidence is the ids in each answer and the spans in the MLflow trace. The exact answer text changes from run to run.
+The demo script asks six questions in five steps. For each question, it prints the route the agent took and the answer. The exact answer text changes from run to run, so the evidence is the route and the ids in each answer.
+
+### How the agent picks a source
+
+The agent has two sources. It decides which one to use for each question.
+
+- **Graph:** Connection questions go to the graph in Neo4j. These ask about connections, such as who shares a phone, which accounts are hubs, and which community an account is in. The agent writes a Cypher query and runs it through the MCP service.
+- **Lakehouse:** Number questions go to Genie, which reads the Delta tables. These ask for numbers over table rows, such as balances, counts, and averages. The agent asks Genie in plain English, and Genie writes the SQL.
+- **Both:** Some questions need both sources. The agent asks the graph first to find the accounts. Then it asks Genie for the values of those accounts.
+
+In the demo, steps 1 and 2 go to the graph. Step 4 goes to Genie. Step 5 uses the graph, then Genie. Step 3 tests memory instead of routing.
 
 ### The steps
 
-Each step lists the question the script asks, the ids the answer should name, and the spans the MLflow trace should show.
+Each step lists the question the script asks, the route to expect, and the ids the answer should name. The route is also in the MLflow trace as spans.
 
 - **1. Shared phone:** This step asks two questions. It asks which customers share phone 312-555-0142 and which accounts they own, then which community those accounts are in.
+  - **Route:** The route is Graph. The trace has a span ending in `read_neo4j_cypher`. The Gateway adds a prefix, so the full name is `neo4j-mcp-server-target___read_neo4j_cypher`.
   - **Answer:** The first answer names Accounts 368, 927, 1033, and 1696. The second answer names Community 8174.
-  - **Trace:** The trace has a span ending in `read_neo4j_cypher`. The Gateway adds a prefix, so the full name is `neo4j-mcp-server-target___read_neo4j_cypher`.
 - **2. Hub:** This step asks whether Account 15940 is a hub and which community it is in.
+  - **Route:** The route is Graph. The trace has a span ending in `read_neo4j_cypher`.
   - **Answer:** The answer names Community 19766.
-  - **Trace:** The trace has a span ending in `read_neo4j_cypher`.
 - **3. Recall:** This step starts a new session and asks "What was I looking at last time?"
+  - **Route:** The script does not check the route. The app reads this analyst's earlier conversations from NAMS before the agent runs. The agent may still check the graph.
   - **Answer:** The answer names Account 15940, although this session never did. The agent found it in NAMS.
   - **Note:** Recall reads only your two latest conversations, so run step 2 right before this step.
-- **4. Genie value question:** This step asks for the average account balance by region and account type.
-  - **Trace:** The trace has a `genie_ask` span, then a `genie_query_result` span.
-- **5. Graph and Genie:** This step asks which phone numbers are shared by more than one customer, and what the balances and 30-day transaction counts of those accounts are.
-  - **Trace:** The trace has a span ending in `read_neo4j_cypher`, then a `genie_ask` span. The Genie question names the account ids that the graph found.
+- **4. Numbers question:** This step asks for the average account balance by region and account type.
+  - **Route:** The route is Lakehouse. The trace has a `genie_ask` span, then a `genie_query_result` span.
+- **5. Graph, then lakehouse:** This step asks which phone numbers are shared by more than one customer, and what the balances and 30-day transaction counts of those accounts are.
+  - **Route:** The route is Graph, then Lakehouse. The trace has a span ending in `read_neo4j_cypher`, then a `genie_ask` span.
+  - **Answer:** The Genie question names the account ids that the graph found.
 - **ring (optional):** This step asks whether Community 3040 is a fraud ring candidate. The default run skips it. Run it with `--step ring` after step 3.
+  - **Route:** The route is Graph. The trace has a span ending in `read_neo4j_cypher`.
   - **Answer:** The answer names Community 3040.
-  - **Trace:** The trace has a span ending in `read_neo4j_cypher`.
 
 Steps 1 and 2 share one session. Step 3 starts a new session, and steps 4 and 5 stay in it.
 
 ### Run the script
 
-Run from `neo4j-mcp-graph-agent/`. The script prints each question, the answer, and a **You should see** list for the step. It cannot read MLflow, so open the latest traces and check the spans yourself.
+Run from `neo4j-mcp-graph-agent/`.
 
 - **Local:** Start `make dev` in another terminal, as in the [local quick start](#quick-start-local-with-make). Then run the script.
 
@@ -207,6 +219,58 @@ Run from `neo4j-mcp-graph-agent/`. The script prints each question, the answer, 
   ```bash
   uv run scripts/demo.py --cloud
   ```
+
+### Read the output
+
+Each step prints a block like this one. The query and the answer are shortened here.
+
+```text
+========================================================================
+Step 5: Graph, then lakehouse
+========================================================================
+Question type:  Connections and numbers
+Expected route: Graph -> Lakehouse
+Why:            The question needs both. The graph finds which accounts share phones.
+                Then Genie looks up the balances and transaction counts of those
+                accounts.
+Session:        demo-223031-4dad
+
+Q: Which phone numbers are shared by more than one customer, and what are ...
+
+Route taken:
+  1. Graph      read_neo4j_cypher: MATCH ...
+  2. Lakehouse  genie_ask: "Balances and 30-day transaction counts for accounts 368, 927, ..."
+  3. Lakehouse  genie_poll: wait for the Genie answer
+  4. Lakehouse  genie_query_result: read the result rows
+
+A: ...
+
+Route check: expected Graph -> Lakehouse, took Graph -> Lakehouse. Result: as expected.
+
+You should see:
+  - The Genie question in the route names the account ids that the graph found.
+```
+
+- **Expected route:** This line shows the source the question should go to, and the **Why** line says why.
+- **Route taken:** This list shows every tool call the agent made, in order, and the source each one reached. A graph call shows its Cypher query. A Genie call shows the question the agent asked Genie.
+- **Route check:** This line compares the route taken with the expected route. A route passes when it uses the same sources and starts with the same one.
+- **You should see:** This list names the ids to look for in the answer.
+
+After the last step, the script prints a summary of every route:
+
+```text
+========================================================================
+Routing summary
+========================================================================
+Step  Type                     Expected            Took                Result
+1     Connections              Graph               Graph               as expected
+2     Connections              Graph               Graph               as expected
+3     Memory                   any                 no tools            not checked
+4     Numbers                  Lakehouse           Lakehouse           as expected
+5     Connections and numbers  Graph -> Lakehouse  Graph -> Lakehouse  as expected
+```
+
+The agent picks its route on every run. A result of `different` is worth a look in MLflow, but it is not always wrong. MLflow shows the same tool calls as spans, with the full Cypher and the Genie results.
 
 ### Run one step or your own question
 
