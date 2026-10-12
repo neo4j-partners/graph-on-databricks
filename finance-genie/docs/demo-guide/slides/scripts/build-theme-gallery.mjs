@@ -54,6 +54,11 @@ const decks = {
     source: "slides-15min.md",
     description: "Shorter version for tight conference or meeting slots.",
   },
+  "agent-memory": {
+    title: "Agent Memory",
+    source: "slides-agent-memory.md",
+    description: "Fraud analyst agent with graph, Genie, and Neo4j Agent Memory.",
+  },
 };
 
 // These decks set their own theme in front matter, so each builds once.
@@ -122,6 +127,10 @@ writeFileSync(join("build", ".nojekyll"), "");
 if (requested === "all") {
   copyFileSync(join("build", outputFile("full", "finance")), join("build", "slides.html"));
   copyFileSync(join("build", outputFile("15min", "finance")), join("build", "slides-15min.html"));
+  copyFileSync(
+    join("build", outputFile("agent-memory", "finance")),
+    join("build", "slides-agent-memory.html"),
+  );
   writeFileSync(join("build", "index.html"), renderIndex());
 }
 
@@ -258,6 +267,7 @@ function renderIndex() {
       <div class="actions">
         <a class="button" href="./slides.html">Open full slide deck</a>
         <a class="button secondary" href="./slides-15min.html">Open 15-minute deck</a>
+        <a class="button secondary" href="./slides-agent-memory.html">Open agent memory deck</a>
         <a class="button tertiary" href="https://github.com/neo4j-partners/graph-on-databricks/tree/main/finance-genie">View project on GitHub</a>
       </div>
       <section class="summary" aria-label="Project overview">

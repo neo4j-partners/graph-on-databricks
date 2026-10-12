@@ -66,6 +66,7 @@ This demo shows the agent answering a new analyst with another analyst's finding
 3. **Point out the finding section:** The second answer lists earlier findings it did not re-run, such as transfer patterns and identity checks. Analyst B shares no session and no conversation history with analyst A. Those facts came from the entity graph.
 4. **Use the deployed app instead:** Do the [cloud quick start](../README.md#quick-start-cloud-with-make) first so the app runs the new code. Then run `uv run scripts/demo_longterm.py --app-url "$APP_URL" --profile "$DATABRICKS_CONFIG_PROFILE"`. Add your email to `MEMORY_TRUSTED_CALLERS` in `app.yaml` so the two analyst ids work.
 5. **Keep re-runs clean:** The script gives each run new session ids. Pass a fresh `--analyst-b`, for example `--analyst-b demo-analyst-b-2`, so analyst B has no earlier demo turns of their own to recall.
+6. **Split the demo for a talk:** Extraction takes seconds to minutes, which is too long to wait on stage. Run turn 1 before the talk with `uv run scripts/demo_longterm.py --turn 1`. It asks as analyst A and waits until NAMS has extracted Community 3040. Then run turn 2 live with `uv run scripts/demo_longterm.py --turn 2 --analyst-b demo-analyst-b-2`. It asks as analyst B only. Tell the audience that turn 1 ran earlier. Add `--app-url` and `--profile` to both commands for the deployed app.
 
 ### How it was tested
 

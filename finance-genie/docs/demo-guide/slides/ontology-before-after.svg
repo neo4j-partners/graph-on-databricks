@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" width="1000" height="640" font-family="Inter, Helvetica, Arial, sans-serif">
+<rect width="1000" height="640" fill="#ffffff" rx="12"/>
+<text x="15" y="42" font-size="28" font-weight="800" fill="#172033">Entities by type, same conversations, two ontologies</text>
+<text x="15" y="84" font-size="24" font-weight="700" fill="#172033">Trial 1: NAMS Default ontology</text>
+<text x="15" y="108" font-size="17" fill="#5b6678">324 entities. 173 land in generic buckets.</text>
+<text x="193" y="154.0" font-size="19" text-anchor="end" fill="#172033">Object</text>
+<rect x="205" y="132" width="203" height="30" rx="4" fill="#d97706"/>
+<text x="418" y="154.0" font-size="18" font-weight="700" fill="#172033">129</text>
+<text x="193" y="202.0" font-size="19" text-anchor="end" fill="#172033">Person</text>
+<rect x="205" y="180" width="82" height="30" rx="4" fill="#9aa5b5"/>
+<text x="297" y="202.0" font-size="18" font-weight="700" fill="#172033">52</text>
+<text x="193" y="250.0" font-size="19" text-anchor="end" fill="#172033">Organization</text>
+<rect x="205" y="228" width="77" height="30" rx="4" fill="#9aa5b5"/>
+<text x="292" y="250.0" font-size="18" font-weight="700" fill="#172033">49</text>
+<text x="193" y="298.0" font-size="19" text-anchor="end" fill="#172033">Concept</text>
+<rect x="205" y="276" width="69" height="30" rx="4" fill="#d97706"/>
+<text x="284" y="298.0" font-size="18" font-weight="700" fill="#172033">44</text>
+<text x="193" y="346.0" font-size="19" text-anchor="end" fill="#172033">Location</text>
+<rect x="205" y="324" width="35" height="30" rx="4" fill="#9aa5b5"/>
+<text x="250" y="346.0" font-size="18" font-weight="700" fill="#172033">22</text>
+<text x="193" y="394.0" font-size="19" text-anchor="end" fill="#172033">Event</text>
+<rect x="205" y="372" width="25" height="30" rx="4" fill="#9aa5b5"/>
+<text x="240" y="394.0" font-size="18" font-weight="700" fill="#172033">16</text>
+<text x="193" y="442.0" font-size="19" text-anchor="end" fill="#172033">Other</text>
+<rect x="205" y="420" width="19" height="30" rx="4" fill="#9aa5b5"/>
+<text x="234" y="442.0" font-size="18" font-weight="700" fill="#172033">12</text>
+<text x="515" y="84" font-size="24" font-weight="700" fill="#172033">Trial 2: finance ontology</text>
+<text x="515" y="108" font-size="17" fill="#5b6678">309 entities. 0 land in generic buckets.</text>
+<text x="693" y="154.0" font-size="19" text-anchor="end" fill="#172033">Account</text>
+<rect x="705" y="132" width="209" height="30" rx="4" fill="#0f766e"/>
+<text x="924" y="154.0" font-size="18" font-weight="700" fill="#172033">133</text>
+<text x="693" y="202.0" font-size="19" text-anchor="end" fill="#172033">Community</text>
+<rect x="705" y="180" width="66" height="30" rx="4" fill="#0f766e"/>
+<text x="781" y="202.0" font-size="18" font-weight="700" fill="#172033">42</text>
+<text x="693" y="250.0" font-size="19" text-anchor="end" fill="#172033">InvestigationFocus</text>
+<rect x="705" y="228" width="52" height="30" rx="4" fill="#0f766e"/>
+<text x="767" y="250.0" font-size="18" font-weight="700" fill="#172033">33</text>
+<text x="693" y="298.0" font-size="19" text-anchor="end" fill="#172033">Analyst</text>
+<rect x="705" y="276" width="46" height="30" rx="4" fill="#0f766e"/>
+<text x="761" y="298.0" font-size="18" font-weight="700" fill="#172033">29</text>
+<text x="693" y="346.0" font-size="19" text-anchor="end" fill="#172033">Customer</text>
+<rect x="705" y="324" width="46" height="30" rx="4" fill="#0f766e"/>
+<text x="761" y="346.0" font-size="18" font-weight="700" fill="#172033">29</text>
+<text x="693" y="394.0" font-size="19" text-anchor="end" fill="#172033">Case</text>
+<rect x="705" y="372" width="25" height="30" rx="4" fill="#0f766e"/>
+<text x="740" y="394.0" font-size="18" font-weight="700" fill="#172033">16</text>
+<text x="693" y="442.0" font-size="19" text-anchor="end" fill="#172033">PhoneNumber</text>
+<rect x="705" y="420" width="19" height="30" rx="4" fill="#0f766e"/>
+<text x="734" y="442.0" font-size="18" font-weight="700" fill="#172033">12</text>
+<text x="693" y="490.0" font-size="19" text-anchor="end" fill="#172033">Team</text>
+<rect x="705" y="468" width="13" height="30" rx="4" fill="#0f766e"/>
+<text x="728" y="490.0" font-size="18" font-weight="700" fill="#172033">8</text>
+<text x="693" y="538.0" font-size="19" text-anchor="end" fill="#172033">Other</text>
+<rect x="705" y="516" width="11" height="30" rx="4" fill="#9aa5b5"/>
+<text x="726" y="538.0" font-size="18" font-weight="700" fill="#172033">7</text>
+<line x1="500.0" y1="68" x2="500.0" y2="570" stroke="#d9e0ea" stroke-width="2"/>
+<rect x="15" y="592" width="22" height="16" rx="3" fill="#d97706"/>
+<text x="45" y="606" font-size="17" fill="#5b6678">Generic bucket (Object, Concept)</text>
+<rect x="325" y="592" width="22" height="16" rx="3" fill="#9aa5b5"/>
+<text x="355" y="606" font-size="17" fill="#5b6678">Other type</text>
+<rect x="525" y="592" width="22" height="16" rx="3" fill="#0f766e"/>
+<text x="555" y="606" font-size="17" fill="#5b6678">Finance ontology type</text>
+<text x="985" y="606" font-size="15" text-anchor="end" fill="#5b6678">One run</text>
+</svg>

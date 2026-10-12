@@ -44,6 +44,19 @@ const featured = {
 const decks = [
   {
     label: "Slide deck",
+    title: "Agents That Remember What the Team Learned",
+    description:
+      "A fraud analyst agent on Agent Bricks reads the Neo4j fraud graph through a Unity Catalog MCP service, asks Genie for values, and remembers every turn in Neo4j Agent Memory. The deck shows recall across sessions, an entity graph that carries one analyst's findings to another, and what a finance ontology changes about that memory.",
+    tags: ["Agent Bricks", "Agent memory", "MCP", "Genie", "Ontology"],
+    actions: [
+      {
+        text: "Open slide deck",
+        href: `./${FINANCE_PATH}/slides-agent-memory.html`,
+      },
+    ],
+  },
+  {
+    label: "Slide deck",
     title: "Databricks Main Services",
     description:
       "The main Databricks products behind each layer of the data and AI stack, from Delta, Iceberg, and Lakebase to Genie Ontology, Genie One, Agent Bricks, and Unity Gateway. The deck ends with the four Neo4j connectors and where Neo4j plugs into each Databricks agent surface.",

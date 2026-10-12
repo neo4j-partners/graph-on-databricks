@@ -12,9 +12,13 @@ answer knows about the entity came from the long-term entity graph.
 
     uv run scripts/demo_longterm.py                     # local server on :8000
     uv run scripts/demo_longterm.py --app-url https://<app> --profile <profile>
+    uv run scripts/demo_longterm.py --turn 1            # analyst A, then the extraction wait
+    uv run scripts/demo_longterm.py --turn 2            # analyst B only
+
+--turn splits the demo for a talk: run turn 1 before it starts and turn 2 live.
 
 Environment (or neo4j-mcp-graph-agent/.env): MEMORY_API_KEY for the extraction wait,
-MEMORY_ENDPOINT (optional). A deployed app also needs --profile, and honors the two body
+which turn 1 runs, MEMORY_ENDPOINT (optional). A deployed app also needs --profile, and honors the two body
 user ids only when the caller is listed in MEMORY_TRUSTED_CALLERS. Otherwise both turns
 land under the caller's own identity, and the demo still works because the entity graph
 is shared across users.
@@ -111,11 +115,19 @@ def main() -> int:
     parser.add_argument("--community", default="3040", help="community id from the traffic run")
     parser.add_argument("--analyst-a", default="demo-analyst-a")
     parser.add_argument("--analyst-b", default="demo-analyst-b")
+    parser.add_argument(
+        "--turn",
+        choices=("1", "2", "both"),
+        default="both",
+        help="1: analyst A and the extraction wait; 2: analyst B only; default both",
+    )
     args = parser.parse_args()
+    run_one = args.turn in ("1", "both")
+    run_two = args.turn in ("2", "both")
 
     load_env()
     api_key = os.environ.get("MEMORY_API_KEY", "").strip()
-    if not api_key:
+    if run_one and not api_key:
         sys.exit("Set MEMORY_API_KEY in the environment or .env.")
     endpoint = os.environ.get("MEMORY_ENDPOINT", DEFAULT_ENDPOINT)
     entity_name = f"Community {args.community}"
@@ -125,17 +137,25 @@ def main() -> int:
     session_a, session_b = f"ltm-demo-a-{run}", f"ltm-demo-b-{run}"
 
     with httpx.Client(base_url=args.app_url.rstrip("/"), timeout=TURN_TIMEOUT) as http:
-        print(f"=== Turn 1: {args.analyst_a}, session {session_a} ===")
-        print(TURN_ONE.format(community=args.community), "\n")
-        first = ask(http, headers, args.analyst_a, session_a,
-                    TURN_ONE.format(community=args.community))
-        print(first, "\n")
+        if run_one:
+            print(f"=== Turn 1: {args.analyst_a}, session {session_a} ===")
+            print(TURN_ONE.format(community=args.community), "\n")
+            first = ask(http, headers, args.analyst_a, session_a,
+                        TURN_ONE.format(community=args.community))
+            print(first, "\n")
 
-        print(f"=== Waiting for NAMS to extract {entity_name!r} ===")
-        if wait_for_entity(entity_name, api_key, endpoint):
-            print(f"{entity_name!r} is in the entity graph.\n")
-        else:
-            print(f"Timed out after {EXTRACTION_TIMEOUT:.0f}s; asking anyway.\n")
+            print(f"=== Waiting for NAMS to extract {entity_name!r} ===")
+            if wait_for_entity(entity_name, api_key, endpoint):
+                print(f"{entity_name!r} is in the entity graph.\n")
+            elif run_two:
+                print(f"Timed out after {EXTRACTION_TIMEOUT:.0f}s; asking anyway.\n")
+            else:
+                print(f"Timed out after {EXTRACTION_TIMEOUT:.0f}s; "
+                      "wait longer before turn 2.\n")
+
+        if not run_two:
+            print("Turn 1 is done. Run --turn 2 with a fresh --analyst-b when you present.")
+            return 0
 
         print(f"=== Turn 2: {args.analyst_b}, new session {session_b} ===")
         print(TURN_TWO.format(community=args.community), "\n")
