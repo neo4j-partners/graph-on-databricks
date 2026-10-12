@@ -126,7 +126,29 @@ node labels and the relationships that connect them. There is no
 fraud label. A ring candidate is a community of 50 to 200 accounts
 with a high average risk score, and the agent treats that as a
 signal, not a verdict. The pipeline that builds the graph and
-writes the scores is in slides.md, and it is not needed here.
+writes the scores is on the next slide in four bullets, and the
+full version is in slides.md.
+-->
+
+---
+
+## Graph Scores Become Gold Columns
+
+- **Neo4j GDS runs on the graph.** PageRank, Louvain, and node similarity score every account.
+- **The scores are written back to the Gold Delta tables.** `risk_score` and `community_id` become plain columns.
+- **Genie reads them like any other dimension.** A SQL user never touches the graph.
+- **The agent uses both sides.** It asks the graph for structure and Genie for values over the same scores.
+
+<!--
+This is the one slide on the enrichment pipeline, and it is here
+because the Genie Agent the agent calls reads these Gold tables.
+Four steps: load the Silver tables into Aura, run GDS, pull the
+scores back through the Neo4j Spark Connector and join them to
+Silver, and write Gold. The graph analysis runs once per pipeline
+cycle, and every downstream consumer reads the results as columns.
+The finance-genie main deck covers this in depth, and this
+audience only needs to know that the values Genie returns already
+carry the graph scores.
 -->
 
 ---
@@ -228,21 +250,29 @@ Source: https://github.com/neo4j-labs/agent-memory
 
 ---
 
-## How the Agent Uses Each Part
+## One Analyst's History, the Team's Findings
 
-- **Short-term memory belongs to one analyst.** Before each turn, the app reads that analyst's two latest conversations.
-- **Long-term memory belongs to the team.** Every analyst's conversations feed the entity graph, and the app searches it for the entities a prompt names.
-- **Reasoning memory is written, not read.** A turn with tool calls saves one trace with a step per tool call.
+- **Short-term memory is one analyst's conversation history.** Before each turn, the app reads that analyst's two latest conversations.
+- **The app keys it to the identity Databricks forwards.** Nobody loads another analyst's history by sending a different user id.
+- **Long-term memory is the entity graph, and it belongs to the team.** Every analyst's conversations feed it, and recall reads it no matter who asks.
+- **Reasoning memory is written, not read.** The app writes each tool call as a step in a trace, and nothing reads it back.
 - **Agent Bricks keeps one session's history.** NAMS holds what outlives the session.
 
 <!--
-The diagram before this showed what NAMS stores. This slide is what
-the app does with each part, and the new point is scope. Short-term
-recall is filtered to one analyst. Long-term recall reads a graph
-that every analyst's conversations built. Reasoning traces are
-saved for the NAMS console and are not recalled by the agent. The
-session store and the MLflow traces stay with Agent Bricks, so NAMS
-only holds what has to outlive the session.
+The diagram before this showed what NAMS stores. This slide is
+what the app does with each part, and the point is scope. The two
+scopes are deliberate. An analyst's working context stays theirs,
+so short-term recall is filtered to the caller's identity, and the
+deployed app takes that identity from the Databricks Apps proxy
+rather than from the request body. The findings are shared, so
+long-term recall searches a graph that every analyst's
+conversations built. Reasoning traces are saved for the NAMS
+console and are not recalled by the agent. If NAMS is slow or
+down, the agent answers without memory. The local server honors a
+body user_id, and so does the deployed app for callers listed in
+MEMORY_TRUSTED_CALLERS, which is how the traffic generator runs
+several synthetic analysts. Backup slide B4 has the header names
+and the recall limits.
 -->
 
 ---
@@ -250,7 +280,7 @@ only holds what has to outlive the session.
 ## Memory Flow in One Turn
 
 1. **Recall:** The app reads the analyst's recent conversations and the matching entities from NAMS.
-2. **Run:** The agent runs with the recalled text in its instructions, not in its input.
+2. **Run:** The agent runs with the recalled text as background in its system prompt, not as a saved message.
 3. **Reply:** The caller gets the answer before any memory write.
 4. **Write:** The app saves the turn as one conversation with two messages and a reasoning trace.
 
@@ -262,65 +292,33 @@ message input to its session store, and the recalled text should
 not be saved twice. The write happens after the reply, so the
 caller never waits on NAMS. Recall waits at most 10 seconds and
 adds at most 2000 characters. A recovery run reads memory but does
-not write, so a replayed turn is not saved twice. The next slide
-is the sequence diagram of the same four steps.
+not write, so a replayed turn is not saved twice. The sequence
+diagram of these four steps is nams-flow.svg in this folder, if a
+question calls for it.
 -->
 
 ---
 
-![bg contain](./nams-flow.svg)
+## What the App Saves
 
-<!--
-Walk the diagram top to bottom. The caller sends the question and
-the user id. The TurnMemory lists the analyst's conversations in
-NAMS and reads the latest two. The agent runs with that text. The
-app returns the answer, then flushes the buffered tool calls and
-answer to NAMS as a conversation, two messages, and a trace.
--->
-
----
-
-## What Gets Saved, and What Does Not
-
-<div class="columns small">
-<div>
-
-- **The stored answer drops Cypher code fences and MCP tool names.** Without that cleanup, NAMS would extract them as entities.
-- **The reasoning trace keeps one plain-sentence step per tool call.** The query text stays out.
-- **The MLflow trace keeps the full Cypher.** That is where debugging happens.
-- **The system prompt fixes the id format.** Extracted names stay consistent.
-
-</div>
-<div class="placeholder">
-<strong>PLACEHOLDER: NAMS console screenshot</strong>
-One analyst's conversations, one reasoning trace, and the entities NAMS found. Replace with <code>./nams-console.png</code>.
-</div>
-</div>
+- **Each turn becomes one conversation with two messages.** The analyst's question and the agent's cleaned answer.
+- **The answer is cleaned before it is saved.** Query code and tool names come out, so NAMS extracts accounts and communities, not Cypher.
+- **Ids are written the same way every time.** "Account 7890" always becomes the same entity.
+- **The trace keeps one plain sentence per tool call.** The full query stays in the MLflow trace.
 
 <!--
 NAMS extracts entities from whatever it stores, so what the app
-writes decides what the memory graph contains. A trace step reads
-like "The agent queried the graph database." Ids, scores, and
-counts stay in the answer text, and the prompt writes them as
-"Account <id>" and "Community <id>" every time. The NAMS console on the right is
-what an analyst sees: each question as its own conversation, with
-its messages, its trace, and the entities extracted from it.
--->
-
----
-
-## Memory Follows the Caller's Identity
-
-- **In the deployed app, the server picks whose memory a turn uses.** It reads the forwarded Databricks identity.
-- **A caller cannot read another analyst's memory by sending a different `user_id`.** The deployed app ignores it.
-- **Recall treats memory as data.** The agent verifies facts against the graph.
-- **If NAMS is slow or down, the agent answers without memory.** NAMS never breaks an answer.
-
-<!--
-The local server honors a body user_id, and so does the deployed
-app for callers listed in MEMORY_TRUSTED_CALLERS. That is how the
-traffic generator runs several synthetic analysts. Backup slide B4
-covers both, with the header names and the recall limits.
+writes decides what the memory graph contains. The cleanup is
+sanitize_answer in agent/nams.py. It removes Cypher code fences
+and MCP tool names, and keeps result tables, ids, scores, and
+counts. The system prompt makes the agent write "Account <id>" and
+"Community <id>" every time, which keeps the extracted names
+consistent. A trace step reads like "The agent queried the graph
+database." Recall treats what comes back as data, and the agent
+verifies facts against the graph. The NAMS console at
+memory.neo4jlabs.com shows all of this: each question as its own
+conversation, with its messages, its trace, and the entities
+extracted from it.
 -->
 
 ---
@@ -341,34 +339,50 @@ Open the step 2 MLflow trace to show the span ending in
 read_neo4j_cypher. Steps 2 and 3 use conversation recall, which
 reads the stored conversation right away, so this demo does not
 wait for extraction. Run the two steps back to back, because
-recall reads only the two latest conversations.
+recall reads only the two latest conversations. This demo shows
+short-term memory. The next three slides move to long-term memory.
+-->
+
+---
+
+## Entity Extraction Turns Conversations into Long-Term Memory
+
+- **NAMS reads each stored conversation in the background.**
+- **It pulls out the entities.** Account 7890 or Community 3040 becomes an entity with a name, a type, and a description.
+- **Each entity links back to the messages it came from.**
+- **Mentions from different analysts merge into one entity.** That merge is what makes the memory shared.
+- **The entities build the long-term memory entity graph.**
+
+<!--
+This is the bridge from one analyst's turn to the team's graph.
+Nothing in the app builds the entity graph. NAMS extracts on its
+own servers from the text the app saved, which is why the cleanup
+on the previous slide matters. An entity carries a name, a type,
+and a description, and the ontology section later changes the
+type and the description. The merge is best effort. Some mentions
+merge and others stay as duplicates, so make who-shares finds the
+merged entity instead of a name search. The lag is why turn 1 of
+the team demo runs before the talk.
 -->
 
 ---
 
 ## The Entity Graph Belongs to the Team
 
-<div class="columns">
-<div class="placeholder">
-<strong>PLACEHOLDER: Aura graph view</strong>
-One entity in the center, a message on each <code>EXTRACTED_FROM</code> arrow, and a conversation behind each message, captioned with its analyst id. Replace with <code>./aura-entity-graph.png</code>.
-</div>
-<div>
-
 - **One entity sits in the center.** A message hangs on each `EXTRACTED_FROM` arrow.
 - **Each message leads back to a conversation.** The caption is its analyst id.
 - **Nobody queried for this graph.** It came from storing conversations.
 
-</div>
-</div>
-
 <!--
-Say this: "The conversation history belongs to one analyst. This
-entity graph belongs to the team. Nobody queried for it. It fell
-out of storing conversations." The screenshot comes from the Aura
-Query tab on the NAMS database, with the Conversation caption set
-to userId. make who-shares lists the entities that more than one
-analyst's conversations fed, and the top row is the one to show.
+Live: open the Aura Query tab on the NAMS database and run the
+query from ontology/who_shares.cypher, or make who-shares, to find
+the entity that more than one analyst's conversations fed. Then
+run the graph query from docs/longterm.md with that id, and set
+the Conversation caption to userId. Say this: "The conversation
+history belongs to one analyst. This entity graph belongs to the
+team. Nobody queried for it. It fell out of storing conversations."
+If the graph view fails, measure_ingestion.py snapshot writes the
+same entities and relationships to a JSON file.
 -->
 
 ---
@@ -391,10 +405,9 @@ trick. The facts in the answer came from the entity graph. The
 demo depends on the make traffic run having filled the graph
 first. A two-turn run on an empty NAMS produced no merged entity
 at all. Pass a fresh --analyst-b every time, so analyst B has no
-earlier demo turns of their own to recall.
-
-PLACEHOLDER: paste the recorded turn 2 output here as the fallback
-if the live call fails or times out.
+earlier demo turns of their own to recall. Keep a recorded turn 2
+output open in a terminal as the fallback if the live call fails
+or times out.
 -->
 
 ---
@@ -417,22 +430,32 @@ to. Backup slide B3 shows the full list.
 
 ---
 
-## Each Type Says What It Is and What It Is Not
+## Each Entity Is a Declared Type
 
-**The Community type:**
+- **Each type is declared in a YAML file.** It has a label, a NAMS pole type, and a description.
+- **The description is a prompt for the extractor.** NAMS reads it when it decides what an entity is.
 
-> A Louvain community of accounts found by graph analysis, identified by a numeric id such as 'Community 24683'. Not an organization, a team, or an identity cluster.
+```yaml
+- label: Account
+  pole_type: OBJECT
+  description: A bank account identified by an account number, for example 'Account 7890'.
+```
 
-- **A Customer is an account holder.** It is not an analyst and not the bank's own staff.
-- **These descriptions go straight to the extractor.**
+- **The type decides what recall returns.** "Community 3040 (Community)" instead of "Community 3040 (Object)".
 - **The ontology runs in permissive mode.** It guides extraction and rejects nothing.
 
 <!--
-The quotation is the Community type's description, word for word
-from ontology/finance_genie.ontology.yaml. Every type has one. The
-"not" half matters as much as the first half. Permissive mode
-means an entity outside the list is still stored. The ontology
-shapes extraction. It is not a schema check.
+The YAML is from ontology/finance_genie.ontology.yaml, trimmed to
+one type. The full file has eleven types and the relationships on
+backup slide B3. The pole type is the NAMS base category, one of
+person, organization, object, or location. The description is
+plain English and goes straight to the extractor, so write it the
+way you would brief a person. The real descriptions also say what
+each type is not, such as "Not a person, a customer, or an account
+holder" on Account, because the extractor confuses neighboring
+types without that. Permissive mode means an entity outside the
+list is still stored. The ontology shapes extraction. It is not a
+schema check.
 -->
 
 ---
@@ -507,24 +530,6 @@ change, not cause.
 
 ---
 
-## Limits to Know
-
-- **Entity recall needs an entity name in the prompt.** A prompt without one gets conversation recall only.
-- **Extraction merges some mentions and leaves others as duplicates.** Several nodes can share the same name.
-- **Extraction is asynchronous.** New entities appear seconds to minutes after a turn.
-- **On hosted NAMS, long-term memory is the entity graph.** Preferences and facts need the self-hosted backend.
-
-<!--
-NAMS entity search matches keywords, so the app pulls short terms
-such as "Community 3040" out of the prompt instead of searching
-the full sentence. The duplicates are why "The Entity Graph
-Belongs to the Team" uses make who-shares to find the merged
-entity instead of searching by name. The async lag is why turn 1
-of that demo runs before the talk.
--->
-
----
-
 ## Genie One Asks the Same Two Graphs
 
 - **Both graphs are Unity Catalog MCP services.** The Neo4j MCP service exists, and backup slide B5 adds NAMS as one.
@@ -575,7 +580,7 @@ long-term memory demo follow, in that order, from the README's
 
 # Backup
 
-The following slides cover the demo steps, the metric definitions, the full ontology, the recall limits, and the experiment caveats.
+The following slides cover the demo steps, the metric definitions, the full ontology, the recall limits, the experiment caveats, and the memory limits.
 
 ---
 
@@ -720,4 +725,22 @@ versions can be checked. If they match, trial 2 did not activate
 the finance ontology and the comparison is invalid. To measure the
 noise floor, repeat one side and compare it with itself. A change
 between the sides that is smaller than that spread is noise.
+-->
+
+---
+
+## B7. Limits to Know
+
+- **Entity recall needs an entity name in the prompt.** A prompt without one gets conversation recall only.
+- **Extraction merges some mentions and leaves others as duplicates.** Several nodes can share the same name.
+- **Extraction is asynchronous.** New entities appear seconds to minutes after a turn.
+- **On hosted NAMS, long-term memory is the entity graph.** Preferences and facts need the self-hosted backend.
+
+<!--
+NAMS entity search matches keywords, so the app pulls short terms
+such as "Community 3040" out of the prompt instead of searching
+the full sentence. The duplicates are why "The Entity Graph
+Belongs to the Team" uses make who-shares to find the merged
+entity instead of searching by name. The async lag is why turn 1
+of that demo runs before the talk.
 -->

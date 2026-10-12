@@ -22,7 +22,7 @@ How one turn flows:
 
 - **One conversation per turn:** Each turn is its own conversation in NAMS. Each one carries the memory user in its `user_id` metadata, and recall filters on it.
 - **Clean answer:** The stored assistant answer has Cypher code fences and MCP tool names removed. `sanitize_answer` in `agent/nams.py` does this, because NAMS would otherwise extract Cypher and tool names as entities. Plain fences, such as result tables, keep their text. Ids, scores, and counts stay in the text.
-- **Trace:** When the agent uses tools, the app saves one reasoning trace. The trace has one step and one tool call for each MCP call. Steps use the bare tool name and a plain sentence, such as "The agent read the graph schema." A Cypher tool call is saved without its query, so NAMS does not extract the query as entities. The MLflow trace keeps the full Cypher for debugging. NAMS keeps the steps and tool calls, but not the trace task or outcome.
+- **Trace:** When the agent uses tools, the app saves one reasoning trace. The trace has one step and one tool call for each tool call the agent made, including the Genie tools. Steps use the bare tool name and a plain sentence, such as "The agent read the graph schema." A Cypher tool call is saved without its query, so NAMS does not extract the query as entities. The MLflow trace keeps the full Cypher for debugging. NAMS keeps the steps and tool calls, but not the trace task or outcome.
 - **Entities:** NAMS finds entities in the messages on its own servers, and the app does nothing for this. The system prompt asks the agent to write ids the same way each time, as "Account <id>" and "Community <id>". That keeps the extracted names consistent.
 
 ## What gets recalled
