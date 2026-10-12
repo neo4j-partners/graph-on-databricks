@@ -80,8 +80,12 @@ code {
 }
 
 pre {
-  background: #111827;
+  background: #e8eef7;
   border-radius: 6px;
+}
+
+pre code {
+  background: transparent;
 }
 
 table {

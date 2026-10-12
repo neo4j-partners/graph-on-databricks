@@ -92,8 +92,12 @@ code {
 }
 
 pre {
-  background: #0b1220;
+  background: #e7eefb;
   border-radius: 6px;
+}
+
+pre code {
+  background: transparent;
 }
 
 table {
