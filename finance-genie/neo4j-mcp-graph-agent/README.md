@@ -1,12 +1,16 @@
-# neo4j-mcp-graph-agent
+# fraud-memory-agent
 
-This is a fraud analyst agent built on Agent Bricks. It reads the finance-genie fraud graph in Neo4j through a Unity Catalog MCP service. It asks a Genie space for values over the gold Delta tables. The agent sends connection questions to the graph and number questions to Genie, and that routing is what makes the two better together. It remembers each analyst's earlier questions in NAMS, the hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/). MLflow tracing records every model call and tool call, so you can see how each answer was found.
+This is a fraud analyst agent that remembers. It is built on Agent Bricks and uses NAMS, the hosted [Neo4j Agent Memory Service](https://memory.neo4jlabs.com/), as its memory. Before each answer, the agent recalls what the same analyst asked before and the entities their questions named. After each answer, it writes the turn back to NAMS. NAMS then pulls entities out of those conversations, such as accounts and communities, and joins them into one graph that every analyst shares. So a new analyst can start from findings that another analyst already made.
+
+To answer, the agent reads the finance-genie fraud graph in Neo4j through a Unity Catalog MCP service. It asks a Genie space for values over the gold Delta tables. The agent sends connection questions to the graph and number questions to Genie, and that routing is what makes the two better together. MLflow tracing records every model call and tool call, so you can see how each answer was found.
 
 What you'll see:
 
+- **Short-term memory:** A new session picks up what the same analyst asked before. The agent reads the analyst's latest conversations back into its instructions.
+- **Long-term memory:** NAMS builds a graph of entities from every analyst's conversations. An ontology tells it which entity types to look for.
+- **Shared findings:** When analyst B asks about an entity that analyst A investigated, the answer opens with what analyst A found.
+- **Memory you can inspect:** NAMS stores each analyst's conversations, reasoning traces, and the entities it found. You can query them in the NAMS Query Console.
 - **Graph and Genie answers:** The agent answers connection questions with read-only Cypher and number questions with Genie. Each MLflow trace shows which source it called and what it asked.
-- **Memory across sessions:** A new session picks up what the same analyst asked before.
-- **Memory you can inspect:** NAMS stores each analyst's conversations, reasoning traces, and the entities it found.
 
 ## Table of contents
 
