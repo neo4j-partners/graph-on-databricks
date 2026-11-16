@@ -6,7 +6,7 @@ Make the demo client a real backend-backed Databricks App instead of a sample-da
 
 The finished demo should send browser requests to the demo-client FastAPI backend, have that backend call the deployed Agentic Commerce agent endpoint, and render live agent results whenever the endpoint is available. Sample data should remain only as an explicit development or fallback mode.
 
-This document is now the source of truth for the remaining work. The older demo proposal and backend gap documents are historical context only.
+This document is now the source of truth for the remaining work.
 
 ## Current State
 
@@ -250,10 +250,3 @@ This document is now the source of truth for the remaining work. The older demo 
 - Bundle builder and comparison pages beyond the two current tabs.
 - Persistent session replay, saved carts, feedback capture, or Lakebase-backed history.
 - Exact token accounting and exact per-tool timing.
-
-## Historical Documents
-
-- `EXPAND.md` is historical background for the Agentic Commerce agent GraphRAG and memory expansion.
-- `docs/agentic-commerce-demo.md` is historical background for demo framing and wireframes.
-- `docs/demo-client-backend-gap.md` is superseded by this plan.
-- `docs/demo-client-plan.md` is superseded by this plan.

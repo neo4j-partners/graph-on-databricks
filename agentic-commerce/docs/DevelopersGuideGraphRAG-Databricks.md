@@ -45,13 +45,14 @@ Here are the most common high-level patterns:
 - [Part V: From Retriever to Deployed Agent](#part-v-from-retriever-to-deployed-agent)
   - [The LangGraph ReAct Agent](#the-langgraph-react-agent)
   - [Deployment Pipeline](#deployment-pipeline)
+  - [Serving Internals](#serving-internals)
 - [Appendix: Configuration Reference](#appendix-configuration-reference)
 
 ---
 
 ## Part I: The Problem With Current RAG
 
-**Why chunk-based RAG hits a ceiling — and why retrieval needs structure**
+**Why chunk-based RAG hits a ceiling, and why retrieval needs structure**
 
 RAG systems start strong. Embed the product catalog, wire up a vector store, wrap a prompt around the results, and deploy. The first demo looks great. The model pulls from real data, answers sound grounded, and stakeholders nod approvingly.
 
@@ -243,11 +244,11 @@ embedding = response["data"][0]["embedding"]  # 1024-dim vector
 
 This is where the graph gets its reasoning power. [`retail_agent/deployment/load_graphrag.py`](../retail_agent/deployment/load_graphrag.py) runs after the product load and uses `neo4j-graphrag` `SimpleKGPipeline` to add the retrieval graph on top of the existing product and document graph. Each stage builds on the previous one.
 
-**Stage 1 — Chunk.** The script fetches KnowledgeArticle, SupportTicket, and Review text from Neo4j and passes each document to `SimpleKGPipeline`. The pipeline creates Document and Chunk nodes, stores document metadata, and links chunks to generated Document nodes. A post-processing step connects those chunks back to the existing KnowledgeArticle, SupportTicket, and Review nodes with `HAS_CHUNK`.
+**Stage 1: Chunk.** The script fetches KnowledgeArticle, SupportTicket, and Review text from Neo4j and passes each document to `SimpleKGPipeline`. The pipeline creates Document and Chunk nodes, stores document metadata, and links chunks to generated Document nodes. A post-processing step connects those chunks back to the existing KnowledgeArticle, SupportTicket, and Review nodes with `HAS_CHUNK`.
 
-**Stage 2 — Embed.** Chunk text is embedded through a `neo4j-graphrag` embedder adapter backed by the Databricks Foundation Model API. Two indexes get created on the Chunk nodes: a vector index (`chunk_embedding`, 1024 dimensions, cosine similarity) for semantic search, and a fulltext index (`chunkText`) configured for English-language text for keyword matching. The fulltext index matters for queries containing specific brand or product terms that need exact matching alongside semantic similarity.
+**Stage 2: Embed.** Chunk text is embedded through a `neo4j-graphrag` embedder adapter backed by the Databricks Foundation Model API. Two indexes get created on the Chunk nodes: a vector index (`chunk_embedding`, 1024 dimensions, cosine similarity) for semantic search, and a fulltext index (`chunkText`) configured for English-language text for keyword matching. The fulltext index matters for queries containing specific brand or product terms that need exact matching alongside semantic similarity.
 
-**Stage 3 — Extract Entities.** `SimpleKGPipeline` sends each chunk to the configured Databricks LLM adapter with a schema that allows Feature, Symptom, and Solution nodes and their relationships:
+**Stage 3: Extract Entities.** `SimpleKGPipeline` sends each chunk to the configured Databricks LLM adapter with a schema that allows Feature, Symptom, and Solution nodes and their relationships:
 
 ```json
 {
@@ -260,7 +261,7 @@ The schema constrains extraction to the retail support concepts the agent needs.
 
 This is the defining step of GraphRAG. An LLM reads unstructured text and produces structured entities that become graph nodes. The same approach can be applied to any domain by changing the extraction prompt and entity types.
 
-**Stage 4 — Link Entities to Products.** The final stage creates aggregated relationships between products and their entities through graph traversal. The path follows existing edges: from Product through the document that covers it, through the chunk extracted from that document, to the entity extracted from that chunk:
+**Stage 4: Link Entities to Products.** The final stage creates aggregated relationships between products and their entities through graph traversal. The path follows existing edges: from Product through the document that covers it, through the chunk extracted from that document, to the entity extracted from that chunk:
 
 ```
 Product <-[:COVERS|ABOUT|REVIEWS]- doc -[:HAS_CHUNK]-> chunk <-[:FROM_CHUNK]- entity
@@ -367,7 +368,7 @@ The retriever patterns from Part IV work in notebooks and scripts. Putting them 
 
 ### The LangGraph ReAct Agent
 
-The agent is a LangGraph `create_react_agent` backed by `databricks-claude-sonnet-4-6`. It has tools for product search, product details, related products, and memory management. The `context_schema=RetailContext` parameter passes shared resources (like the Neo4j client and session ID) to every tool automatically, without routing them through the LLM.
+The agent is a LangGraph `create_react_agent` backed by `databricks-claude-sonnet-4-6`. It has tools for product search, product details, and related products. It also has tools for GraphRAG knowledge search and issue diagnosis, session memory, long-term preferences, personalized recommendations, and reasoning traces. The `context_schema=RetailContext` parameter passes shared resources (like the Neo4j client and session ID) to every tool automatically, without routing them through the LLM.
 
 The agent decides which tool to call based on the user's question. "Search for running shoes under $200" triggers `search_products`, which embeds the query with `databricks-bge-large-en` and runs a vector search against the product graph. "What products are related to the Nike Pegasus 40?" triggers `get_related_products`, which uses graph traversal across category, brand, and attribute relationships to score and rank related items. The LLM handles orchestration; the tools handle data access.
 
@@ -375,15 +376,31 @@ The agent decides which tool to call based on the user's question. "Search for r
 
 Deployment follows a four-step pipeline in [`retail_agent/deployment/deploy_agent.py`](../retail_agent/deployment/deploy_agent.py):
 
-1. **Log model to MLflow.** The [`serving.py`](../retail_agent/agent/serving.py) file is the entry point. MLflow's Models from Code approach packages it along with all imported modules (agent, tools, embedder, config) and the `neo4j-agent-memory` wheel as code artifacts.
+1. **Log model to MLflow.** The [`serving.py`](../retail_agent/agent/serving.py) file is the entry point. MLflow's Models from Code approach packages it along with all imported modules (agent, tools, embedder, config) as code artifacts. The `neo4j-agent-memory` library is installed as a pinned pip requirement.
 
 2. **Register to Unity Catalog.** The logged model gets registered as a versioned model at `retail_assistant.retail.retail_agent_v3`.
 
-3. **Deploy with `agents.deploy()`.** Neo4j credentials are injected as secret-backed environment variables. The endpoint supports scale-to-zero by default.
+3. **Deploy with `agents.deploy()`.** Neo4j credentials are injected as secret-backed environment variables. The deployment configuration requests scale-to-zero by default. The served endpoint versions validated for this project reported `scale_to_zero_enabled: false`.
 
 4. **Wait for ready.** The script polls the endpoint state until it reports `READY` or the timeout expires.
 
 The [serving adapter](../retail_agent/agent/serving.py) handles the transition from Model Serving's synchronous `predict()` contract to the agent's async internals. A background thread manages the async Neo4j connection and keeps it alive across requests. The adapter delays connecting to Neo4j until the first real request arrives, since credentials aren't available during initial validation. Once connected, it reuses the same client for all subsequent calls.
+
+### Serving Internals
+
+The serving adapter integrates the `neo4j-agent-memory` library into Model Serving in three steps:
+
+- **Lazy initialization:** The adapter creates the `MemoryClient` on the first real request. It reads the Neo4j credentials from Databricks secrets and passes a custom `DatabricksEmbedder`, which wraps the Foundation Model API to satisfy the library's `Embedder` interface.
+- **Per-request context:** Each request builds a `RetailContext` that holds the shared `MemoryClient`, the caller's session ID, and the caller's user ID. LangGraph injects that context into every tool through `ToolRuntime`.
+- **Direct memory calls:** Tools call the `MemoryClient` directly. Short-term calls store and recall messages. Long-term calls track and retrieve preferences with user ID metadata. Reasoning calls record and search multi-step traces.
+
+The serving configuration disables conversation entity extraction in `neo4j-agent-memory`. The endpoint therefore needs no additional extraction model at runtime.
+
+The Neo4j async driver must stay bound to one event loop, so the adapter keeps a persistent loop:
+
+- A daemon thread runs a single asyncio loop for the lifetime of the serving process.
+- The `MemoryClient` connects on that loop during lazy initialization, which binds the Neo4j driver to the persistent loop from the start.
+- Every request dispatches its async work to the same loop with `run_coroutine_threadsafe`.
 
 ---
 
@@ -400,6 +417,6 @@ All configuration lives in [`agent/config.py`](../retail_agent/agent/config.py) 
 | `embedding_model` | `databricks-bge-large-en` | Foundation Model API embedding endpoint |
 | `embedding_dimensions` | `1024` | Must match vector index dimensions |
 | `scale_to_zero` | `true` | Enable scale-to-zero on serving endpoint |
-| `max_wait_seconds` | `600` | Timeout for endpoint readiness check |
+| `max_wait_seconds` | `1200` | Timeout for endpoint readiness check |
 
 The full Unity Catalog model name resolves to `retail_assistant.retail.retail_agent_v3` by default. The active validated serving endpoint is `agents_retail_assistant-retail-retail_agent_v3`.

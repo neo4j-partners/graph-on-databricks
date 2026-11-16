@@ -19,7 +19,7 @@ This writes CSVs to `data/lakehouse/`:
 | `reviews.csv` | ~115K | Product reviews linked to transactions |
 | `inventory_snapshots.csv` | ~417K | Daily stock levels per product |
 | `stores.csv` | 20 | Physical store locations |
-| `knowledge_articles.csv` | Product knowledge articles | Product manuals, FAQs, and troubleshooting content |
+| `knowledge_articles.csv` | 84 | Product manuals, FAQs, and troubleshooting content |
 
 Upload CSVs and create Delta tables:
 

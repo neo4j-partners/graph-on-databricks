@@ -31,10 +31,6 @@ The serving adapter now collects per-tool latency during each LangGraph run:
 - The demo UI now renders `n/a` rather than a fake `0ms` when an older endpoint
   or malformed trace does not include `duration_ms`.
 
-The important distinction is that MLflow traces remain authoritative for
-production debugging, while `demo_trace` is a lightweight response payload for
-the live demo UI.
-
 ## How It Should Work
 
 The normal request path is:
@@ -78,8 +74,7 @@ uv run python -m cli pipeline --deploy
 ```
 
 Use `--all` only when product data or GraphRAG data also needs to be rebuilt.
-For this tracing fix, `--all` is unnecessary because it reloads Neo4j product
-data and rebuilds GraphRAG before redeploying the model.
+The [deployment runbook](runbook.md) describes each pipeline mode.
 
 After deployment, run at least:
 

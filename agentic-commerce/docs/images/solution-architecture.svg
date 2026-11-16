@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 740" width="1000" height="740" role="img" aria-labelledby="sa-title sa-desc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="sa-title">Agentic Commerce runtime solution architecture</title>
+  <desc id="sa-desc">A user or the optional demo client sends chat requests to a Databricks Model Serving endpoint. The endpoint hosts an MLflow ChatAgent that wraps a LangGraph ReAct agent with product, knowledge, memory, preference, recommendation, and reasoning tools. The agent calls Databricks Foundation Model APIs for the LLM and for embeddings, and it emits MLflow traces. The agent reads and writes one Neo4j database that holds three layers: the product graph, the GraphRAG layer, and agent memory. Delta Lake analytics tables are optional, and a multi-agent supervisor with Genie is planned.</desc>
+
+  <defs>
+    <marker id="sa-arrow" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 z" fill="#57606A"/>
+    </marker>
+  </defs>
+
+  <!-- Canvas -->
+  <rect x="0.5" y="0.5" width="999" height="739" rx="12" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+
+  <!-- Client -->
+  <rect x="94" y="24" width="400" height="72" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+  <text x="294" y="54" text-anchor="middle" font-size="14" font-weight="600" fill="#1F2328">User and demo client</text>
+  <text x="294" y="76" text-anchor="middle" font-size="12" fill="#57606A">Optional Databricks App: React UI + FastAPI backend</text>
+
+  <!-- Databricks group -->
+  <rect x="24" y="140" width="952" height="240" rx="8" fill="#FFF1EE" stroke="#FF3621" stroke-width="1.5"/>
+  <text x="44" y="168" font-size="16" font-weight="700" fill="#FF3621">Databricks</text>
+
+  <!-- Model Serving endpoint -->
+  <rect x="44" y="184" width="500" height="176" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+  <text x="60" y="210" font-size="14" font-weight="600" fill="#1F2328">Model Serving endpoint</text>
+  <text x="60" y="230" font-size="12" fill="#57606A">MLflow ChatAgent wrapping a LangGraph ReAct agent and its tools</text>
+
+  <!-- Tool groups -->
+  <g font-size="12" text-anchor="middle">
+    <rect x="60" y="246" width="148" height="44" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+    <text x="134" y="264" font-weight="600" fill="#1F2328">Product</text>
+    <text x="134" y="280" font-size="11" fill="#57606A">search, details, related</text>
+
+    <rect x="220" y="246" width="148" height="44" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+    <text x="294" y="264" font-weight="600" fill="#1F2328">Knowledge</text>
+    <text x="294" y="280" font-size="11" fill="#57606A">GraphRAG and diagnosis</text>
+
+    <rect x="380" y="246" width="148" height="44" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+    <text x="454" y="264" font-weight="600" fill="#1F2328">Memory</text>
+    <text x="454" y="280" font-size="11" fill="#57606A">session messages</text>
+
+    <rect x="60" y="300" width="148" height="44" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+    <text x="134" y="318" font-weight="600" fill="#1F2328">Preferences</text>
+    <text x="134" y="334" font-size="11" fill="#57606A">long-term user profile</text>
+
+    <rect x="220" y="300" width="148" height="44" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+    <text x="294" y="318" font-weight="600" fill="#1F2328">Recommendations</text>
+    <text x="294" y="334" font-size="11" fill="#57606A">personalized picks</text>
+
+    <rect x="380" y="300" width="148" height="44" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+    <text x="454" y="318" font-weight="600" fill="#1F2328">Reasoning</text>
+    <text x="454" y="334" font-size="11" fill="#57606A">past task traces</text>
+  </g>
+
+  <!-- Foundation Model APIs -->
+  <rect x="664" y="184" width="292" height="80" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+  <text x="680" y="208" font-size="14" font-weight="600" fill="#1F2328">Foundation Model APIs</text>
+  <text x="680" y="228" font-size="12" fill="#57606A">LLM: databricks-claude-sonnet-4-6</text>
+  <text x="680" y="246" font-size="12" fill="#57606A">Embeddings: databricks-bge-large-en</text>
+
+  <!-- Unity Catalog + MLflow -->
+  <rect x="664" y="280" width="292" height="80" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+  <text x="680" y="304" font-size="14" font-weight="600" fill="#1F2328">Unity Catalog + MLflow</text>
+  <text x="680" y="324" font-size="12" fill="#57606A">Registered model versions</text>
+  <text x="680" y="342" font-size="12" fill="#57606A">Tracing of agent, model, and tool spans</text>
+
+  <!-- Neo4j group -->
+  <rect x="24" y="452" width="952" height="168" rx="8" fill="#EAF4FB" stroke="#0A6190" stroke-width="1.5"/>
+  <text x="44" y="480" font-size="16" font-weight="700" fill="#0A6190">Neo4j: one database, three layers</text>
+
+  <!-- Product graph -->
+  <rect x="44" y="496" width="292" height="104" rx="8" fill="#FFFFFF" stroke="#0A6190" stroke-width="1"/>
+  <text x="60" y="522" font-size="14" font-weight="600" fill="#1F2328">Product graph</text>
+  <text x="60" y="544" font-size="12" fill="#1F2328">Product, Category, Brand, Attribute</text>
+  <text x="60" y="562" font-size="12" fill="#57606A">Cypher traversal across shared</text>
+  <text x="60" y="580" font-size="12" fill="#57606A">categories, brands, and attributes</text>
+
+  <!-- GraphRAG layer -->
+  <rect x="354" y="496" width="292" height="104" rx="8" fill="#FFFFFF" stroke="#0A6190" stroke-width="1"/>
+  <text x="370" y="522" font-size="14" font-weight="600" fill="#1F2328">GraphRAG layer</text>
+  <text x="370" y="544" font-size="12" fill="#1F2328">Document, Chunk, Feature, Symptom, Solution</text>
+  <text x="370" y="562" font-size="12" fill="#57606A">Source documents linked to products</text>
+  <text x="370" y="580" font-size="12" fill="#57606A">Vector and fulltext indexes</text>
+
+  <!-- Agent memory -->
+  <rect x="664" y="496" width="292" height="104" rx="8" fill="#FFFFFF" stroke="#0A6190" stroke-width="1"/>
+  <text x="680" y="522" font-size="14" font-weight="600" fill="#1F2328">Agent memory</text>
+  <text x="680" y="544" font-size="12" fill="#1F2328">Message, Preference, ReasoningTrace</text>
+  <text x="680" y="562" font-size="12" fill="#57606A">Session, user, and reasoning memory</text>
+  <text x="680" y="580" font-size="12" fill="#57606A">Managed by neo4j-agent-memory</text>
+
+  <!-- Product graph and GraphRAG layer share edges -->
+  <line x1="336" y1="548" x2="354" y2="548" stroke="#57606A" stroke-width="1.5"/>
+
+  <!-- Arrows -->
+  <g stroke="#57606A" stroke-width="1.5" fill="none" marker-end="url(#sa-arrow)">
+    <line x1="294" y1="96" x2="294" y2="184"/>
+    <line x1="544" y1="224" x2="664" y2="224"/>
+    <line x1="544" y1="320" x2="664" y2="320"/>
+    <line x1="294" y1="360" x2="294" y2="452"/>
+  </g>
+
+  <!-- Arrow labels -->
+  <g font-size="12" fill="#57606A">
+    <text x="306" y="122">chat request</text>
+    <text x="604" y="200" text-anchor="middle">LLM and</text>
+    <text x="604" y="215" text-anchor="middle">embedding calls</text>
+    <text x="604" y="311" text-anchor="middle">MLflow traces</text>
+    <text x="310" y="412">Cypher traversal, vector and hybrid retrieval</text>
+    <text x="310" y="430">Memory reads and writes</text>
+  </g>
+
+  <!-- Optional and planned -->
+  <rect x="24" y="648" width="464" height="68" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="44" y="677" font-size="14" font-weight="600" fill="#57606A">Optional: Delta Lake analytics tables</text>
+  <text x="44" y="699" font-size="12" fill="#57606A">Synthetic transactions, customers, reviews, inventory, and stores</text>
+
+  <rect x="512" y="648" width="464" height="68" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="532" y="677" font-size="14" font-weight="600" fill="#57606A">Planned: multi-agent supervisor with Genie</text>
+  <text x="532" y="699" font-size="12" fill="#57606A">Routes analytics to Genie and product questions to this agent</text>
+</svg>

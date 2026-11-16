@@ -6,7 +6,7 @@ Knowledge graphs store the commercial ontology, the products, suppliers, pricing
 
 ## Anatomy of an Agentic Transaction
 
-When a user initiates a commercial request, the agent logs the interaction into short-term memory and parses the natural language to extract entities and constraints. The POLE+O data model (Person, Organization, Location, Event, Object) classifies those entities by type, updating the agent's long-term memory graph with new user preferences that persist across sessions.
+When a user initiates a commercial request, the agent logs the interaction into short-term memory and parses the natural language to extract entities and constraints. The POLE+O data model (Person, Object, Location, Event, Organization) classifies those entities by type, updating the agent's long-term memory graph with new user preferences that persist across sessions.
 
 With the request understood, the agent triggers a GraphRAG retrieval against the Neo4j knowledge graph, traversing semantic relationships that connect the user's preferences to product catalogs, pricing tiers, and fulfillment logistics. Because the data is structured relationally, the agent can execute multi-hop reasoning in a single pass: verifying that a specific device is compatible with the user's existing hardware, checking stock at a nearby warehouse via geospatial indexing, and confirming it qualifies for an active promotional discount.
 
@@ -16,21 +16,21 @@ Neo4j is what makes this convergence practical. Knowledge graph traversals, vect
 
 ---
 
-# [neo4j-graphrag-python](https://github.com/neo4j/neo4j-graphrag-python): Full-Pipeline GraphRAG in a Single Library
+## [neo4j-graphrag-python](https://github.com/neo4j/neo4j-graphrag-python): Full-Pipeline GraphRAG in a Single Library
 
 **Built on Neo4j | Open Source**
 
-## Standard RAG Loses Relationships. GraphRAG Keeps Them.
+### Standard RAG Loses Relationships. GraphRAG Keeps Them.
 
 Ask a vector-only RAG system "how are Company A and Company B connected?" and it retrieves chunks that mention each company independently. The relationship between them, a shared board member, a joint venture filed in an SEC document three pages away from either mention, never surfaces. Flat embeddings capture what words mean. They don't capture how entities relate to each other across a corpus.
 
 The neo4j-graphrag-python library addresses this gap directly. It builds knowledge graphs from unstructured text and retrieves information from those graphs to feed into LLM-powered answer generation. Raw text goes in, a queryable knowledge graph comes out, and the same library handles retrieval and response generation on the other side. Construction and retrieval share the same abstractions, the same Neo4j connection, and the same schema definitions.
 
-## Two Paths to Knowledge Graph Construction
+### Two Paths to Knowledge Graph Construction
 
 Two construction approaches target fundamentally different use cases. One optimizes for speed. The other trades convenience for full control over every component in the pipeline.
 
-### SimpleKGPipeline Gets a Graph Running in Minutes
+#### SimpleKGPipeline Gets a Graph Running in Minutes
 
 SimpleKGPipeline wraps the entire construction process into a single class. Hand it an LLM, a Neo4j driver, and an embedder, point it at a PDF or a block of text, and it handles document loading, chunking, embedding, entity extraction, schema validation, graph writing, and entity resolution automatically, seven components wired together in one constructor call.
 
@@ -40,13 +40,13 @@ The pipeline also builds a lexical graph alongside the knowledge graph. This tra
 
 Entity resolution runs by default after extraction. The built-in resolver handles exact name matches across chunks. For abbreviations, misspellings, or alternate names, optional resolvers using spaCy for semantic similarity or RapidFuzz for fuzzy string matching step in, though they require additional dependencies.
 
-### The Pipeline Class Gives Full DAG Control
+#### The Pipeline Class Gives Full DAG Control
 
 The Pipeline class provides a blank directed acyclic graph. The developer adds components individually and wires them together explicitly, controlling ordering, data flow, and which components to include.
 
 The tradeoff is more upfront configuration for real flexibility. Swap in a LangChain text splitter. Skip entity resolution entirely. Add a custom validation step between extraction and writing. Route different document types through different processing paths. Each component gets instantiated individually, assigned a name, and connected to other components through an explicit mapping that defines how outputs flow into inputs. That explicit wiring is what makes custom workflows possible, since the developer decides exactly which components participate, in what order, and how data moves between them.
 
-## Six Retrieval Strategies, Each With Different Strengths
+### Six Retrieval Strategies, Each With Different Strengths
 
 Six retrieval strategies get information out of Neo4j and into an LLM's context window. Each makes a different tradeoff between precision, recall, and the types of questions it handles well, and the right choice depends on whether the question is conceptual, factual, or structural.
 
@@ -64,11 +64,11 @@ Six retrieval strategies get information out of Neo4j and into an LLM's context 
 
 For teams already running Pinecone, Weaviate, or Qdrant, dedicated external retrievers keep vectors in those stores while pulling entity metadata and graph context from Neo4j. Each system handles what it's best at, and data stays in one place.
 
-## LLM and Embedder Support
+### LLM and Embedder Support
 
 Multiple LLM providers and embedders work out of the box, including OpenAI, Anthropic, Google Vertex AI, Cohere, Mistral AI, Ollama, and Azure OpenAI. Every provider includes built-in rate limit handling with configurable retry behavior and exponential backoff.
 
-## Orchestration, Prompts, and Index Management
+### Orchestration, Prompts, and Index Management
 
 The GraphRAG class ties retrieval and generation together, running the full retrieve-augment-generate loop with any retriever, any LLM, and a customizable prompt template. It supports multi-turn conversation through message history, stored in memory or persisted to Neo4j for applications that need conversation continuity across sessions.
 
@@ -78,15 +78,15 @@ The library is open source and under active development. For teams already runni
 
 ---
 
-# [Agent-Memory](https://github.com/neo4j-labs/agent-memory/): A Three-Layer Memory Architecture for AI Agents
+## [Agent-Memory](https://github.com/neo4j-labs/agent-memory/): A Three-Layer Memory Architecture for AI Agents
 
 **Built on Neo4j | Neo4j Labs Project**
 
-## The Problem With Treating All Memory as One Thing
+### The Problem With Treating All Memory as One Thing
 
 Most agent memory systems store everything in a single knowledge graph of entities and facts. That works for basic recall. But agents operate across multiple types of memory simultaneously, and those types have different retrieval characteristics. An agent tracking a conversation needs different recall than an agent looking up a known entity, and both differ from an agent trying to remember how it solved a similar problem last week. Flattening three fundamentally different types of recall into one structure forces tradeoffs that show up as missing capabilities downstream.
 
-## Three Connected Memory Layers in One Graph
+### Three Connected Memory Layers in One Graph
 
 Agent-Memory organizes agent memory into three distinct layers, all stored in a single Neo4j graph and connected through native graph relationships.
 
@@ -98,49 +98,49 @@ Agent-Memory organizes agent memory into three distinct layers, all stored in a 
 
 Because all three layers share the same graph, the connections between them are real graph relationships rather than foreign keys across separate databases. A single Cypher query can traverse from a reasoning trace to the message that triggered it, to the entities mentioned in that conversation, to other messages referencing those same entities. That kind of traversal is what a native graph architecture makes possible without stitching together results from multiple stores.
 
-## POLE+O Gives Every Entity a Type the Whole System Honors
+### POLE+O Gives Every Entity a Type the Whole System Honors
 
 Agent-Memory classifies every entity using the POLE+O data model: Person, Object, Location, Event, and Organization. This taxonomy originated in law enforcement and intelligence analysis, where organizing real-world information by entity type proved more reliable than ad-hoc categorization. Each category carries subtypes. A Person can be an Individual, Alias, or Persona. An Object can be a Vehicle, Phone, Email, or Document. A Location can be a City, Country, Address, or Landmark.
 
 POLE+O goes beyond typical entity labeling to establish a contract that every component in the system honors. The extraction pipeline applies domain schemas built around these categories. The resolution engine uses different matching strategies by type, including name-based fuzzy matching for Persons, address matching for Locations, and identifier matching for Objects. The enrichment service geocodes Location entities with real-world coordinates while looking up Person and Organization entities in Wikipedia and Diffbot. The search layer filters Location entities geospatially while applying semantic or metadata filters to other types. Even the graph schema participates, using POLE+O types as additional Neo4j node labels so Cypher queries can target specific entity categories efficiently.
 
-## Cost-Efficient Extraction Without Constant LLM Calls
+### Cost-Efficient Extraction Without Constant LLM Calls
 
 Agent-Memory's extraction pipeline starts with spaCy, which runs locally for free and handles common entity types. GLiNER runs next, also locally, applying zero-shot extraction against eight pre-built domain schemas organized around POLE+O categories, covering podcast, news, scientific, business, medical, and legal domains. The LLM only fires as a fallback when the first two stages can't handle the input.
 
 Each stage produces confidence scores, so downstream components know how reliable each extraction is. The majority of entity extraction happens without any LLM cost at all, which changes the economics of running memory extraction at production volumes.
 
-## Entity Resolution That Preserves History
+### Entity Resolution That Preserves History
 
 Extracting entities is half the problem. The other half is figuring out that "Alice Smith," "A. Smith," and "Alice" all refer to the same person. Agent-Memory runs four resolution strategies in sequence: exact matching, fuzzy matching with RapidFuzz, semantic matching using embeddings already computed for search (making deduplication essentially free), and a composite approach combining all three. Configurable thresholds auto-merge at 95% confidence and flag for human review at 85%. Merges create explicit SAME_AS relationships, preserving the full record of what was combined and why rather than overwriting one entity with another.
 
 Enrichment builds on the POLE+O classification. Person and Organization entities get looked up in Wikipedia and Diffbot, adding descriptions, images, and structured data. Location entities get geocoded through Nominatim or Google Maps, enabling geospatial queries like "find all entities within 50 kilometers of this point." The knowledge graph grows richer over time in ways appropriate to each entity's nature, even without new conversations.
 
-## Reasoning Traces Create a Learning Feedback Loop
+### Reasoning Traces Create a Learning Feedback Loop
 
 Agent-Memory tracks both what an agent knows and how it reasons. Every time an agent works on a task, a ReasoningTrace opens. Each step the agent takes, whether thinking through a problem, calling a tool, or processing a result, gets recorded as a ReasoningStep within that trace. Tool calls are logged with their inputs, outputs, duration, and success or failure status.
 
 The value surfaces when the agent encounters a similar problem later. Task descriptions get embedded, so semantic similarity search can retrieve past reasoning traces that worked for comparable tasks, even if the wording differs completely. An agent that previously figured out how to query a complex API can surface that successful trace when facing a similar integration challenge months later. The agent improves at tasks it has done before because its memory of successful approaches feeds directly into prompt context, independent of any model retraining.
 
-## Native Neo4j Integration
+### Native Neo4j Integration
 
 Agent-Memory commits fully to Neo4j's feature set rather than targeting a lowest-common-denominator abstraction across multiple databases. Vector indexes handle semantic search across messages, entities, preferences, and reasoning tasks using Neo4j's built-in vector capabilities. Point indexes on Location entities support geospatial queries, like finding all entities within a specified radius of a coordinate.
 
 The optional Graph Data Science library exposes algorithms like shortest path, node similarity, and community detection as agent tools through the Microsoft Agent Framework integration. These computations run as optimized graph algorithms rather than LLM inference, which matters when the analysis involves traversing thousands of nodes.
 
-## Composable With Neo4j GraphRAG
+### Composable With Neo4j GraphRAG
 
 Neo4j GraphRAG builds knowledge bases from documents: PDFs, technical documentation, structured data. Agent-Memory builds personal memory from interactions: conversations, entity extraction, preferences, reasoning traces. Both write to the same Neo4j database, and Agent-Memory's POLE+O model gives the combined graph a consistent entity classification spanning both sources.
 
 A Person entity extracted from a PDF by Neo4j GraphRAG and a Person entity extracted from a conversation by Agent-Memory share the same type system, making it natural to link, resolve, and query across both. Over time, the agent's personal memory grows on top of the document-derived knowledge base. A single Cypher query can traverse from a document chunk to an extracted entity to a conversation where that entity was discussed to the reasoning trace of how the agent used that information.
 
-## Built-In Observability and Framework Support
+### Built-In Observability and Framework Support
 
 Agent-Memory includes OpenTelemetry tracing for extraction pipelines and Opik integration for monitoring LLM calls. Developers can trace how long each extraction stage takes, which extractor produced which entities, and where bottlenecks form as the system scales. When GLiNER starts taking longer than expected on certain document types, or when LLM fallback rates climb, the telemetry surfaces it.
 
 Native integrations ship for six agent frameworks: LangChain, Pydantic AI, CrewAI, LlamaIndex, OpenAI Agents, and the Microsoft Agent Framework. These integrations automate the full memory lifecycle. All three layers get queried before execution, combined context gets injected into system instructions, and responses save to short-term memory afterward while optionally triggering entity extraction and reasoning trace recording in the background.
 
-## Architectural Tradeoffs With Graphiti
+### Architectural Tradeoffs With Graphiti
 
 Graphiti's bi-temporal design tracks both when a fact became true in the real world and when the graph recorded it. For applications where temporal reasoning is the primary concern, like tracking how a customer's preferences changed over six months or auditing when specific facts entered the system, that design carries real value. The approach is backed by peer-reviewed research (arXiv: 2501.13956) and handles point-in-time queries and automatic contradiction detection well.
 
@@ -152,7 +152,7 @@ Entities contain only what the LLM extracted, without geocoding, external knowle
 
 Supporting four graph backends (Neo4j, FalkorDB, Kuzu, Neptune) gives Graphiti broader database compatibility, but limits it to features common across all four. That rules out vector indexes, geospatial queries via point indexes, and graph algorithms from the Neo4j Graph Data Science library.
 
-## Side-by-Side Comparison
+### Side-by-Side Comparison
 
 | Capability | Agent-Memory | Graphiti |
 |---|---|---|

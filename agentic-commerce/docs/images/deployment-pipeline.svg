@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000" role="img" aria-labelledby="dp-title dp-desc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="dp-title">Agentic Commerce build and deployment pipeline</title>
+  <desc id="dp-desc">The developer machine uses uv, a .env file, and the project CLI to build the retail_agent wheel and upload it to a Unity Catalog volume. The CLI also submits one-time Python wheel jobs to the Databricks workspace. A Databricks cluster installs the wheel and runs the entry points in order. Step 1 loads the product graph and source knowledge into Neo4j. Step 2 builds GraphRAG chunks, entities, relationships, and indexes. Step 3 logs, registers, and deploys the agent model. Step 4 verifies the endpoint, retrievers, and knowledge tools. The load steps write graph data to Neo4j. The deploy and verify steps target Databricks Model Serving, which hosts an MLflow ChatAgent, a LangGraph ReAct agent, and a ChatDatabricks LLM. Model Serving reads and writes Neo4j, which holds the product graph, the GraphRAG retrieval graph, and agent memory. An optional analytics path sends synthetic retail CSVs from the Lakehouse generator to Delta tables for SQL and Genie analytics demos.</desc>
+
+  <defs>
+    <marker id="dp-arrow" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 z" fill="#57606A"/>
+    </marker>
+  </defs>
+
+  <!-- Canvas -->
+  <rect x="0.5" y="0.5" width="999" height="999" rx="12" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1"/>
+
+  <!-- Developer machine -->
+  <rect x="360" y="28" width="280" height="72" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1"/>
+  <text x="500" y="58" text-anchor="middle" font-size="14" font-weight="600" fill="#1F2328">Developer machine</text>
+  <text x="500" y="80" text-anchor="middle" font-size="12" fill="#57606A">uv, .env, and the project CLI</text>
+
+  <!-- Developer machine to volume and workspace -->
+  <path d="M360,64 H258 Q250,64 250,72 V172" fill="none" stroke="#57606A" stroke-width="1.5" marker-end="url(#dp-arrow)"/>
+  <text x="262" y="132" font-size="12" fill="#57606A">build and upload retail_agent wheel</text>
+  <path d="M640,64 H742 Q750,64 750,72 V172" fill="none" stroke="#57606A" stroke-width="1.5" marker-end="url(#dp-arrow)"/>
+  <text x="738" y="132" text-anchor="end" font-size="12" fill="#57606A">submit wheel jobs</text>
+
+  <!-- Unity Catalog volume -->
+  <rect x="70" y="172" width="360" height="72" rx="8" fill="#FFF1EE" stroke="#FF3621" stroke-width="1.5"/>
+  <text x="250" y="202" text-anchor="middle" font-size="14" font-weight="600" fill="#FF3621">Unity Catalog volume</text>
+  <text x="250" y="224" text-anchor="middle" font-size="12" fill="#57606A">Holds the retail_agent wheel under wheels/</text>
+
+  <!-- Databricks workspace -->
+  <rect x="570" y="172" width="360" height="72" rx="8" fill="#FFF1EE" stroke="#FF3621" stroke-width="1.5"/>
+  <text x="750" y="202" text-anchor="middle" font-size="14" font-weight="600" fill="#FF3621">Databricks workspace</text>
+  <text x="750" y="224" text-anchor="middle" font-size="12" fill="#57606A">One-time Python wheel job per entry point</text>
+
+  <!-- Volume and workspace to cluster -->
+  <path d="M250,244 V316" fill="none" stroke="#57606A" stroke-width="1.5" marker-end="url(#dp-arrow)"/>
+  <text x="262" y="284" font-size="12" fill="#57606A">wheel dependency</text>
+  <path d="M750,244 V316" fill="none" stroke="#57606A" stroke-width="1.5" marker-end="url(#dp-arrow)"/>
+  <text x="738" y="284" text-anchor="end" font-size="12" fill="#57606A">submit tasks</text>
+
+  <!-- Databricks cluster group -->
+  <rect x="24" y="316" width="952" height="275" rx="8" fill="#FFF1EE" stroke="#FF3621" stroke-width="1.5"/>
+  <text x="40" y="346" font-size="16" font-weight="700" fill="#FF3621">Databricks cluster</text>
+  <text x="40" y="366" font-size="12" fill="#57606A">Runs the wheel entry points in order, one job run each</text>
+
+  <!-- Step 1 -->
+  <rect x="40" y="382" width="452" height="82" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+  <circle cx="66" cy="411" r="12" fill="#FF3621"/>
+  <text x="66" y="415.5" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">1</text>
+  <text font-size="14" font-weight="600" fill="#1F2328">
+    <tspan x="90" y="409">Load the product graph and source</tspan>
+    <tspan x="90" y="427">knowledge into Neo4j</tspan>
+  </text>
+  <text x="90" y="449" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#57606A">retail-agent-load-products</text>
+
+  <!-- Step 2 -->
+  <rect x="40" y="476" width="452" height="99" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+  <circle cx="66" cy="505" r="12" fill="#FF3621"/>
+  <text x="66" y="509.5" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">2</text>
+  <text font-size="14" font-weight="600" fill="#1F2328">
+    <tspan x="90" y="503">Build GraphRAG chunks, entities,</tspan>
+    <tspan x="90" y="521">relationships, and indexes</tspan>
+  </text>
+  <text x="90" y="543" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#57606A">retail-agent-load-graphrag</text>
+
+  <!-- Step 3 -->
+  <rect x="508" y="382" width="452" height="82" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+  <circle cx="534" cy="411" r="12" fill="#FF3621"/>
+  <text x="534" y="415.5" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">3</text>
+  <text font-size="14" font-weight="600" fill="#1F2328">
+    <tspan x="558" y="409">Log, register, and deploy</tspan>
+    <tspan x="558" y="427">the agent model</tspan>
+  </text>
+  <text x="558" y="449" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#57606A">retail-agent-deploy</text>
+
+  <!-- Step 4 -->
+  <rect x="508" y="476" width="452" height="99" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+  <circle cx="534" cy="505" r="12" fill="#FF3621"/>
+  <text x="534" y="509.5" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">4</text>
+  <text font-size="14" font-weight="600" fill="#1F2328">
+    <tspan x="558" y="503">Verify the endpoint, retrievers,</tspan>
+    <tspan x="558" y="521">and knowledge tools</tspan>
+  </text>
+  <text font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#57606A">
+    <tspan x="558" y="543">retail-agent-demo</tspan>
+    <tspan x="704" y="543">retail-agent-demo-retrievers</tspan>
+    <tspan x="558" y="560">retail-agent-check-knowledge</tspan>
+  </text>
+
+  <!-- Cluster to Neo4j and Model Serving -->
+  <path d="M250,591 V663" fill="none" stroke="#57606A" stroke-width="1.5" marker-end="url(#dp-arrow)"/>
+  <text x="262" y="631" font-size="12" fill="#57606A">writes graph data</text>
+  <path d="M750,591 V663" fill="none" stroke="#57606A" stroke-width="1.5" marker-end="url(#dp-arrow)"/>
+  <text x="738" y="631" text-anchor="end" font-size="12" fill="#57606A">deploys and verifies</text>
+
+  <!-- Neo4j -->
+  <rect x="70" y="663" width="360" height="172" rx="8" fill="#EAF4FB" stroke="#0A6190" stroke-width="1.5"/>
+  <text x="86" y="692" font-size="16" font-weight="700" fill="#0A6190">Neo4j</text>
+  <g font-size="14" font-weight="600" fill="#1F2328" text-anchor="middle">
+    <rect x="86" y="707" width="328" height="32" rx="8" fill="#FFFFFF" stroke="#0A6190" stroke-width="1"/>
+    <text x="250" y="728">Product graph</text>
+    <rect x="86" y="747" width="328" height="32" rx="8" fill="#FFFFFF" stroke="#0A6190" stroke-width="1"/>
+    <text x="250" y="768">GraphRAG retrieval graph</text>
+    <rect x="86" y="787" width="328" height="32" rx="8" fill="#FFFFFF" stroke="#0A6190" stroke-width="1"/>
+    <text x="250" y="808">Agent memory</text>
+  </g>
+
+  <!-- Databricks Model Serving -->
+  <rect x="570" y="663" width="360" height="172" rx="8" fill="#FFF1EE" stroke="#FF3621" stroke-width="1.5"/>
+  <text x="586" y="692" font-size="16" font-weight="700" fill="#FF3621">Databricks Model Serving</text>
+  <g font-size="14" font-weight="600" fill="#1F2328" text-anchor="middle">
+    <rect x="586" y="707" width="328" height="32" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+    <text x="750" y="728">MLflow ChatAgent</text>
+    <rect x="586" y="747" width="328" height="32" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+    <text x="750" y="768">LangGraph ReAct agent</text>
+    <rect x="586" y="787" width="328" height="32" rx="8" fill="#FFFFFF" stroke="#FF3621" stroke-width="1"/>
+    <text x="750" y="808">ChatDatabricks LLM</text>
+  </g>
+
+  <!-- Model Serving to Neo4j -->
+  <path d="M570,749 H430" fill="none" stroke="#57606A" stroke-width="1.5" marker-end="url(#dp-arrow)"/>
+  <text x="500" y="740" text-anchor="middle" font-size="12" fill="#57606A">reads and writes</text>
+
+  <!-- Optional analytics path -->
+  <line x1="24" y1="863" x2="976" y2="863" stroke="#D0D7DE" stroke-width="1"/>
+  <text x="70" y="892" font-size="16" font-weight="700" fill="#57606A">Optional analytics path</text>
+
+  <rect x="70" y="906" width="360" height="64" rx="8" fill="#F6F8FA" stroke="#D0D7DE" stroke-width="1" stroke-dasharray="6 4"/>
+  <text x="250" y="933" text-anchor="middle" font-size="14" font-weight="600" fill="#1F2328">Lakehouse generator</text>
+  <text x="250" y="953" text-anchor="middle" font-size="12" fill="#57606A">Synthetic retail CSVs</text>
+
+  <path d="M430,938 H570" fill="none" stroke="#57606A" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#dp-arrow)"/>
+
+  <rect x="570" y="906" width="360" height="64" rx="8" fill="#FFF1EE" stroke="#FF3621" stroke-width="1" stroke-dasharray="6 4"/>
+  <text x="750" y="933" text-anchor="middle" font-size="14" font-weight="600" fill="#FF3621">Delta tables, SQL, and Genie</text>
+  <text x="750" y="953" text-anchor="middle" font-size="12" fill="#57606A">Analytics demos</text>
+</svg>

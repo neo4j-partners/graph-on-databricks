@@ -19,8 +19,11 @@ Current state:
 - The visible UI submits through the generated backend API client.
 - The target Agentic Commerce agent serving endpoint is
   `agents_retail_assistant-retail-retail_agent_v3`.
-- The live Agentic Commerce agent endpoint is validated on model version 15 with
+- The live Agentic Commerce agent endpoint is validated on model version 16 with
   `custom_outputs.demo_trace`.
+
+The [Real Backend Integration Plan](../docs/real-backend.md) records the
+integration phases, the validation results, and the remaining work.
 
 ## Local Run And Test
 
@@ -119,15 +122,16 @@ Expected backend route results:
 Manual UI checks:
 
 - Agentic search loads as the first usable screen.
-- MacBook mouse preset renders top picks, related products, profile chips, and
-  intelligence surge rows.
-- Traveler headphones preset renders top picks, related products, profile
-  chips, and intelligence surge rows.
+- "waterproof trail shoes under $150" preset renders top picks, related
+  products, profile chips, and intelligence surge rows.
+- "packable rain shell for day hikes" preset renders top picks, related
+  products, profile chips, and intelligence surge rows.
 - Typed search query submits on Enter and with the Ask button.
 - Issue diagnosis tab switches without a full page reload.
-- Headphones disconnect preset renders diagnosis path, actions, alternatives,
-  and cited sources.
-- Printer offline preset renders diagnosis path, actions, and cited sources.
+- "running shoes feel flat" preset renders diagnosis path, actions,
+  alternatives, and cited sources.
+- "outsole peeling after 3 months" preset renders diagnosis path, actions, and
+  cited sources.
 - Reset session clears the active response, profile chips, query, progress
   state, and local session id.
 - Narrow viewport stacks the right rail below the main content without overlap.
@@ -310,7 +314,7 @@ Expected serving endpoint state:
 - `state.ready` is `READY`.
 - `state.config_update` is `NOT_UPDATING`.
 - Active traffic is routed to the latest validated model version.
-- The current validated upstream model version is `15`.
+- The current validated upstream model version is `16`.
 
 Validate live trace output through the backend routes after deployment:
 
@@ -370,7 +374,5 @@ Troubleshooting:
 - If the app does not start, inspect app and system logs.
 - If the deployed app cannot call Model Serving, confirm endpoint state,
   endpoint permissions, and backend configuration.
-- If backend routes return sample data, check
+- If backend routes return sample data or the UI only shows sample data, check
   `AGENTIC_COMMERCE_DEMO_DATA_MODE` and fallback settings.
-- If the UI only shows sample data, check whether sample mode is configured or
-  explicit fallback mode was enabled.
